@@ -1,0 +1,21 @@
+{
+  "name": "@persuando/response",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev -H localhost -p 3100",
+    "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@persuando/config": "0.1.0",
+    "@persuando/contracts": "0.1.0",
+    "next": "^16.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String               @id
+  email               String               @unique
+  displayName         String               @map("display_name")
+  locale              String               @default("en")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  disabledAt          DateTime?            @map("disabled_at") @db.Timestamptz
+  deletedAt           DateTime?            @map("deleted_at") @db.Timestamptz
+  auditEvents         AuditEvent[]
+  consentGrants       ConsentGrant[]
+  providerCredentials ProviderCredential[]
+  retentionPolicies   RetentionPolicy[]
+  sessionClients      SessionClient[]
+  sessions            Session[]
+  settings            UserSettings?
+  workspaces          Workspace[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String    @id @db.Uuid
+  ownerUserId String    @map("owner_user_id")
+  name        String
+  archivedAt  DateTime? @map("archived_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  owner       User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sessions    Session[]
+
+  @@map("workspaces")
+}
+
+model ProviderCredential {
+  id                  String         @id @db.Uuid
+  userId              String         @map("user_id")
+  providerName        String         @map("provider_name")
+  encryptedCiphertext String         @map("encrypted_ciphertext")
+  encryptionVersion   String         @map("encryption_version")
+  maskedDisplayValue  String         @map("masked_display_value")
+  validationStatus    String         @map("validation_status")
+  lastCheckedAt       DateTime?      @map("last_checked_at") @db.Timestamptz
+  deletedAt           DateTime?      @map("deleted_at") @db.Timestamptz
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  settings            UserSettings[]
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("provider_credentials")
+}
+
+model UserSettings {
+  userId                           String              @id @map("user_id")
+  providerCredentialId             String?             @map("provider_credential_id") @db.Uuid
+  primaryLanguage                  String              @default("en") @map("primary_language")
+  responseLanguage                 String              @default("en") @map("response_language")
+  preferredProgrammingLanguage     String              @default("typescript") @map("preferred_programming_language")
+  microphoneCaptureDefault         Boolean             @default(false) @map("microphone_capture_default")
+  periodicScreenshotCaptureDefault Boolean             @default(false) @map("periodic_screenshot_capture_default")
+  codePracticeContextDefault       Boolean             @default(false) @map("code_practice_context_default")
+  autoScrollDefault                Boolean             @default(true) @map("auto_scroll_default")
+  sessionTimerMinutes              Int?                @map("session_timer_minutes")
+  transcriptionModel               String              @default("gpt-4o-mini-transcribe") @map("transcription_model")
+  analysisModel                    String              @default("gpt-4o-mini") @map("analysis_model")
+  retentionMode                    String              @default("seven_day_workspace") @map("retention_mode")
+  updatedAt                        DateTime            @default(now()) @map("updated_at") @db.Timestamptz
+  providerCredential               ProviderCredential? @relation(fields: [providerCredentialId], references: [id])
+  user                             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model Session {
+  id                    String               @id @db.Uuid
+  workspaceId           String               @map("workspace_id") @db.Uuid
+  ownerUserId           String               @map("owner_user_id")
+  title                 String
+  status                String
+  startedAt             DateTime?            @map("started_at") @db.Timestamptz
+  endedAt               DateTime?            @map("ended_at") @db.Timestamptz
+  retentionExpiresAt    DateTime             @map("retention_expires_at") @db.Timestamptz
+  deletedAt             DateTime?            @map("deleted_at") @db.Timestamptz
+  activeCaptureClientId String?              @map("active_capture_client_id")
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  auditEvents           AuditEvent[]
+  captureDevices        CaptureDevice[]
+  captureEvents         CaptureEvent[]
+  codeCopilotContexts   CodeCopilotContext[]
+  consentGrants         ConsentGrant[]
+  insights              Insight[]
+  owner                 User                 @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  screenCaptureEvents   ScreenCaptureEvent[]
+  sessionClients        SessionClient[]
+  summaries             Summary[]
+  suggestions           Suggestion[]
+  transcriptSegments    TranscriptSegment[]
+  workspace             Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, status], map: "idx_sessions_owner_status")
+  @@index([retentionExpiresAt], map: "idx_sessions_retention_expires_at")
+  @@map("sessions")
+}
+
+model ConsentGrant {
+  id                 String    @id @db.Uuid
+  userId             String    @map("user_id")
+  sessionId          String?   @map("session_id") @db.Uuid
+  consentType        String    @map("consent_type")
+  status             String
+  consentTextVersion String    @map("consent_text_version")
+  grantedAt          DateTime? @map("granted_at") @db.Timestamptz
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz
+  expiresAt          DateTime? @map("expires_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  session            Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("consent_grants")
+}
+
+model SessionClient {
+  id              String    @id
+  sessionId       String    @map("session_id") @db.Uuid
+  userId          String    @map("user_id")
+  clientType      String    @map("client_type")
+  connectedAt     DateTime  @default(now()) @map("connected_at") @db.Timestamptz
+  disconnectedAt  DateTime? @map("disconnected_at") @db.Timestamptz
+  lastAckSequence BigInt?   @map("last_ack_sequence")
+  session         Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session_clients")
+}
+
+model CaptureDevice {
+  id               String  @id
+  sessionId        String  @map("session_id") @db.Uuid
+  deviceType       String  @map("device_type")
+  displayName      String  @map("display_name")
+  platform         String
+  permissionStatus String  @map("permission_status")
+  session          Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("capture_devices")
+}
+
+model CaptureEvent {
+  id           String   @id @db.Uuid
+  sessionId    String   @map("session_id") @db.Uuid
+  eventType    String   @map("event_type")
+  sequence     BigInt
+  occurredAt   DateTime @map("occurred_at") @db.Timestamptz
+  safeMetadata Json     @default("{}") @map("safe_metadata") @db.JsonB
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId, sequence], map: "idx_capture_events_session_sequence")
+  @@map("capture_events")
+}
+
+model TranscriptSegment {
+  id          String   @id @db.Uuid
+  sessionId   String   @map("session_id") @db.Uuid
+  text        String
+  startMs     Int      @map("start_ms")
+  endMs       Int      @map("end_ms")
+  confidence  Decimal  @db.Decimal
+  source      String
+  language    String
+  provisional Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, startMs], map: "idx_transcript_segments_session_start")
+  @@map("transcript_segments")
+}
+
+model Summary {
+  id               String   @id @db.Uuid
+  sessionId        String   @map("session_id") @db.Uuid
+  content          String
+  sourceSegmentIds String[] @default([]) @map("source_segment_ids") @db.Uuid
+  generatedAt      DateTime @map("generated_at") @db.Timestamptz
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("summaries")
+}
+
+model Insight {
+  id               String   @id @db.Uuid
+  sessionId        String   @map("session_id") @db.Uuid
+  insightType      String   @map("insight_type")
+  content          String
+  confidence       Decimal  @db.Decimal
+  sourceSegmentIds String[] @default([]) @map("source_segment_ids") @db.Uuid
+  generatedAt      DateTime @map("generated_at") @db.Timestamptz
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("insights")
+}
+
+model Suggestion {
+  id               String   @id @db.Uuid
+  sessionId        String   @map("session_id") @db.Uuid
+  category         String
+  content          String
+  urgency          String
+  sourceSegmentIds String[] @default([]) @map("source_segment_ids") @db.Uuid
+  generatedAt      DateTime @map("generated_at") @db.Timestamptz
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("suggestions")
+}
+
+model ScreenCaptureEvent {
+  id             String   @id @db.Uuid
+  sessionId      String   @map("session_id") @db.Uuid
+  capturedAt     DateTime @map("captured_at") @db.Timestamptz
+  sourceLabel    String   @map("source_label")
+  imageReference String?  @map("image_reference")
+  textContext    String?  @map("text_context")
+  analysisStatus String   @map("analysis_status")
+  session        Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, capturedAt], map: "idx_screen_capture_events_session_captured")
+  @@map("screen_capture_events")
+}
+
+model CodeCopilotContext {
+  id                  String   @id @db.Uuid
+  sessionId           String   @map("session_id") @db.Uuid
+  programmingLanguage String   @map("programming_language")
+  explanationMode     String   @map("explanation_mode")
+  problemContext      String   @map("problem_context")
+  generatedGuidance   String?  @map("generated_guidance")
+  status              String
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  session             Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, status], map: "idx_code_copilot_contexts_session_status")
+  @@map("code_copilot_contexts")
+}
+
+model RetentionPolicy {
+  id                  String   @id @db.Uuid
+  userId              String   @map("user_id")
+  retentionMode       String   @default("seven_day_workspace") @map("retention_mode")
+  durationDays        Int      @default(7) @map("duration_days")
+  manualDeleteEnabled Boolean  @default(true) @map("manual_delete_enabled")
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("retention_policies")
+}
+
+model AuditEvent {
+  id           String   @id @db.Uuid
+  userId       String   @map("user_id")
+  sessionId    String?  @map("session_id") @db.Uuid
+  eventType    String   @map("event_type")
+  safeMetadata Json     @default("{}") @map("safe_metadata") @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  session      Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt], map: "idx_audit_events_user_created")
+  @@map("audit_events")
+}

@@ -1,0 +1,34 @@
+# Project Constitution
+
+## Principles
+
+### I. Documentation-First Direction
+
+Product direction starts in `docs/`. Specs, plans, tasks, and implementation must preserve documented
+decisions or explicitly update them.
+
+### II. Prototype Before Scalable UI
+
+Navigable prototypes are requirement-discovery artifacts. They guide UX, data, and workflows, but
+production implementation must follow the project architecture and quality bar.
+
+### III. Spec Kit Traceability
+
+Feature work should move through Spec Kit artifacts in `specs/` when scope is significant. Generated
+artifacts must remain aligned with `README.md`, `docs/`, and this constitution.
+
+### IV. Compatibility By Default
+
+Prefer additive changes and established project patterns. Breaking API, schema, or workflow changes
+require explicit approval.
+
+### V. Documentation Closeout
+
+Every implementation must update affected docs plus `docs/handoff.md`, `docs/roadmap.md`, and
+`docs/next-spec-prompt.md` before it is reported complete.
+
+## Governance
+
+Changes to this constitution must explain why the process changed and what templates, rules, or skills
+must be updated to stay aligned.
+

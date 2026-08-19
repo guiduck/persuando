@@ -1,0 +1,86 @@
+## Command
+speckit.specify
+
+## Objective
+Create the next focused Persuando specification for Windows Capture App packaging, UI polish, and production-readiness hardening after the first MVP implementation slice.
+
+## Current Context
+
+The first MVP slice in `specs/001-persuando-mvp/` is implemented and validated locally:
+
+- NestJS API with Prisma/PostgreSQL persistence.
+- Google/local-dev auth.
+- Backend-encrypted provider credentials.
+- Consent grant/revoke.
+- Settings.
+- 7-day retention and manual delete.
+- Native `/realtime` WebSocket.
+- Consent-gated microphone chunk ingestion.
+- Transcript, summary, insight, suggestion, and code-practice guidance fan-out.
+- BullMQ worker boundaries.
+- Next.js Response Mode.
+- Electron/Vite/React Capture Mode with dashboard, settings, floating toolbar, tray menu, microphone capture, visible context controls, user-requested screen context, periodic screen context, and responsible Code Practice tutoring from recent visual context.
+
+Validation completed:
+
+- `npm.cmd run build`
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run format`
+- `npm.cmd run test` with 103 passing tests
+- Local integrated REST/WebSocket smoke for capture activation, audio upload, response fan-out, copilot context, and manual delete
+- Regression coverage for active-session cleanup on new capture creation and periodic screenshot toggle startup during active capture
+
+## Feature To Specify
+
+Define the next production-readiness slice for:
+
+1. Windows Capture App packaging and local distribution.
+2. Floating toolbar and tray UX polish.
+3. Manual end-to-end Electron/browser smoke workflow.
+4. Real OpenAI-compatible provider smoke workflow.
+5. Screen/context capture hardening before broader use.
+6. Code Practice visual-context quality gates for study/practice/review explanations.
+
+## Requirements To Cover
+
+- Package the Capture App into a runnable Windows artifact suitable for local testing.
+- Preserve close-to-tray behavior and visible toolbar show/hide.
+- Keep capture status visible for idle, active, paused, reconnecting, error, revoked, and ended states.
+- Make settings, provider key entry, model selection, consent toggles, microphone selection, and shortcut references easier to test manually.
+- Add manual smoke documentation for: Google sign-in, provider key save/validate, consent grant/revoke, start capture, pause/resume, hide/show toolbar, Response Mode live session, context capture, provider error, and manual delete.
+- Define real-provider testing expectations without committing keys or secrets.
+- Add screen/context limits for size, consent text, visible active state, maximum retained visual-context count, redaction expectations, and retention/delete behavior.
+- Define manual validation criteria for Code Practice outputs from screenshots: identify the visible prompt/enunciado when present, explain the chosen technique step by step, include complexity analysis, provide pseudocode or final code only in allowed study/practice/review contexts, and avoid live-assessment cheating behavior or claims.
+
+## Non-Goals
+
+- Do not add stealth, invisibility, recording bypass, screen-share bypass, browser focus evasion, proctoring evasion, platform-rule evasion, or cheating-oriented features.
+- Do not add robust system-audio capture in this slice.
+- Do not add automatic app/site detection in this slice.
+- Do not add local/offline models in this slice.
+- Do not choose a production deployment provider unless required by the spec.
+
+## Source Context
+
+Use:
+
+- `.specify/memory/constitution.md`
+- `docs/overview.md`
+- `docs/vision.md`
+- `docs/architecture.md`
+- `docs/domain-model.md`
+- `docs/reference-ui.md`
+- `docs/prototype-mvp-flow.md`
+- `docs/roadmap.md`
+- `docs/handoff.md`
+- `specs/001-persuando-mvp/spec.md`
+- `specs/001-persuando-mvp/plan.md`
+- `specs/001-persuando-mvp/tasks.md`
+
+## Output Expectations
+
+- Produce a concise Spec Kit feature specification.
+- Preserve the current two-mode architecture.
+- Keep consent, privacy, responsible use, and documentation closeout enforceable.
+- Do not create implementation tasks until `/speckit-tasks` is invoked.

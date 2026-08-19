@@ -1,0 +1,28 @@
+{
+  "name": "@persuando/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.21",
+    "@nestjs/core": "^11.1.21",
+    "@nestjs/platform-express": "^11.1.21",
+    "@persuando/config": "0.1.0",
+    "@persuando/contracts": "0.1.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
+    "pg": "^8.21.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "ws": "^8.21.0"
+  }
+}

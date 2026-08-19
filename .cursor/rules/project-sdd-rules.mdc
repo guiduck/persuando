@@ -1,0 +1,32 @@
+---
+alwaysApply: true
+---
+
+# Project SDD Rule
+
+- Treat `README.md` and `docs/` as the current product context.
+- Treat `.cursor/skills/**` as the canonical agent workflow source for Cursor.
+- Treat `.codex/skills/**` as Codex mirrors for the same workflows.
+- When working with `speckit` commands such as `speckit.specify`, `speckit.constitution`,
+  `speckit.clarify`, `speckit.plan`, `speckit.tasks`, or `speckit.implement`, first load and follow
+  the `project-context` skill.
+- Before `speckit.constitution`, `speckit.clarify`, `speckit.specify`, or `speckit.plan`, also load
+  and follow the `specify-prompt-engineer` skill to transform rough user text into a structured,
+  command-ready prompt.
+- For informal implementation or product requests, consider `project-prompt-engineer` before changing
+  code.
+- For feature/risk review before implementation, consider `change-impact-review`.
+- For Lovable prototype prompts, load `lovable-prompt-engineer` and use `docs/` plus
+  `references/lovable-template/`.
+- If `docs/`, the constitution, and generated spec artifacts disagree, surface the conflict and
+  resolve it explicitly before proceeding.
+- At the end of every implementation, update all affected documentation plus `docs/handoff.md` and
+  `docs/roadmap.md`, and prepare the next Spec Kit `/speckit-specify` prompt in
+  `docs/next-spec-prompt.md`. Do this before reporting the implementation as complete.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure, shell commands, and other
+important information, read the current plan:
+`{{ACTIVE_SPEC_PLAN}}`
+<!-- SPECKIT END -->
+

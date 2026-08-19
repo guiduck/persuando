@@ -1,0 +1,27 @@
+{
+  "name": "@persuando/capture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "electron-main.cjs",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite --host localhost --port 5174",
+    "start:debug": "npm run build && set ELECTRON_ENABLE_LOGGING=true&& electron --enable-logging .",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@persuando/config": "0.1.0",
+    "@persuando/contracts": "0.1.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "electron": "^42.3.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vite": "^8.0.16"
+  }
+}

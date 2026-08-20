@@ -137,6 +137,101 @@ test("OpenAiCompatibleProviderAdapter maps missing key, network failure, and unk
   assert.equal(JSON.stringify(safe).includes("sk-provider-secret"), false);
 });
 
+test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (url, init) => {
+    requests.push({ url, init });
+    return jsonResponse(200, {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              summary: { content: "Resumo." },
+              insights: [],
+              suggestions: [
+                {
+                  category: "response",
+                  content: [
+                    "## Problema em palavras simples",
+                    "Este texto e longo o suficiente para passar pela validacao de qualidade. ".repeat(40),
+                    "## Técnica escolhida",
+                    "Usar algoritmo recursivo passo a passo.",
+                    "## Complexidade Big-O",
+                    "Tempo O(n) e espaco O(h)."
+                  ].join("\n"),
+                  urgency: "high"
+                }
+              ]
+            })
+          }
+        }
+      ]
+    });
+  });
+
+  await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,abc"],
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "HackerRank tree height getHeight"
+  });
+
+  const body = JSON.parse(requests[0].init.body);
+  assert.equal(body.max_tokens, 3200);
+  assert.equal(body.temperature, 0.15);
+  assert.match(body.messages[0].content, /900 to 1500 words/);
+  assert.match(body.messages[0].content, /Markdown plain text/);
+  assert.match(body.messages[0].content, /fenced code blocks/);
+  assert.match(body.messages[0].content, /Detect the programming language/);
+  assert.match(body.messages[0].content, /every major step must include a small code snippet/);
+  assert.match(body.messages[1].content[0].text, /Quality bar/);
+  assert.match(body.messages[1].content[0].text, /fenced code blocks/);
+  assert.match(body.messages[1].content[0].text, /Linguagem detectada/);
+  assert.match(body.messages[1].content[0].text, /Passo a passo com trechos de código/);
+  assert.equal(body.messages[1].content.filter((part) => part.type === "image_url").length, 1);
+});
+
+test("OpenAiCompatibleProviderAdapter replaces short Code Practice output with structured guidance", async () => {
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
+    jsonResponse(200, {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              summary: { content: "Voce precisa calcular a altura de uma arvore." },
+              insights: [],
+              suggestions: [{ category: "response", content: "Calcule a altura da arvore.", urgency: "medium" }]
+            })
+          }
+        }
+      ]
+    })
+  );
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,abc"],
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Tree Height of a Binary Tree getHeight root"
+  });
+
+  const guidance = output.suggestions[0].content;
+  assert.equal(output.suggestions[0].urgency, "high");
+  assert.match(guidance, /Problema em palavras simples/);
+  assert.match(guidance, /Linguagem detectada/);
+  assert.match(guidance, /Passo a passo com trechos de código/);
+  assert.match(guidance, /Complexidade Big-O/);
+  assert.match(guidance, /O\(n\)/);
+  assert.match(guidance, /```javascript/);
+  assert.match(guidance, /getHeight/);
+  assert.ok(guidance.length > 900);
+});
 function jsonResponse(status, payload) {
   return {
     ok: status >= 200 && status < 300,

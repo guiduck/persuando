@@ -76,7 +76,7 @@ Goal:
 
 Status:
 
-- First integrated MVP slice implemented and validated locally. Runtime fixes now keep Response polling from ending active captures and allow periodic screenshot capture to start when enabled during an active session. Code Practice prompting is constrained to study/practice/review tutoring with Big-O, step-by-step guidance, and responsible-use boundaries. Not production-ready for end users until Windows packaging/signing, UI polish, extended real-provider smoke, explicit visual-context quality gates, and screen-context hardening are completed.
+- First integrated MVP slice implemented and validated locally. Runtime fixes now keep Response polling from ending active captures and allow periodic screenshot capture to start when enabled during an active session. Code Practice prompting is constrained to study/practice/review tutoring with detected-language pseudocode/snippets, code-backed step-by-step guidance, Big-O, responsible-use boundaries, Markdown headings/lists, fenced code blocks, longer OpenAI-compatible generation settings, quality fallback for short or code-free outputs, and Response Mode Auto triggering from new screen context. Response Mode renders Code Practice answers with semantic Markdown sections, inline code, and scrollable code blocks so longer explanations are readable in the live session view. Not production-ready for end users until Windows packaging/signing, UI polish, extended real-provider smoke, explicit visual-context quality gates, richer syntax-highlighting polish, deployment hardening, and screen-context hardening are completed.
 
 Gate:
 

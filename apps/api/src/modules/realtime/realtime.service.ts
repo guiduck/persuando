@@ -520,7 +520,7 @@ export class RealtimeService {
     const sourceSegmentIds = contextSegments.map((segment) => segment.id);
     const screenContexts = this.getRecentScreenContexts(event.sessionId);
     const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
-    const imageReferences = event.payload.mode === "code_practice" ? screenContexts.map((context) => context.imageReference).filter((value): value is string => Boolean(value)).slice(-2) : undefined;
+    const imageReferences = event.payload.mode === "code_practice" ? screenContexts.map((context) => context.imageReference).filter((value): value is string => Boolean(value)).slice(-4) : undefined;
     this.logger.log(
       `Manual generation requested: sessionId=${event.sessionId} mode=${event.payload.mode} transcriptSegments=${contextSegments.length} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} hasCredential=${Boolean(apiKey)}`
     );

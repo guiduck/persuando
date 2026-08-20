@@ -27,9 +27,10 @@ Validation completed:
 - `npm.cmd run typecheck`
 - `npm.cmd run lint`
 - `npm.cmd run format`
-- `npm.cmd run test` with 103 passing tests
+- `npm.cmd run test` with 105 passing tests
 - Local integrated REST/WebSocket smoke for capture activation, audio upload, response fan-out, copilot context, and manual delete
 - Regression coverage for active-session cleanup on new capture creation and periodic screenshot toggle startup during active capture
+- Code Practice provider prompt now requires long Markdown teaching answers with detected-language code snippets in the step-by-step section, fenced code blocks, JavaScript fallback when unclear, and Response Mode renders headings, lists, inline code, and scrollable code blocks
 
 ## Feature To Specify
 
@@ -40,7 +41,8 @@ Define the next production-readiness slice for:
 3. Manual end-to-end Electron/browser smoke workflow.
 4. Real OpenAI-compatible provider smoke workflow.
 5. Screen/context capture hardening before broader use.
-6. Code Practice visual-context quality gates for study/practice/review explanations.
+7. Optional VPS production deployment hardening from `docs/vps-deployment.md`, including ports, PM2/systemd or containerization, HTTPS/domain setup, and production URL configuration.
+6. Code Practice visual-context quality gates for study/practice/review explanations, including manual smoke criteria for automatic screenshot-triggered generation behavior, detected-language snippets, Markdown/code-block readability, and future syntax-highlighting polish in Response Mode.
 
 ## Requirements To Cover
 
@@ -51,7 +53,7 @@ Define the next production-readiness slice for:
 - Add manual smoke documentation for: Google sign-in, provider key save/validate, consent grant/revoke, start capture, pause/resume, hide/show toolbar, Response Mode live session, context capture, provider error, and manual delete.
 - Define real-provider testing expectations without committing keys or secrets.
 - Add screen/context limits for size, consent text, visible active state, maximum retained visual-context count, redaction expectations, and retention/delete behavior.
-- Define manual validation criteria for Code Practice outputs from screenshots: identify the visible prompt/enunciado when present, explain the chosen technique step by step, include complexity analysis, provide pseudocode or final code only in allowed study/practice/review contexts, and avoid live-assessment cheating behavior or claims.
+- Define manual validation criteria for Code Practice outputs from screenshots: identify the visible prompt/enunciado when present, detect the selected programming language and fall back to JavaScript only when unclear, explain the chosen technique step by step with concrete code snippets inside the steps, include child-friendly intuition, include Big-O time and space complexity, provide pseudocode or final code only in allowed study/practice/review contexts, format the answer as Markdown with fenced code blocks, render code blocks readably in Response Mode, avoid live-assessment cheating behavior or claims, and verify Auto mode triggers from new screenshots without repeated spam.
 
 ## Non-Goals
 

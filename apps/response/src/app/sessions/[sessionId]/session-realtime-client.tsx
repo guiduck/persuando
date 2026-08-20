@@ -64,6 +64,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
   const [generatingModes, setGeneratingModes] = useState<Set<GenerateMode>>(new Set());
   const panelModesRef = useRef(panelModes);
   const pendingManualModesRef = useRef<Set<GenerateMode>>(new Set());
+  const lastAutomaticGenerationRef = useRef<Partial<Record<GenerateMode, { itemCount: number; requestedAt: number }>>>({});
 
   useEffect(() => {
     panelModesRef.current = panelModes;
@@ -154,15 +155,15 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
   const directAnswers = suggestions.filter((suggestion) => suggestion.category === "response");
   const topics = deriveTopics(segments, insights);
   const statusCopy = useMemo(() => statusLabel(connectionState, sessionStatus), [connectionState, sessionStatus]);
-  const requestGeneration = (mode: GenerateMode) => {
+  const requestGeneration = (mode: GenerateMode, source: "manual" | "automatic" = "manual") => {
     if (connectionState !== "live") {
       setProviderError("Connect live updates before generating assistance.");
       return;
     }
     setProviderError(undefined);
-    pendingManualModesRef.current.add(mode);
+    if (source === "manual") pendingManualModesRef.current.add(mode);
     setGeneratingModes((values) => new Set([...values, mode]));
-    console.info(`[Persuando Response] Manual generation requested: sessionId=${history.session.id} mode=${mode}.`);
+    console.info(`[Persuando Response] ${source === "manual" ? "Manual" : "Automatic"} generation requested: sessionId=${history.session.id} mode=${mode}.`);
     send(socketRef.current, {
       version: 1,
       type: "response.generate",
@@ -174,7 +175,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
       setGeneratingModes((values) => {
         const next = new Set(values);
         next.delete(mode);
-        pendingManualModesRef.current.delete(mode);
+        if (source === "manual") pendingManualModesRef.current.delete(mode);
         return next;
       });
     }, 12000);
@@ -182,6 +183,23 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
   const updatePanelMode = (panel: PanelKey, mode: PanelMode) => {
     setPanelModes((current) => ({ ...current, [panel]: mode }));
   };
+
+  useEffect(() => {
+    if (panelModes.code !== "automatic") return;
+    if (connectionState !== "live" || sessionStatus !== "active") return;
+    if (screenContexts.length === 0 || generatingModes.has("code_practice")) return;
+
+    const now = Date.now();
+    const previous = lastAutomaticGenerationRef.current.code_practice;
+    if (previous && (previous.itemCount === screenContexts.length || now - previous.requestedAt < 45000)) return;
+
+    lastAutomaticGenerationRef.current.code_practice = { itemCount: screenContexts.length, requestedAt: now };
+    console.info(
+      `[Persuando Response] Code Practice auto trigger armed: sessionId=${history.session.id} screenContexts=${screenContexts.length}.`
+    );
+    const timer = window.setTimeout(() => requestGeneration("code_practice", "automatic"), 1200);
+    return () => window.clearTimeout(timer);
+  }, [connectionState, generatingModes, history.session.id, panelModes.code, screenContexts.length, sessionStatus]);
 
   return (
     <>
@@ -429,7 +447,7 @@ function CopilotPanel({ explanations, isGenerating, mode, onGenerate, onModeChan
           explanations.map((explanation) => (
             <article className="artifact" key={explanation.contextId}>
               <span className="pill active">{explanation.kind}</span>
-              <p>{explanation.content}</p>
+              <MarkdownContent content={explanation.content} />
             </article>
           ))
         )}
@@ -438,6 +456,160 @@ function CopilotPanel({ explanations, isGenerating, mode, onGenerate, onModeChan
   );
 }
 
+type MarkdownBlock =
+  | { type: "code"; code: string; language?: string }
+  | { type: "heading"; level: 3 | 4; text: string }
+  | { type: "ordered-list"; items: string[] }
+  | { type: "paragraph"; text: string }
+  | { type: "unordered-list"; items: string[] };
+
+function MarkdownContent({ content }: Readonly<{ content: string }>) {
+  const blocks = parseMarkdownBlocks(content);
+  return (
+    <div className="markdown-content">
+      {blocks.map((block, index) => renderMarkdownBlock(block, index))}
+    </div>
+  );
+}
+
+function renderMarkdownBlock(block: MarkdownBlock, index: number) {
+  if (block.type === "heading") {
+    const HeadingTag = block.level === 3 ? "h3" : "h4";
+    return <HeadingTag key={`${block.type}-${index}`}>{parseInlineMarkdown(block.text)}</HeadingTag>;
+  }
+
+  if (block.type === "unordered-list") {
+    return (
+      <ul key={`${block.type}-${index}`}>
+        {block.items.map((item, itemIndex) => (
+          <li key={`${item}-${itemIndex}`}>{parseInlineMarkdown(item)}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (block.type === "ordered-list") {
+    return (
+      <ol key={`${block.type}-${index}`}>
+        {block.items.map((item, itemIndex) => (
+          <li key={`${item}-${itemIndex}`}>{parseInlineMarkdown(item)}</li>
+        ))}
+      </ol>
+    );
+  }
+
+  if (block.type === "code") {
+    return (
+      <figure className="code-block" key={`${block.type}-${index}`}>
+        {block.language ? <figcaption>{block.language}</figcaption> : null}
+        <pre>
+          <code>{block.code}</code>
+        </pre>
+      </figure>
+    );
+  }
+
+  return <p key={`${block.type}-${index}`}>{parseInlineMarkdown(block.text)}</p>;
+}
+
+function parseMarkdownBlocks(content: string): MarkdownBlock[] {
+  const lines = content.replaceAll("\r\n", "\n").split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let listItems: string[] = [];
+  let listType: "ordered-list" | "unordered-list" | undefined;
+  let codeLines: string[] = [];
+  let codeLanguage: string | undefined;
+  let inCodeBlock = false;
+
+  const flushParagraph = () => {
+    const text = paragraph.join(" ").trim();
+    if (text) blocks.push({ type: "paragraph", text });
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (listType && listItems.length > 0) blocks.push({ type: listType, items: listItems });
+    listItems = [];
+    listType = undefined;
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const codeFence = trimmed.match(/^```([\w#+.-]+)?\s*$/);
+    if (codeFence) {
+      if (inCodeBlock) {
+        blocks.push({ type: "code", code: codeLines.join("\n").trimEnd(), language: codeLanguage });
+        codeLines = [];
+        codeLanguage = undefined;
+        inCodeBlock = false;
+      } else {
+        flushParagraph();
+        flushList();
+        codeLanguage = codeFence[1];
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "heading", level: (heading[1] ?? "#").length <= 2 ? 3 : 4, text: heading[2] ?? trimmed });
+      continue;
+    }
+
+    const unordered = trimmed.match(/^[-*]\s+(.+)$/);
+    if (unordered) {
+      flushParagraph();
+      if (listType !== "unordered-list") flushList();
+      listType = "unordered-list";
+      listItems.push(unordered[1] ?? trimmed);
+      continue;
+    }
+
+    const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (ordered) {
+      flushParagraph();
+      if (listType !== "ordered-list") flushList();
+      listType = "ordered-list";
+      listItems.push(ordered[1] ?? trimmed);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(trimmed);
+  }
+
+  if (inCodeBlock) blocks.push({ type: "code", code: codeLines.join("\n").trimEnd(), language: codeLanguage });
+  flushParagraph();
+  flushList();
+  return blocks;
+}
+
+function parseInlineMarkdown(text: string) {
+  return text.split(/(`[^`]+`)/g).map((part, index) => {
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
+      return (
+        <code className="inline-code" key={`${part}-${index}`}>
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
 function SessionMeta({
   deleteState,
   history,

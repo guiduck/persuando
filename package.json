@@ -21,10 +21,14 @@
     "typecheck": "tsc -b --pretty false",
     "test": "npm run build && node --test apps/*/test/*.test.mjs packages/*/test/*.test.mjs",
     "lint": "node scripts/lint.mjs",
-    "format": "node scripts/format-check.mjs"
+    "format": "node scripts/format-check.mjs",
+    "capture:start:vps": "npm run --workspace @persuando/capture start:vps",
+    "capture:pack:win": "npm run --workspace @persuando/capture pack:win",
+    "capture:dist:win": "npm run --workspace @persuando/capture dist:win"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "electron-builder": "^26.15.3",
     "prisma": "^7.8.0",
     "typescript": "^5.9.0"
   },
@@ -35,3 +39,4 @@
     "bullmq": "^5.77.2"
   }
 }
+

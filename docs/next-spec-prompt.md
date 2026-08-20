@@ -2,7 +2,7 @@
 speckit.specify
 
 ## Objective
-Create the next focused Persuando specification for Windows Capture App packaging, UI polish, and production-readiness hardening after the first MVP implementation slice.
+Create the next focused Persuando specification for Windows Capture App release polish, UI polish, and production-readiness hardening after the first MVP implementation slice and initial VPS/installer smoke path.
 
 ## Current Context
 
@@ -36,7 +36,7 @@ Validation completed:
 
 Define the next production-readiness slice for:
 
-1. Windows Capture App packaging and local distribution.
+1. Windows Capture App release polish beyond the current Electron Builder smoke installer.
 2. Floating toolbar and tray UX polish.
 3. Manual end-to-end Electron/browser smoke workflow.
 4. Real OpenAI-compatible provider smoke workflow.
@@ -46,7 +46,7 @@ Define the next production-readiness slice for:
 
 ## Requirements To Cover
 
-- Package the Capture App into a runnable Windows artifact suitable for local testing.
+- Refine the current runnable Windows artifacts (`release/capture/win-unpacked/Persuando Capture.exe` and `release/capture/Persuando-Capture-Setup-0.1.0.exe`) into a safer release flow with icon, signing/publisher decisions, update policy, and installer smoke checks.
 - Preserve close-to-tray behavior and visible toolbar show/hide.
 - Keep capture status visible for idle, active, paused, reconnecting, error, revoked, and ended states.
 - Make settings, provider key entry, model selection, consent toggles, microphone selection, and shortcut references easier to test manually.

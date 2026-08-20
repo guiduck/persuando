@@ -11,7 +11,10 @@
     "start:debug": "npm run build && set ELECTRON_ENABLE_LOGGING=true&& electron --enable-logging .",
     "start": "npm run build && electron .",
     "typecheck": "tsc -b --pretty false",
-    "test": "node --test"
+    "test": "node --test",
+    "start:vps": "set VITE_API_BASE_URL=https://api-persuando.gfig.space&& set VITE_WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime&& set PERSUANDO_API_BASE_URL=https://api-persuando.gfig.space&& npm run build && electron .",
+    "pack:win": "set VITE_API_BASE_URL=https://api-persuando.gfig.space&& set VITE_WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime&& set PERSUANDO_API_BASE_URL=https://api-persuando.gfig.space&& npm run build && electron-builder --win dir --x64",
+    "dist:win": "set VITE_API_BASE_URL=https://api-persuando.gfig.space&& set VITE_WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime&& set PERSUANDO_API_BASE_URL=https://api-persuando.gfig.space&& npm run build && electron-builder --win nsis --x64"
   },
   "dependencies": {
     "@persuando/config": "0.1.0",
@@ -19,9 +22,37 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
-    "electron": "^42.3.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "vite": "^8.0.16"
+  },
+  "build": {
+    "appId": "space.gfig.persuando.capture",
+    "productName": "Persuando Capture",
+    "directories": {
+      "output": "../../release/capture"
+    },
+    "files": [
+      "electron-main.cjs",
+      "preload.cjs",
+      "package.json",
+      "dist/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Persuando-Capture-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "42.3.3"
   }
 }

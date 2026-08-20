@@ -4,6 +4,7 @@ dist/
 .next/
 coverage/
 *.log
+release/
 .env
 .env.local
 .env.*.local

@@ -3,7 +3,7 @@
 ## Current Status
 
 - `current_phase`: MVP implementation closeout for `specs/001-persuando-mvp`.
-- `current_focus`: the first end-to-end MVP slice is implemented and validated; recent runtime fixes focused on reliable periodic screen context startup, active-session reconciliation, and safer Code Practice image-context tutoring quality, automatic screenshot-triggered Code Practice generation in Response Mode, and Markdown/code-block rendering for longer teaching answers.
+- `current_focus`: the first end-to-end MVP slice is implemented and validated; recent runtime fixes focused on reliable periodic screen context startup, active-session reconciliation, safer Code Practice image-context tutoring quality, automatic screenshot-triggered Code Practice generation in Response Mode, Markdown/code-block rendering for longer teaching answers, VPS domain deployment, and Windows Capture packaging scripts.
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
@@ -22,6 +22,8 @@
 ## Latest Validation
 
 - `npm.cmd run build` passed.
+- `npm.cmd run capture:pack:win` passed and generated `release/capture/win-unpacked/Persuando Capture.exe`.
+- `npm.cmd run capture:dist:win` passed and generated `release/capture/Persuando-Capture-Setup-0.1.0.exe`.
 - `npm.cmd run typecheck` passed.
 - `npm.cmd run lint` passed.
 - `npm.cmd run format` passed.
@@ -53,7 +55,7 @@
 - If periodic screenshots do not start, check the Capture debug log first. periodicScreenshotCaptureDefault=false means the feature toggle is off even if consent grants exist; enable Periodic screen context default before starting capture again.
 - The Capture UI is functional but visually minimal; a follow-up UI polish/spec should refine layout, density, keyboard shortcuts, and tray ergonomics.
 - Screen context currently sends an in-memory data URL through the realtime event and keeps only the latest 30 screen contexts in the Response UI. A production hardening spec should add backend image size limits, redaction, storage policy, deletion behavior, and an explicit study/practice confirmation before richer code-solution output.
-- The app has not yet been packaged into an installer or signed Windows executable. `docs/vps-deployment.md` documents the current VPS shape: API, worker, Response App, Postgres, and Redis on the server; Electron Capture remains local on Windows until packaging is specified.
+- Windows Capture can now be run against the VPS with `npm.cmd run capture:start:vps`, packaged as `release/capture/win-unpacked/Persuando Capture.exe`, or built as `release/capture/Persuando-Capture-Setup-0.1.0.exe`. Production distribution still needs app icon, publisher/signing decisions, update strategy, and release-channel policy.
 - The local integrated smoke uses the mock provider by default. Real OpenAI-compatible provider validation should be tested after setting `PROVIDER_ADAPTER=openai-compatible` and a valid user key.
 - Robust system-audio capture, automatic app/site detection, hidden capture, proctoring/focus evasion, local/offline models, and non-Windows desktop targets remain out of scope.
 

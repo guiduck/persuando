@@ -74,7 +74,7 @@ PROVIDER_ADAPTER=openai-compatible
 OPENAI_COMPATIBLE_BASE_URL=https://api.openai.com/v1
 
 SESSION_RETENTION_DAYS=7
-RETENTION_CLEANUP_CRON=0 */2 * * *
+RETENTION_CLEANUP_CRON="0 */2 * * *"
 LOG_LEVEL=info
 LOG_REDACT_KEYS=apiKey,authorization,credential,ciphertext,decryptedSecret,audio,providerPayload,transcript
 ```
@@ -156,10 +156,36 @@ http://216.158.236.156:3100
 
 ## Electron Capture App
 
-The Electron app is not deployed to the VPS. Today it runs locally in dev mode:
+The Electron app is not deployed to the VPS. It runs on the Windows machine that captures microphone and screen context.
+
+To run Capture locally against the VPS domain:
 
 ```bash
-npm.cmd run --workspace @persuando/capture start:debug
+npm.cmd run capture:start:vps
 ```
 
-For a real `.exe` or installer, the project still needs a packaging step with a tool such as Electron Builder or Electron Forge. That should be a focused follow-up spec because it needs app icons, Windows installer config, update/signing decisions, and production API URL configuration.
+To build a Windows unpacked app folder:
+
+```bash
+npm.cmd run capture:pack:win
+```
+
+Output:
+
+```text
+release/capture/win-unpacked/Persuando Capture.exe
+```
+
+To build a Windows installer:
+
+```bash
+npm.cmd run capture:dist:win
+```
+
+Output:
+
+```text
+release/capture/Persuando-Capture-Setup-0.1.0.exe
+```
+
+The current installer is suitable for local smoke testing. Production distribution still needs app icon, publisher/signing decisions, update strategy, and release-channel policy.

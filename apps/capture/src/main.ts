@@ -20,6 +20,7 @@ let toolbarWindow: ElectronBrowserWindow | undefined;
 let authWindow: ElectronBrowserWindow | undefined;
 let tray: ElectronTray | undefined;
 let appIsQuitting = false;
+let authCookieUrl = process.env.PERSUANDO_API_BASE_URL ?? "http://localhost:4000";
 
 interface CaptureAuthUser {
   id: string;
@@ -185,24 +186,29 @@ async function capturePrimaryScreenImage(): Promise<{ dataUrl: string; sourceLab
 }
 
 async function readAuthUserFromCookie(): Promise<CaptureAuthUser | undefined> {
-  const cookies = await electron.session.defaultSession.cookies.get({
-    name: "persuando_user",
-    url: "http://localhost:4000"
-  });
-  const token = cookies[0]?.value;
-  if (!token) return undefined;
-  const payload = token.split(".")[0];
-  if (!payload) return undefined;
-  try {
-    const user = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as CaptureAuthUser;
-    return user?.id && user?.email ? user : undefined;
-  } catch {
-    return undefined;
+  const candidateUrls = Array.from(new Set([authCookieUrl, process.env.PERSUANDO_API_BASE_URL, "https://api-persuando.gfig.space", "http://localhost:4000"].filter((url): url is string => Boolean(url))));
+  for (const url of candidateUrls) {
+    const cookies = await electron.session.defaultSession.cookies.get({ name: "persuando_user", url });
+    const token = cookies[0]?.value;
+    if (!token) continue;
+    const payload = token.split(".")[0];
+    if (!payload) continue;
+    try {
+      const user = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as CaptureAuthUser;
+      if (user?.id && user?.email) {
+        authCookieUrl = url;
+        return user;
+      }
+    } catch {
+      // Ignore malformed auth cookies and keep looking at the next configured API origin.
+    }
   }
+  return undefined;
 }
-
 function loginWithGoogle(loginUrl: string): Promise<CaptureAuthUser | undefined> {
   return new Promise((resolveLogin, rejectLogin) => {
+    const loginOrigin = new URL(loginUrl).origin;
+    authCookieUrl = loginOrigin;
     authWindow?.close();
     toolbarWindow?.hide();
     authWindow = new BrowserWindow({
@@ -230,7 +236,8 @@ function loginWithGoogle(loginUrl: string): Promise<CaptureAuthUser | undefined>
 
     authWindow.webContents.on("did-finish-load", () => {
       const url = authWindow?.webContents.getURL() ?? "";
-      if (url.startsWith("http://localhost:4000/auth/google/callback")) finish();
+      const currentUrl = new URL(url);
+      if (currentUrl.origin === loginOrigin && currentUrl.pathname === "/auth/google/callback") finish();
     });
     authWindow.webContents.on("did-fail-load", (_event: ElectronEvent, _errorCode: number, errorDescription: string) => {
       if (completed) return;

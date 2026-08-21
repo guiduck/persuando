@@ -62,6 +62,7 @@ export type RealtimeHandleResult =
   | { action: "accepted" };
 
 export const REALTIME_INGESTION_OPTIONS = "REALTIME_INGESTION_OPTIONS";
+const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 
 @Injectable()
 export class RealtimeService {
@@ -369,7 +370,7 @@ export class RealtimeService {
 
     validateCopilotContextPayload(event);
     this.logger.log(
-      `Copilot context received: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} textLength=${event.payload.textContext?.length ?? 0}`
+      `Copilot context received: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} textLength=${event.payload.textContext?.length ?? 0} programmingLanguage=${event.payload.programmingLanguage}`
     );
     const consentGrants = await this.consentService.listGrants(client.user.id, event.sessionId);
     this.logger.log(
@@ -874,12 +875,11 @@ function captureStatusMessage(status: CaptureStatusEvent["payload"]["status"]): 
 }
 
 function validateCopilotContextPayload(event: CopilotContextEvent): void {
-  const { contextId, explanationMode, imageReference, programmingLanguage, textContext } = event.payload;
+  const { contextId, explanationMode, imageReference, textContext } = event.payload;
+  event.payload.programmingLanguage = normalizeCopilotProgrammingLanguage(event.payload.programmingLanguage);
+
   if (!contextId || contextId.length > 128) {
     throw new BadRequestException("Copilot contextId is required");
-  }
-  if (!programmingLanguage || programmingLanguage.length > 64) {
-    throw new BadRequestException("Copilot programmingLanguage is required");
   }
   if (explanationMode !== "hint" && explanationMode !== "explain" && explanationMode !== "review") {
     throw new BadRequestException("Copilot explanationMode is invalid");
@@ -890,6 +890,15 @@ function validateCopilotContextPayload(event: CopilotContextEvent): void {
   if (textContext && textContext.length > 12000) {
     throw new BadRequestException("Copilot textContext is too large");
   }
+}
+
+function normalizeCopilotProgrammingLanguage(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return DEFAULT_COPILOT_PROGRAMMING_LANGUAGE;
+  if (text.length > 64) {
+    throw new BadRequestException("Copilot programmingLanguage must be 64 characters or less");
+  }
+  return text;
 }
 
 function decodeAudioPayload(event: CaptureAudioChunkEvent): Uint8Array {

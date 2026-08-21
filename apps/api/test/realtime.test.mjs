@@ -83,12 +83,13 @@ function audioChunk(sessionId, chunkSequence = 1) {
   });
 }
 
-function copilotContext(sessionId, contextId = "copilot-context-1") {
+function copilotContext(sessionId, contextId = "copilot-context-1", overrides = {}) {
   return event("copilot.context", sessionId, {
     contextId,
     programmingLanguage: "typescript",
     explanationMode: "explain",
-    textContext: "function add(a: number, b: number) { return a + b }"
+    textContext: "function add(a: number, b: number) { return a + b }",
+    ...overrides
   });
 }
 
@@ -417,7 +418,10 @@ test("RealtimeService persists copilot context and publishes provider guidance",
   realtimeService.connectClient({ clientId: "capture-1", user: user(), clientType: "capture" });
   realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
 
-  const result = await realtimeService.handleClientEvent("capture-1", copilotContext(session.id));
+  const result = await realtimeService.handleClientEvent(
+    "capture-1",
+    copilotContext(session.id, "copilot-context-1", { programmingLanguage: "" })
+  );
   const replay = await realtimeService.handleClientEvent(
     "response-1",
     event("response.subscribe", session.id, { lastSeenSequence: 0 })
@@ -427,6 +431,7 @@ test("RealtimeService persists copilot context and publishes provider guidance",
 
   assert.equal(result.action, "accepted");
   assert.equal(contextEvent?.payload.contextId, "copilot-context-1");
+  assert.equal(contextEvent?.payload.programmingLanguage, "javascript");
   assert.equal(explanationEvent?.payload.contextId, "copilot-context-1");
   assert.equal(explanationEvent?.payload.kind, "explanation");
   assert.equal((explanationEvent?.payload.content ?? "").length > 0, true);

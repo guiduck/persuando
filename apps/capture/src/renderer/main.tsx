@@ -52,9 +52,16 @@ const defaultState: CaptureRuntimeState = {
 };
 
 const PERIODIC_SCREEN_CAPTURE_INTERVAL_MS = 5000;
+const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 
 let activeCapture: ActiveCapture | undefined;
 let periodicScreenCapture: { stop(): void } | undefined;
+
+function normalizeProgrammingLanguageInput(value: string | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return DEFAULT_COPILOT_PROGRAMMING_LANGUAGE;
+  return trimmed.slice(0, 64);
+}
 
 function App() {
   const route = useRoute();
@@ -340,8 +347,12 @@ function Dashboard({
               Programming language
               <input
                 disabled={!settings}
-                onBlur={(event) => void updateSettingsField(settings, setSettings, { preferredProgrammingLanguage: event.currentTarget.value })}
-                placeholder={settings?.preferredProgrammingLanguage ?? "typescript"}
+                onBlur={(event) =>
+                  void updateSettingsField(settings, setSettings, {
+                    preferredProgrammingLanguage: normalizeProgrammingLanguageInput(event.currentTarget.value)
+                  })
+                }
+                placeholder={settings?.preferredProgrammingLanguage || DEFAULT_COPILOT_PROGRAMMING_LANGUAGE}
               />
             </label>
             <label>
@@ -564,7 +575,7 @@ async function toggleListening(
         return;
       }
       console.info(
-        `[Persuando Capture] Capture start settings: periodicScreenshotCaptureDefault=${effectiveSettings.periodicScreenshotCaptureDefault} screenConsent=${hasConsentGrant(effectiveConsentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(effectiveConsentGrants, "code_copilot")}.`
+        `[Persuando Capture] Capture start settings: periodicScreenshotCaptureDefault=${effectiveSettings.periodicScreenshotCaptureDefault} screenConsent=${hasConsentGrant(effectiveConsentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(effectiveConsentGrants, "code_copilot")} programmingLanguage=${normalizeProgrammingLanguageInput(effectiveSettings.preferredProgrammingLanguage)}.`
       );
       const missingConsent = missingConsentLabels(effectiveConsentGrants, requiredCaptureConsents);
       if (missingConsent.length > 0) {

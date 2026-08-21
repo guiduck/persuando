@@ -23,14 +23,20 @@ The first MVP slice in `specs/001-persuando-mvp/` is implemented and validated l
 
 Validation completed:
 
-- `npm.cmd run build`
-- `npm.cmd run typecheck`
-- `npm.cmd run lint`
-- `npm.cmd run format`
-- `npm.cmd run test` with 108 passing tests
+-
+pm.cmd run build`
+-
+pm.cmd run typecheck`
+-
+pm.cmd run lint`
+-
+pm.cmd run format`
+-
+pm.cmd run test` with 108 passing tests
 - Local integrated REST/WebSocket smoke for capture activation, audio upload, response fan-out, copilot context, and manual delete
 - Regression coverage for active-session cleanup on new capture creation and periodic screenshot toggle startup during active capture
 - Code Practice provider prompt now requires long Markdown teaching answers with detected-language code snippets in the step-by-step section, fenced code blocks, JavaScript fallback when unclear, and Response Mode renders headings, lists, inline code, and scrollable code blocks
+- Realtime regression coverage confirms blank/missing Copilot programming language falls back to `javascript` instead of rejecting screen context during capture
 
 ## Feature To Specify
 
@@ -55,6 +61,7 @@ Define the next production-readiness slice for:
 - Define production auth hardening expectations for the current browser one-time login bridge and Electron Capture callback flow: short TTL, single use, no signed token in URLs, host-only cookies per subdomain, Capture login must not redirect into Response Mode, and Redis/PostgreSQL storage if the API runs more than one process.
 - Add screen/context limits for size, consent text, visible active state, maximum retained visual-context count, redaction expectations, and retention/delete behavior.
 - Define manual validation criteria for Code Practice outputs from screenshots: identify the visible prompt/enunciado when present, detect the selected programming language and fall back to JavaScript only when unclear, explain the chosen technique step by step with concrete code snippets inside the steps, include child-friendly intuition, include Big-O time and space complexity, provide pseudocode or final code only in allowed study/practice/review contexts, format the answer as Markdown with fenced code blocks, render code blocks readably in Response Mode, avoid live-assessment cheating behavior or claims, and verify Auto mode triggers from new screenshots without repeated spam.
+- Preserve the new programming-language fallback in both Capture and API validation so missing user settings cannot break screenshot/code-practice context upload.
 
 ## Non-Goals
 

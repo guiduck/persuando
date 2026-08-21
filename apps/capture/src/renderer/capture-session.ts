@@ -10,6 +10,7 @@ import type {
 import { captureWebSocketUrl, createSession } from "./api.js";
 
 const AUDIO_CHUNK_DURATION_MS = 6000;
+const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 
 export interface ActiveCapture {
   pause(): void;
@@ -30,7 +31,7 @@ export async function startMicrophoneCapture(
   deviceId: string | undefined,
   callbacks: CaptureSessionCallbacks
 ): Promise<ActiveCapture> {
-  console.info(`[Persuando Capture] Creating capture session: microphoneDefault=${settings.microphoneCaptureDefault} periodicScreenDefault=${settings.periodicScreenshotCaptureDefault} transcriptionModel=${settings.transcriptionModel} analysisModel=${settings.analysisModel}.`);
+  console.info(`[Persuando Capture] Creating capture session: microphoneDefault=${settings.microphoneCaptureDefault} periodicScreenDefault=${settings.periodicScreenshotCaptureDefault} transcriptionModel=${settings.transcriptionModel} analysisModel=${settings.analysisModel} programmingLanguage=${normalizeProgrammingLanguage(settings.preferredProgrammingLanguage)}.`);
   const { session } = await createSession(settings);
   console.info(`[Persuando Capture] Capture session created: sessionId=${session.id} status=${session.status}.`);
   console.info(`[Persuando Capture] Requesting microphone stream: device=${deviceId ? "selected" : "default"}.`);
@@ -126,6 +127,7 @@ export async function startMicrophoneCapture(
     },
     sendContext(input) {
       if (socket.readyState !== WebSocket.OPEN) throw new Error("Capture WebSocket is not connected");
+      const programmingLanguage = normalizeProgrammingLanguage(settings.preferredProgrammingLanguage);
       const contextEvent: CopilotContextEvent = {
         version: 1,
         type: "copilot.context",
@@ -135,14 +137,14 @@ export async function startMicrophoneCapture(
           contextId: crypto.randomUUID(),
           explanationMode: input.explanationMode,
           imageReference: input.imageReference,
-          programmingLanguage: settings.preferredProgrammingLanguage,
+          programmingLanguage,
           textContext: input.textContext
         }
       };
       console.info(
         `[Persuando Capture] Sending copilot.context: sessionId=${session.id} contextId=${contextEvent.payload.contextId} hasImage=${Boolean(
           input.imageReference
-        )} textLength=${input.textContext?.length ?? 0}.`
+        )} textLength=${input.textContext?.length ?? 0} programmingLanguage=${programmingLanguage}.`
       );
       socket.send(JSON.stringify(contextEvent));
       console.info(`[Persuando Capture] copilot.context sent: sessionId=${session.id} contextId=${contextEvent.payload.contextId} socketState=${socket.readyState}.`);
@@ -158,6 +160,12 @@ export async function startMicrophoneCapture(
       socket.close();
     }
   };
+}
+
+function normalizeProgrammingLanguage(value: string | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return DEFAULT_COPILOT_PROGRAMMING_LANGUAGE;
+  return trimmed.slice(0, 64);
 }
 
 async function sendAudioChunk(socket: WebSocket, sessionId: string, chunk: Blob, chunkSequence: number, durationMs: number): Promise<void> {

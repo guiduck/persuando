@@ -14,9 +14,15 @@ export interface GoogleOAuthProfile {
   name?: string;
 }
 
+interface LoginBridgeCode {
+  sessionToken: string;
+  expiresAt: number;
+}
+
 @Injectable()
 export class AuthService {
   private readonly sessionSecret = process.env.AUTH_SESSION_SECRET ?? "local-test-secret";
+  private readonly loginBridgeCodes = new Map<string, LoginBridgeCode>();
 
   getAuthProviderSummary(): string {
     return "google-primary-local-dev-test-fallback";
@@ -46,6 +52,22 @@ export class AuthService {
 
   createStateToken(): string {
     return randomBytes(24).toString("base64url");
+  }
+
+  createLoginBridgeCode(sessionToken: string): string {
+    const code = randomBytes(32).toString("base64url");
+    this.loginBridgeCodes.set(code, {
+      sessionToken,
+      expiresAt: Date.now() + 2 * 60 * 1000
+    });
+    return code;
+  }
+
+  consumeLoginBridgeCode(code: string): string | undefined {
+    const ticket = this.loginBridgeCodes.get(code);
+    this.loginBridgeCodes.delete(code);
+    if (!ticket || ticket.expiresAt < Date.now()) return undefined;
+    return ticket.sessionToken;
   }
 
   createUserSessionToken(user: AuthenticatedUser): string {

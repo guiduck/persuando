@@ -88,7 +88,24 @@ WEBSOCKET_URL=wss://api.your-domain.com/realtime
 ALLOWED_ORIGINS=https://your-domain.com,app://persuando-capture
 ```
 
+Current `gfig.space` production-style values:
+
+```env
+GOOGLE_CALLBACK_URL=https://api-persuando.gfig.space/auth/google/callback
+API_BASE_URL=https://api-persuando.gfig.space
+WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime
+ALLOWED_ORIGINS=https://persuando.gfig.space,app://persuando-capture
+```
+
 Google OAuth must have the exact callback URL registered in Google Cloud Console.
+
+For the current `gfig.space` deployment, add this authorized redirect URI to the Google OAuth web client:
+
+```text
+https://api-persuando.gfig.space/auth/google/callback
+```
+
+The OAuth callback intentionally lands on the API first. The API creates a short-lived one-time login bridge code, redirects the browser to the Response App at `/auth/complete`, and the Response App exchanges that code with `/auth/bridge/consume` to set its own host-only login cookie. This keeps the API and Response cookies separated without putting the signed session token in the URL. The bridge code is currently in memory and assumes one API process; use Redis/PostgreSQL for this handoff before running multiple API instances.
 
 ## Start Infrastructure
 
@@ -134,9 +151,23 @@ PORT=3100 NEXT_PUBLIC_API_BASE_URL=$API_BASE_URL NEXT_PUBLIC_WEBSOCKET_URL=$WEBS
 pm2 save
 ```
 
-Check logs:
+After pulling code or changing `.env.local`, reload the shell environment and restart the PM2 processes with updated env vars:
 
 ```bash
+set -a
+source .env.local
+set +a
+
+pm2 restart persuando-api --update-env
+pm2 restart persuando-worker --update-env
+pm2 restart persuando-response --update-env
+pm2 save
+```
+
+Check status and logs:
+
+```bash
+pm2 status
 pm2 logs persuando-api
 pm2 logs persuando-worker
 pm2 logs persuando-response

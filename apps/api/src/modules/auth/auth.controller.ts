@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Query, Res, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Post, Query, Res, UnauthorizedException } from "@nestjs/common";
 
 import { ApiConfigService } from "../config/config.service.js";
 import { UsersService } from "../users/users.service.js";
@@ -18,7 +18,7 @@ export class AuthController {
     if (!googleClientId) throw new UnauthorizedException("Google auth is not configured");
 
     const state = this.authService.createStateToken();
-    response.cookie("persuando_oauth_state", state, cookieOptions());
+    response.cookie("persuando_oauth_state", state, authCookieOptions(googleCallbackUrl));
 
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     url.searchParams.set("client_id", googleClientId);
@@ -48,11 +48,21 @@ export class AuthController {
     const user = this.authService.fromGoogleProfile(profile);
     await this.users.upsertAuthenticatedUser(user);
 
-    response.cookie("persuando_user", this.authService.createUserSessionToken(user), cookieOptions());
-    response.clearCookie("persuando_oauth_state");
-    response
-      .status(200)
-      .send(`<html><body><h1>Persuando login ok</h1><p>Signed in as ${escapeHtml(user.email)}.</p></body></html>`);
+    const sessionToken = this.authService.createUserSessionToken(user);
+    const options = authCookieOptions(this.config.env.googleCallbackUrl);
+    response.cookie("persuando_user", sessionToken, options);
+    response.clearCookie("persuando_oauth_state", options);
+    response.redirect(responseAuthCompleteUrl(this.config.env.allowedOrigins, this.authService.createLoginBridgeCode(sessionToken)));
+  }
+
+  @Post("bridge/consume")
+  consumeLoginBridge(@Body("code") code: string | undefined): { sessionToken: string } {
+    if (!code) throw new UnauthorizedException("Missing login bridge code");
+
+    const sessionToken = this.authService.consumeLoginBridgeCode(code);
+    if (!sessionToken) throw new UnauthorizedException("Invalid or expired login bridge code");
+
+    return { sessionToken };
   }
 
   @Get("me")
@@ -89,23 +99,31 @@ export class AuthController {
     if (!userInfoResponse.ok) throw new UnauthorizedException("Google userinfo fetch failed");
     return (await userInfoResponse.json()) as { sub: string; email: string; name?: string };
   }
-
 }
 
 interface RedirectResponse {
   cookie(name: string, value: string, options?: Record<string, unknown>): void;
-  clearCookie(name: string): void;
+  clearCookie(name: string, options?: Record<string, unknown>): void;
   redirect(url: string): void;
-  status(code: number): { send(body: string): void };
 }
 
-function cookieOptions(): Record<string, unknown> {
+export function authCookieOptions(googleCallbackUrl: string): Record<string, unknown> {
   return {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    secure: googleCallbackUrl.startsWith("https://"),
     path: "/"
   };
+}
+
+export function responseAuthCompleteUrl(allowedOrigins: readonly string[], bridgeCode: string): string {
+  const url = new URL("/auth/complete", responseAppRedirectUrl(allowedOrigins));
+  url.searchParams.set("code", bridgeCode);
+  return url.toString();
+}
+
+export function responseAppRedirectUrl(allowedOrigins: readonly string[]): string {
+  return allowedOrigins.find((origin) => origin.startsWith("http://") || origin.startsWith("https://")) ?? "http://localhost:3000";
 }
 
 function parseCookie(cookieHeader: string | undefined): Record<string, string> {
@@ -116,8 +134,4 @@ function parseCookie(cookieHeader: string | undefined): Record<string, string> {
     cookies[key] = decodeURIComponent(valueParts.join("="));
   }
   return cookies;
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

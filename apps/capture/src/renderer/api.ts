@@ -28,7 +28,9 @@ export function setCaptureAuthUser(user: AuthMeResponse["user"] | undefined): vo
 }
 
 export function googleLoginUrl(): string {
-  return `${apiBaseUrl}/auth/google`;
+  const url = new URL("/auth/google", apiBaseUrl);
+  url.searchParams.set("clientType", "capture");
+  return url.toString();
 }
 
 export function captureWebSocketUrl(): string {

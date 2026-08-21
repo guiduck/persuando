@@ -13,12 +13,16 @@ export class AuthController {
   ) {}
 
   @Get("google")
-  startGoogleLogin(@Res() response: RedirectResponse): void {
+  startGoogleLogin(@Query("clientType") clientType: string | undefined, @Res() response: RedirectResponse): void {
     const { googleClientId, googleCallbackUrl } = this.config.env;
     if (!googleClientId) throw new UnauthorizedException("Google auth is not configured");
 
     const state = this.authService.createStateToken();
-    response.cookie("persuando_oauth_state", state, authCookieOptions(googleCallbackUrl));
+    const options = authCookieOptions(googleCallbackUrl);
+    response.cookie("persuando_oauth_state", state, options);
+    if (clientType === "capture") {
+      response.cookie("persuando_oauth_client", "capture", options);
+    }
 
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     url.searchParams.set("client_id", googleClientId);
@@ -40,9 +44,11 @@ export class AuthController {
     @Res() response: RedirectResponse
   ): Promise<void> {
     if (!code || !state) throw new UnauthorizedException("Missing Google OAuth callback parameters");
-    if (parseCookie(cookieHeader).persuando_oauth_state !== state) {
+    const callbackCookies = parseCookie(cookieHeader);
+    if (callbackCookies.persuando_oauth_state !== state) {
       throw new UnauthorizedException("Invalid Google OAuth state");
     }
+    const shouldCompleteInCapture = callbackCookies.persuando_oauth_client === "capture";
 
     const profile = await this.fetchGoogleProfile(code);
     const user = this.authService.fromGoogleProfile(profile);
@@ -52,6 +58,12 @@ export class AuthController {
     const options = authCookieOptions(this.config.env.googleCallbackUrl);
     response.cookie("persuando_user", sessionToken, options);
     response.clearCookie("persuando_oauth_state", options);
+    response.clearCookie("persuando_oauth_client", options);
+    if (shouldCompleteInCapture) {
+      response.send(captureAuthCompleteHtml(user));
+      return;
+    }
+
     response.redirect(responseAuthCompleteUrl(this.config.env.allowedOrigins, this.authService.createLoginBridgeCode(sessionToken)));
   }
 
@@ -105,6 +117,7 @@ interface RedirectResponse {
   cookie(name: string, value: string, options?: Record<string, unknown>): void;
   clearCookie(name: string, options?: Record<string, unknown>): void;
   redirect(url: string): void;
+  send(body: string): void;
 }
 
 export function authCookieOptions(googleCallbackUrl: string): Record<string, unknown> {
@@ -124,6 +137,30 @@ export function responseAuthCompleteUrl(allowedOrigins: readonly string[], bridg
 
 export function responseAppRedirectUrl(allowedOrigins: readonly string[]): string {
   return allowedOrigins.find((origin) => origin.startsWith("http://") || origin.startsWith("https://")) ?? "http://localhost:3000";
+}
+
+export function captureAuthCompleteHtml(user: AuthenticatedUser): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Persuando login ok</title>
+  </head>
+  <body>
+    <h1>Persuando login ok</h1>
+    <p>Signed in as ${escapeHtml(user.email)}.</p>
+    <p>You can close this window and return to Persuando Capture.</p>
+  </body>
+</html>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function parseCookie(cookieHeader: string | undefined): Record<string, string> {

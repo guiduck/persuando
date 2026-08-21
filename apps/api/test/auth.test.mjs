@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { authCookieOptions, responseAuthCompleteUrl } from "../dist/src/modules/auth/auth.controller.js";
+import { authCookieOptions, captureAuthCompleteHtml, responseAuthCompleteUrl } from "../dist/src/modules/auth/auth.controller.js";
 import { AuthService } from "../dist/src/modules/auth/auth.service.js";
 
 test("AuthService maps Google profile to same-account identity", () => {
@@ -53,4 +53,18 @@ test("Auth callback redirects to the Response App login completion route", () =>
   const redirectUrl = responseAuthCompleteUrl(["https://persuando.gfig.space", "app://persuando-capture"], "bridge-code-123");
 
   assert.equal(redirectUrl, "https://persuando.gfig.space/auth/complete?code=bridge-code-123");
+});
+
+
+test("Capture auth completion renders API-local success page without bridge redirect", () => {
+  const html = captureAuthCompleteHtml({
+    id: "google:123",
+    email: "person@example.com",
+    displayName: "Person Example",
+    provider: "google"
+  });
+
+  assert.match(html, /Persuando login ok/);
+  assert.match(html, /person@example.com/);
+  assert.doesNotMatch(html, /auth\/complete/);
 });

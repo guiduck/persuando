@@ -105,7 +105,7 @@ For the current `gfig.space` deployment, add this authorized redirect URI to the
 https://api-persuando.gfig.space/auth/google/callback
 ```
 
-The OAuth callback intentionally lands on the API first. The API creates a short-lived one-time login bridge code, redirects the browser to the Response App at `/auth/complete`, and the Response App exchanges that code with `/auth/bridge/consume` to set its own host-only login cookie. This keeps the API and Response cookies separated without putting the signed session token in the URL. The bridge code is currently in memory and assumes one API process; use Redis/PostgreSQL for this handoff before running multiple API instances.
+The OAuth callback intentionally lands on the API first. Browser/Response Mode login uses the default `/auth/google` flow: the API creates a short-lived one-time login bridge code, redirects the browser to the Response App at `/auth/complete`, and the Response App exchanges that code with `/auth/bridge/consume` to set its own host-only login cookie. Electron Capture login uses `/auth/google?clientType=capture`; the API sets its API-host cookie and returns a small API-local success page instead of redirecting to Response Mode, so the Capture window can read the API cookie and complete sign-in. This keeps the API and Response cookies separated without putting the signed session token in the URL. The bridge code is currently in memory and assumes one API process; use Redis/PostgreSQL for this handoff before running multiple API instances.
 
 ## Start Infrastructure
 

@@ -9,7 +9,7 @@ Create the next focused Persuando specification for Windows Capture App release 
 The first MVP slice in `specs/001-persuando-mvp/` is implemented and validated locally:
 
 - NestJS API with Prisma/PostgreSQL persistence.
-- Google/local-dev auth, including production subdomain callback bridge from API OAuth callback to the Response App login completion route.
+- Google/local-dev auth, including production subdomain browser callback bridge from API OAuth callback to the Response App login completion route and a separate Electron Capture callback completion path using `/auth/google?clientType=capture`.
 - Backend-encrypted provider credentials.
 - Consent grant/revoke.
 - Settings.
@@ -52,7 +52,7 @@ Define the next production-readiness slice for:
 - Make settings, provider key entry, model selection, consent toggles, microphone selection, and shortcut references easier to test manually.
 - Add manual smoke documentation for: Google sign-in, provider key save/validate, consent grant/revoke, start capture, pause/resume, hide/show toolbar, Response Mode live session, context capture, provider error, and manual delete.
 - Define real-provider testing expectations without committing keys or secrets.
-- Define production auth hardening expectations for the current one-time login bridge: short TTL, single use, no signed token in URLs, host-only cookies per subdomain, and Redis/PostgreSQL storage if the API runs more than one process.
+- Define production auth hardening expectations for the current browser one-time login bridge and Electron Capture callback flow: short TTL, single use, no signed token in URLs, host-only cookies per subdomain, Capture login must not redirect into Response Mode, and Redis/PostgreSQL storage if the API runs more than one process.
 - Add screen/context limits for size, consent text, visible active state, maximum retained visual-context count, redaction expectations, and retention/delete behavior.
 - Define manual validation criteria for Code Practice outputs from screenshots: identify the visible prompt/enunciado when present, detect the selected programming language and fall back to JavaScript only when unclear, explain the chosen technique step by step with concrete code snippets inside the steps, include child-friendly intuition, include Big-O time and space complexity, provide pseudocode or final code only in allowed study/practice/review contexts, format the answer as Markdown with fenced code blocks, render code blocks readably in Response Mode, avoid live-assessment cheating behavior or claims, and verify Auto mode triggers from new screenshots without repeated spam.
 

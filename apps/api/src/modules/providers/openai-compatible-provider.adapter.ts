@@ -3,7 +3,12 @@ import { Logger } from "@nestjs/common";
 import { ProviderAdapterError, type ProviderAdapter, type ProviderGenerationInput, type ProviderGenerationOutput, type ProviderTranscriptionInput, type ProviderTranscriptionOutput } from "./provider-adapter.js";
 
 type FetchLike = typeof fetch;
-const CODE_PRACTICE_MAX_TOKENS = 3200;
+interface ChatCompletionPayload {
+  choices?: { finish_reason?: string; message?: { content?: string } }[];
+}
+
+const CODE_PRACTICE_MAX_TOKENS = 5200;
+const CODE_PRACTICE_VISUAL_MAX_TOKENS = 4800;
 const DEFAULT_GENERATION_MAX_TOKENS = 900;
 const MAX_CODE_PRACTICE_IMAGES = 30;
 
@@ -48,13 +53,14 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
   async generate(input: ProviderGenerationInput): Promise<ProviderGenerationOutput> {
     if (!input.apiKey) throw new ProviderAdapterError("PROVIDER_KEY_INVALID", "Provider API key is missing.", false);
 
+    const generationId = input.generationId ?? `${input.sessionId}-${Date.now()}`;
     const imageCount = input.imageReferences?.filter(Boolean).length ?? 0;
     const visualAnalysis = input.task === "code_practice"
-      ? await this.analyzeCodePracticeVisuals(input)
+      ? await this.analyzeCodePracticeVisuals(input, generationId)
       : undefined;
     const startedAt = Date.now();
     this.logger.log(
-      `Generation provider request: sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer model=${input.analysisModel} imageCount=${imageCount} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} transcriptLength=${input.transcriptText.length}`
+      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} transcriptLength=${input.transcriptText.length}`
     );
     const response = await this.fetchProvider("/chat/completions", input.apiKey, {
       body: JSON.stringify({
@@ -75,15 +81,22 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
       headers: { "content-type": "application/json" },
       method: "POST"
     });
-    const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-    const responseContent = payload.choices?.[0]?.message?.content ?? "";
+    const payload = await this.readChatCompletionResponse(response, generationId, "answer");
+    const responseContent = typeof payload.choices?.[0]?.message?.content === "string"
+      ? payload.choices[0].message.content
+      : "";
+    const finishReason = payload.choices?.[0]?.finish_reason ?? "missing";
     this.logger.log(
-      `Generation provider response: sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer model=${input.analysisModel} imageCount=${imageCount} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
+      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
     );
     return parseGenerationContent(responseContent, input.transcriptText, input.task);
   }
 
-  private async analyzeCodePracticeVisuals(input: ProviderGenerationInput): Promise<string> {
+  private async analyzeCodePracticeVisuals(
+    input: ProviderGenerationInput,
+    generationId: string,
+    attempt = 1
+  ): Promise<string> {
     if (!input.apiKey) throw new ProviderAdapterError("PROVIDER_KEY_INVALID", "Provider API key is missing.", false);
     const imageReferences = input.imageReferences?.filter(Boolean).slice(-MAX_CODE_PRACTICE_IMAGES) ?? [];
     if (imageReferences.length === 0) {
@@ -92,7 +105,7 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
 
     const startedAt = Date.now();
     this.logger.log(
-      `Generation provider request: sessionId=${input.sessionId} task=code_practice phase=visual_analysis model=${input.analysisModel} imageCount=${imageReferences.length} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0}`
+      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=code_practice phase=visual_analysis attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageReferences.length} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0}`
     );
     const response = await this.fetchProvider("/chat/completions", input.apiKey, {
       body: JSON.stringify({
@@ -101,29 +114,71 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           { role: "user", content: codePracticeVisualAnalysisContent(input, imageReferences) }
         ],
         model: input.analysisModel,
-        ...generationControls(input.analysisModel, 1800, 0),
+        ...generationControls(input.analysisModel, CODE_PRACTICE_VISUAL_MAX_TOKENS, 0),
         response_format: { type: "json_object" }
       }),
       headers: { "content-type": "application/json" },
       method: "POST"
     });
-    const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-    const responseContent = payload.choices?.[0]?.message?.content ?? "";
+    const payload = await this.readChatCompletionResponse(response, generationId, "visual_analysis");
+    const responseContent = typeof payload.choices?.[0]?.message?.content === "string"
+      ? payload.choices[0].message.content
+      : "";
+    const finishReason = payload.choices?.[0]?.finish_reason ?? "missing";
     this.logger.log(
-      `Generation provider response: sessionId=${input.sessionId} task=code_practice phase=visual_analysis model=${input.analysisModel} imageCount=${imageReferences.length} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
+      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=code_practice phase=visual_analysis attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageReferences.length} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
     );
 
+    const parsed = parseJsonObject(responseContent);
+    if (parsed) return JSON.stringify(parsed);
+
+    this.logger.warn(
+      `Generation provider invalid JSON: generationId=${generationId} sessionId=${input.sessionId} phase=visual_analysis attempt=${attempt} model=${input.analysisModel} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} startsWithBrace=${responseContent.trimStart().startsWith("{")}`
+    );
+    if (attempt === 1) {
+      this.logger.warn(
+        `Generation provider retrying visual analysis: generationId=${generationId} sessionId=${input.sessionId} nextAttempt=2.`
+      );
+      return this.analyzeCodePracticeVisuals(input, generationId, 2);
+    }
+    throw new ProviderAdapterError(
+      "PROVIDER_RESPONSE_INVALID",
+      finishReason === "length"
+        ? "Provider response was truncated while reading Code Practice screenshots."
+        : "Provider returned invalid JSON while reading Code Practice screenshots.",
+      true
+    );
+  }
+
+  private async readChatCompletionResponse(
+    response: Response,
+    generationId: string,
+    phase: "visual_analysis" | "answer"
+  ): Promise<ChatCompletionPayload> {
+    let payload: unknown;
     try {
-      const parsed = JSON.parse(responseContent) as Record<string, unknown>;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid analysis shape");
-      return JSON.stringify(parsed);
+      payload = await response.json();
     } catch {
+      this.logger.warn(
+        `Generation provider non-JSON HTTP response: generationId=${generationId} phase=${phase} httpStatus=${response.status}.`
+      );
       throw new ProviderAdapterError(
         "PROVIDER_RESPONSE_INVALID",
-        "Provider returned invalid JSON while reading Code Practice screenshots.",
+        `Provider returned a non-JSON HTTP response during ${phase}.`,
         true
       );
     }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      this.logger.warn(
+        `Generation provider invalid response shape: generationId=${generationId} phase=${phase} httpStatus=${response.status}.`
+      );
+      throw new ProviderAdapterError(
+        "PROVIDER_RESPONSE_INVALID",
+        `Provider returned an invalid response shape during ${phase}.`,
+        true
+      );
+    }
+    return payload as ChatCompletionPayload;
   }
   private async fetchProvider(path: string, apiKey: string, init: RequestInit): Promise<Response> {
     let response: Response;
@@ -135,11 +190,17 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           ...(init.headers ?? {})
         }
       });
-    } catch {
+    } catch (error) {
+      this.logger.warn(
+        `Provider network request failed: path=${path} errorType=${error instanceof Error ? error.name : "unknown"}.`
+      );
       throw new ProviderAdapterError("PROVIDER_UNAVAILABLE", "Provider network request failed.", true);
     }
 
-    if (!response.ok) throw providerErrorForStatus(response.status, path);
+    if (!response.ok) {
+      this.logger.warn(`Provider HTTP request rejected: path=${path} httpStatus=${response.status}.`);
+      throw providerErrorForStatus(response.status, path);
+    }
     return response;
   }
 }
@@ -214,7 +275,8 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"]): string {
       "For output-format problems, verify spaces, line breaks, trailing separators, and print-versus-return semantics explicitly.",
       "Responsible-use boundary: for a clearly proctored exam, hiring assessment, live interview, or active contest, provide conceptual debugging and pseudocode rather than copy-paste final code. A public practice page without proctoring signals may receive a complete taught solution.",
       "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the main answer in suggestions[0].content with category='response' and urgency='high'.",
-      "Write in the requested response language. Use concise Markdown headings, exact same-language snippets, Big-O, and a final contract checklist. Prefer 500 to 1200 useful words over repetitive boilerplate.",
+      "Write explanations in the requested response language, but write every code block in the explicitly selected programming language. Never substitute pseudocode or another language when a programming language is provided.",
+      "Use concise Markdown headings, exact same-language snippets, Big-O, and a final contract checklist. Prefer 500 to 1200 useful words over repetitive boilerplate.",
       "Do not include secrets."
     ].join(" ");
   }
@@ -251,7 +313,7 @@ function codePracticeVisualAnalysisContent(
   return [
     {
       type: "text",
-      text: `Analyze all ${imageReferences.length} screenshots oldest-to-newest. The latest screenshots are authoritative.\n\nSession notes:\n${input.transcriptText}`
+      text: `Analyze all ${imageReferences.length} screenshots oldest-to-newest. The latest screenshots are authoritative.\nSelected programming language: ${input.programmingLanguage ?? "unknown"}. Treat this selection as authoritative for the requested solution even when the editor language is not visible. Keep the JSON compact enough to complete.\n\nSession notes:\n${input.transcriptText}`
     },
     ...imageReferences.map((url) => ({ type: "image_url" as const, image_url: { url } }))
   ];
@@ -271,6 +333,7 @@ function codePracticeUserText(input: ProviderGenerationInput, visualAnalysis: st
 
   return `Task: code_practice
 Response language: ${input.responseLanguage}
+Selected programming language: ${input.programmingLanguage ?? "unknown"}
 
 Structured visual analysis of all current screenshots:
 ${visualAnalysis}
@@ -286,22 +349,42 @@ Produce the next tutoring turn, not a fresh generic solution. Follow this order:
 2. "Contrato exato da plataforma": state the exact function signature, provided fields/types, print-versus-return behavior, and output formatting. Do not add scaffolding the editor already provides.
 3. "Correção do histórico": identify any incorrect or stale prior guidance and correct it explicitly. If prior guidance was sound, say what remains applicable.
 4. "Correção mínima": show the smallest change that addresses the newest visible failure.
-5. "Solução atualizada": provide the same-language method/function in the exact format requested when allowed. Match identifiers and output format exactly.
+5. "Solução atualizada": provide the method/function in the selected programming language and exact platform format when allowed. Match identifiers and output format exactly.
 6. "Por que funciona": walk through the visible sample or newest test evidence.
 7. "Complexidade Big-O" and "Checklist antes de enviar".
 
 Hard requirements:
 - Use the latest screenshot state as authoritative while using older screenshots to understand progress.
-- Never switch language without explicit visual evidence.
+- Use the selected programming language for every code block. If it is provided, do not output language-neutral pseudocode even when the editor language is not visible.
 - Never use generic node fields such as value when the provided type uses data.
 - Never print one item per line when the output contract requires one space-separated line.
 - Never recreate Node, Tree, main, stdin parsing, or sample construction in a method-only submission.
 - Do not claim the solution passes when the newest screenshot shows a failure; explain what still needs verification.
 - Return strict JSON with the complete Markdown answer in suggestions[0].content.`;
 }
+function parseJsonObject(content: string): Record<string, unknown> | undefined {
+  const trimmed = content.trim();
+  const candidates = [trimmed];
+  const fenced = trimmed.match(/^\`\`\`(?:json)?\s*([\s\S]*?)\s*\`\`\`$/i)?.[1];
+  if (fenced) candidates.push(fenced);
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch {
+      // Try the next safe extraction candidate.
+    }
+  }
+  return undefined;
+}
 function parseGenerationContent(content: string, fallbackTranscript: string, task: ProviderGenerationInput["task"]): ProviderGenerationOutput {
   try {
-    const parsed = JSON.parse(content) as Partial<ProviderGenerationOutput>;
+    const parsed = parseJsonObject(content) as Partial<ProviderGenerationOutput> | undefined;
+    if (!parsed) throw new Error("invalid generation JSON");
     const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
     const summaryContent = parsed.summary?.content?.trim() ?? "";
     const primaryContent = suggestions[0]?.content?.trim() ?? summaryContent;

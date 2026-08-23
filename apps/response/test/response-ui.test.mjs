@@ -30,6 +30,8 @@ test("Response session UI includes topic, direct answer, and code-practice surfa
   assert.match(sessionPage, /What to say/);
   assert.match(sessionPage, /Topics/);
   assert.match(sessionPage, /Code practice/);
+  assert.match(sessionPage, /Latest generation failed/);
+  assert.match(sessionPage, /previous successful explanation/);
   assert.match(sessionPage, /Screen context/);
   assert.match(sessionPage, /copilot\.explanation/);
 });

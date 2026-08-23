@@ -40,6 +40,11 @@ test("Capture app offers current GPT-5.6 analysis models", () => {
   assert.match(renderer, /gpt-5\.6-terra/);
   assert.match(renderer, /gpt-5\.6-luna/);
 });
+test("Capture app persists an explicit programming language selection", () => {
+  assert.match(renderer, /value=\{settings\?\.preferredProgrammingLanguage/);
+  assert.match(renderer, /<option value="javascript">JavaScript<\/option>/);
+  assert.match(renderer, /<option value="typescript">TypeScript<\/option>/);
+});
 test("Capture app exposes visible error and permission failure paths", () => {
   const combined = `${renderer}\n${captureSession}`;
   assert.match(combined, /Capture error/);

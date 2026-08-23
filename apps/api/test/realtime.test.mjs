@@ -537,6 +537,8 @@ test("RealtimeService sends all 30 requested screenshots to the real Code Practi
   assert.equal(result.action, "accepted");
   assert.equal(generationInputs.length, 2);
   assert.equal(generationInputs[0].task, "code_practice");
+  assert.equal(generationInputs[0].programmingLanguage, "typescript");
+  assert.ok(generationInputs[0].generationId);
   assert.deepEqual(generationInputs[0].previousCodePracticeGuidance, []);
   assert.deepEqual(generationInputs[1].previousCodePracticeGuidance, [
     "Use BFS com uma fila e visite os nós nível por nível."
@@ -544,6 +546,8 @@ test("RealtimeService sends all 30 requested screenshots to the real Code Practi
   assert.equal(generationInputs[0].imageReferences.length, 30);
   assert.equal(generationInputs[0].imageReferences[0], "data:image/png;base64,image-1");
   assert.equal(generationInputs[0].imageReferences.at(-1), "data:image/png;base64,image-30");
+  assert.equal(generationInputs[1].imageReferences.length, 30);
+  assert.equal(generationInputs[1].imageReferences.at(-1), "data:image/png;base64,history-15");
   assert.match(explanation?.payload.content ?? "", /BFS com uma fila/i);
   assert.doesNotMatch(explanation?.payload.content ?? "", /altura|getHeight/i);
 });

@@ -351,3 +351,10 @@ Current handoff and next prompt:
 - `docs/handoff.md`
 - `docs/roadmap.md`
 - `docs/next-spec-prompt.md`
+### Code Practice provider diagnostics
+
+Manual Code Practice generation logs a `generationId` across `visual_analysis` and `answer`. The request combines current Response contexts with the latest persisted/cache history, keeps the newest 30, and sends them chronologically. The Capture-selected programming language is authoritative. Visual-analysis JSON may be strict, fenced, or embedded; one parse-failure retry is allowed, while HTTP/auth/quota/network failures remain visible without generated fallback content. Use PM2 with `--nostream` when collecting logs so the command exits:
+
+```bash
+pm2 logs persuando-api --lines 500 --nostream | grep -E "Manual generation|Generation provider|generationId|invalid JSON|network request|HTTP request"
+```

@@ -544,20 +544,26 @@ export class RealtimeService {
     const requestedScreenContexts = event.payload.mode === "code_practice"
       ? event.payload.screenContexts?.slice(-MAX_SCREEN_CONTEXTS) ?? []
       : [];
-    const persistedScreenContexts = requestedScreenContexts.length === 0
+    const persistedScreenContexts = event.payload.mode === "code_practice"
       ? await this.sessionsService.getRecentScreenContexts(event.sessionId, MAX_SCREEN_CONTEXTS)
       : [];
-    const cachedScreenContexts = requestedScreenContexts.length === 0
+    const cachedScreenContexts = event.payload.mode === "code_practice"
       ? this.getCachedScreenContexts(event.sessionId)
       : [];
-    const screenContexts = requestedScreenContexts.length > 0
-      ? requestedScreenContexts
-      : mergeScreenContexts([...persistedScreenContexts, ...cachedScreenContexts]).slice(-MAX_SCREEN_CONTEXTS);
-    const screenContextSource = requestedScreenContexts.length > 0 ? "response_payload" : "session_history";
+    const screenContexts = mergeScreenContexts([
+      ...requestedScreenContexts,
+      ...persistedScreenContexts,
+      ...cachedScreenContexts
+    ]).slice(-MAX_SCREEN_CONTEXTS);
+    const screenContextSource = requestedScreenContexts.length > 0
+      ? "response_payload+session_history"
+      : "session_history";
     const previousCodePracticeGuidance = event.payload.mode === "code_practice"
       ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
       : [];
     const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
+    const generationId = randomUUID();
+    const programmingLanguage = settings.preferredProgrammingLanguage?.trim() || "javascript";
     const imageReferences = event.payload.mode === "code_practice"
       ? screenContexts
           .map((context) => context.imageReference)
@@ -569,7 +575,7 @@ export class RealtimeService {
     }
 
     this.logger.log(
-      `Manual generation requested: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} hasCredential=${Boolean(apiKey)}`
+      `Manual generation requested: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} hasCredential=${Boolean(apiKey)}`
     );
 
     let output: ProviderGenerationOutput;
@@ -577,6 +583,8 @@ export class RealtimeService {
       output = await this.providersService.generate({
         apiKey,
         analysisModel: settings.analysisModel,
+        generationId,
+        programmingLanguage,
         responseLanguage: settings.responseLanguage,
         sessionId: event.sessionId,
         task: event.payload.mode,
@@ -587,13 +595,13 @@ export class RealtimeService {
     } catch (error) {
       const safeError = toSafeProviderError(error);
       this.logger.warn(
-        `Manual generation failed: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} screenContextSource=${screenContextSource} imageReferences=${imageReferences?.length ?? 0} code=${safeError.code} retryable=${safeError.retryable} message=${safeError.message}`
+        `Manual generation failed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} screenContextSource=${screenContextSource} imageReferences=${imageReferences?.length ?? 0} code=${safeError.code} retryable=${safeError.retryable} message=${safeError.message}`
       );
       throw error;
     }
 
     this.logger.log(
-      `Manual generation completed: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} imageReferences=${imageReferences?.length ?? 0} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`
+      `Manual generation completed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} imageReferences=${imageReferences?.length ?? 0} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`
     );
 
     if (event.payload.mode === "summary") {
@@ -617,11 +625,13 @@ export class RealtimeService {
       data: {
         id: contextId,
         sessionId: event.sessionId,
-        programmingLanguage: settings.preferredProgrammingLanguage || "javascript",
+        programmingLanguage,
         explanationMode: "explain",
         problemContext: JSON.stringify({
           version: 1,
           kind: "manual_generation",
+          generationId,
+          programmingLanguage,
           screenContextSource,
           screenContextCount: screenContexts.length,
           imageReferenceCount: imageReferences?.length ?? 0

@@ -19,6 +19,8 @@ export interface ProviderGenerationInput {
   transcriptText: string;
   imageReferences?: string[];
   previousCodePracticeGuidance?: string[];
+  programmingLanguage?: string;
+  generationId?: string;
 }
 
 export interface ProviderTranscriptionOutput {

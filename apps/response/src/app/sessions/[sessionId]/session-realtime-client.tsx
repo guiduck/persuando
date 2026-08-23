@@ -487,7 +487,11 @@ function CopilotPanel({ error, explanations, isGenerating, mode, onGenerate, onM
     <section className="panel">
       <PanelTitle isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title="Code practice" />
       <div className="artifact-list">
-        {error ? <span className="pill empty">{error}</span> : null}
+        {error ? (
+          <span className="pill empty">
+            Latest generation failed: {error}{explanations.length > 0 ? " The previous successful explanation is still shown below." : ""}
+          </span>
+        ) : null}
         {explanations.length === 0 ? (
           <span className="pill empty">No code explanation yet.</span>
         ) : (

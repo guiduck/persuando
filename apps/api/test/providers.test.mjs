@@ -207,36 +207,71 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
     sessionId: "session-1",
     task: "code_practice",
     transcriptText: "HackerRank tree height getHeight",
-    previousCodePracticeGuidance: ["A orientação anterior usou o campo value e precisa ser revisada."]
+    previousCodePracticeGuidance: ["A orientação anterior usou o campo value e precisa ser revisada."],
+    programmingLanguage: "javascript"
   });
 
   assert.equal(requests.length, 2);
   const analysisBody = JSON.parse(requests[0].init.body);
   const answerBody = JSON.parse(requests[1].init.body);
 
-  assert.equal(analysisBody.max_tokens, 1800);
+  assert.equal(analysisBody.max_tokens, 4800);
   assert.equal(analysisBody.temperature, 0);
   assert.match(analysisBody.messages[0].content, /visual evidence analyst/i);
   assert.match(analysisBody.messages[0].content, /functionSignature/);
   assert.match(analysisBody.messages[0].content, /observedTestResults/);
+  assert.match(analysisBody.messages[1].content[0].text, /Selected programming language: javascript/);
   const imageParts = analysisBody.messages[1].content.filter((part) => part.type === "image_url");
   assert.equal(imageParts.length, 30);
   assert.equal(imageParts[0].image_url.url, "data:image/png;base64,image-1");
   assert.equal(imageParts.at(-1).image_url.url, "data:image/png;base64,image-30");
 
-  assert.equal(answerBody.max_tokens, 3200);
+  assert.equal(answerBody.max_tokens, 5200);
   assert.equal(answerBody.temperature, 0.15);
   assert.match(answerBody.messages[0].content, /exact contract/i);
   assert.match(answerBody.messages[0].content, /previous guidance as fallible history/i);
   assert.equal(typeof answerBody.messages[1].content, "string");
   assert.match(answerBody.messages[1].content, /Structured visual analysis of all current screenshots/);
   assert.match(answerBody.messages[1].content, /Previous Code Practice guidance/);
+  assert.match(answerBody.messages[1].content, /Selected programming language: javascript/);
+  assert.match(answerBody.messages[1].content, /do not output language-neutral pseudocode/);
   assert.match(answerBody.messages[1].content, /campo value e precisa ser revisada/);
   assert.match(answerBody.messages[1].content, /Diagnóstico da tentativa atual/);
   assert.match(answerBody.messages[1].content, /print-versus-return/);
   assert.match(answerBody.messages[1].content, /Never recreate Node, Tree, main, stdin parsing/);
 });
 
+test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accepts fenced JSON", async () => {
+  const responses = [
+    "not-json",
+    "```json\n{\"problemTitle\":\"Tree: Level Order Traversal\",\"language\":\"javascript\"}\n```",
+    JSON.stringify({
+      summary: { content: "Use BFS em JavaScript." },
+      insights: [],
+      suggestions: [{ category: "response", content: "Implemente levelOrder com uma fila em JavaScript.", urgency: "high" }]
+    })
+  ];
+  let requestCount = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
+    jsonResponse(200, {
+      choices: [{ finish_reason: "stop", message: { content: responses[requestCount++] } }]
+    })
+  );
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,level-order"],
+    programmingLanguage: "javascript",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Tree: Level Order Traversal"
+  });
+
+  assert.equal(requestCount, 3);
+  assert.match(output.suggestions[0].content, /JavaScript/);
+});
 test("OpenAiCompatibleProviderAdapter preserves genuine short Code Practice output without hardcoded replacement", async () => {
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
     jsonResponse(200, {
@@ -295,6 +330,26 @@ test("OpenAiCompatibleProviderAdapter reports invalid final Code Practice JSON i
       error instanceof ProviderAdapterError &&
       error.code === "PROVIDER_RESPONSE_INVALID" &&
       /invalid JSON/i.test(error.message)
+  );
+});
+test("OpenAiCompatibleProviderAdapter maps malformed JSON response shapes to a safe provider error", async () => {
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => jsonResponse(200, null));
+
+  await assert.rejects(
+    () => adapter.generate({
+      apiKey: "sk-provider-secret",
+      analysisModel: "gpt-4o-mini",
+      imageReferences: ["data:image/png;base64,level-order"],
+      programmingLanguage: "javascript",
+      responseLanguage: "pt-BR",
+      sessionId: "session-1",
+      task: "code_practice",
+      transcriptText: "Tree: Level Order Traversal"
+    }),
+    (error) =>
+      error instanceof ProviderAdapterError &&
+      error.code === "PROVIDER_RESPONSE_INVALID" &&
+      /invalid response shape/i.test(error.message)
   );
 });
 test("OpenAiCompatibleProviderAdapter maps rejected generation requests separately from audio format errors", async () => {

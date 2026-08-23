@@ -149,3 +149,36 @@ The next `/speckit-specify` should define model capability discovery or an expli
 provider-specific compatibility checks, quality/latency/cost acceptance criteria, and a deployment
 smoke proving the browser connects to the production WSS endpoint rather than localhost. Preserve
 truthful provider errors and do not add silent model or content fallbacks.
+## Next Spec Prompt - 2026-08-23 Provider Reliability And Visual Tutoring Evaluation
+
+```text
+/speckit-specify Specify production reliability and evaluation for Persuando Code Practice provider generation.
+
+Objective:
+Make the two-phase visual tutoring flow consistently use fresh screenshots, the selected programming language, and provider output that is structurally valid, accurate, observable, and bounded in latency/cost.
+
+Source request/context:
+Recent production runs returned invalid visual-analysis JSON, generic pre-response failures, stale-looking context, and language-neutral pseudocode despite JavaScript being selected. The implemented baseline now merges persisted/session contexts, sends the selected language to both prompts, accepts fenced JSON, retries one visual parse failure, and assigns a generationId.
+
+Project context:
+Use README.md, docs/architecture.md, docs/domain-model.md, docs/handoff.md, docs/roadmap.md, specs/001-persuando-mvp/, and the existing Capture -> realtime API -> OpenAI-compatible provider -> Response architecture.
+
+Requirements:
+- Preserve the latest-30 screenshot window and chronological provider input while rendering newest-first in Response.
+- Define freshness guarantees for shortcut/periodic screenshots immediately before manual and automatic generation.
+- Define provider/model capability checks for vision, structured output, token controls, and supported model IDs.
+- Define bounded retry behavior by failure class; never turn provider failure into fabricated tutoring.
+- Require the Capture-selected programming language in extracted facts, code blocks, and platform-compatible solutions.
+- Add fixture-based evaluations for problem title, exact signature, provided scaffolding, output format, current attempt, compiler/test feedback, correction of prior advice, and uncertainty.
+- Correlate each phase by generationId while excluding prompts, images, keys, and secrets from logs.
+- Establish latency, image/token, and cost budgets for visual_analysis and answer phases.
+
+Artifact considerations:
+Prefer additive contracts and existing provider abstractions. Preserve existing persisted CodeCopilotContext rows and safe client errors. Include deployment and rollback notes for API, Response, and Capture artifacts.
+
+Risks/assumptions:
+Model support and structured-output behavior differ across OpenAI-compatible providers. Thirty full-screen data URLs and two sequential calls can be slow or expensive. Real-provider tests require external credentials that must not be committed.
+
+Expected output:
+Produce a concise feature specification with measurable acceptance criteria, error taxonomy, observability fields, fixture matrix, deployment/rollback checks, and manual Electron-to-VPS smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
+```

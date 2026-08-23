@@ -353,15 +353,23 @@ function Dashboard({
           <div className="split">
             <label>
               Programming language
-              <input
+              <select
                 disabled={!settings}
-                onBlur={(event) =>
+                onChange={(event) =>
                   void updateSettingsField(settings, setSettings, {
                     preferredProgrammingLanguage: normalizeProgrammingLanguageInput(event.currentTarget.value)
                   })
                 }
-                placeholder={settings?.preferredProgrammingLanguage || DEFAULT_COPILOT_PROGRAMMING_LANGUAGE}
-              />
+                value={settings?.preferredProgrammingLanguage || DEFAULT_COPILOT_PROGRAMMING_LANGUAGE}
+              >
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="python">Python</option>
+                <option value="java">Java</option>
+                <option value="cpp">C++</option>
+                <option value="csharp">C#</option>
+                <option value="go">Go</option>
+              </select>
             </label>
             <label>
               Session timer
@@ -765,26 +773,36 @@ async function maybeStartPeriodicScreenCapture(
   try {
     console.info(`[Persuando Capture] Periodic screen context timer started: activeSessionId=${activeCapture?.session.id ?? "none"} intervalMs=${PERIODIC_SCREEN_CAPTURE_INTERVAL_MS}.`);
     let stopped = false;
+    let captureInFlight = false;
     const capture = async () => {
       const debugId = createScreenDebugId("periodic");
       const screenPrefix = `[screen:${debugId}] `;
       if (stopped) return;
+      if (captureInFlight) {
+        console.warn(`[Persuando Capture] ${screenPrefix}Periodic tick skipped: previous screen capture is still in flight.`);
+        return;
+      }
       if (!activeCapture) {
         console.warn(`[Persuando Capture] ${screenPrefix}Periodic screen context skipped: no active capture in this renderer.`);
         return;
       }
-      console.info(`[Persuando Capture] ${screenPrefix}Periodic tick fired: activeSessionId=${activeCapture.session.id}.`);
-      console.info(`[Persuando Capture] ${screenPrefix}Screen capture requested from capture bridge.`);
-      const image = await captureScreenImageFallback(debugId);
-      console.info(`[Persuando Capture] ${screenPrefix}Screen capture result: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
-      activeCapture.sendContext({
-        debugId,
-        explanationMode: "explain",
-        imageReference: image.dataUrl,
-        textContext: `Periodic screen context captured during the active session from ${image.sourceLabel}.`
-      });
-      console.info(`[Persuando Capture] ${screenPrefix}Context send called.`);
-      setCaptureError(undefined);
+      captureInFlight = true;
+      try {
+        console.info(`[Persuando Capture] ${screenPrefix}Periodic tick fired: activeSessionId=${activeCapture.session.id}.`);
+        console.info(`[Persuando Capture] ${screenPrefix}Screen capture requested from capture bridge.`);
+        const image = await captureScreenImageFallback(debugId);
+        console.info(`[Persuando Capture] ${screenPrefix}Screen capture result: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
+        activeCapture.sendContext({
+          debugId,
+          explanationMode: "explain",
+          imageReference: image.dataUrl,
+          textContext: `Periodic screen context captured during the active session from ${image.sourceLabel}.`
+        });
+        console.info(`[Persuando Capture] ${screenPrefix}Context send called.`);
+        setCaptureError(undefined);
+      } finally {
+        captureInFlight = false;
+      }
     };
     const runCapture = async () => {
       try {

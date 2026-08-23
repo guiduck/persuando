@@ -10,10 +10,11 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const electron = require("electron") as typeof import("electron");
-const { app, BrowserWindow, desktopCapturer, ipcMain, Menu, nativeImage, Tray } = electron;
+const { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, Tray } = electron;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.CAPTURE_RENDERER_URL !== undefined;
 const preloadPath = resolve(__dirname, "../../preload.cjs");
+const SCREEN_CAPTURE_ACCELERATOR = "CommandOrControl+E";
 
 let dashboardWindow: ElectronBrowserWindow | undefined;
 let toolbarWindow: ElectronBrowserWindow | undefined;
@@ -152,6 +153,19 @@ function hideToolbar(): void {
   runtimeState.toolbarVisible = false;
   toolbarWindow?.hide();
   broadcastState();
+}
+
+function registerGlobalShortcuts(): void {
+  const registered = globalShortcut.register(SCREEN_CAPTURE_ACCELERATOR, () => {
+    log(`Global shortcut ${SCREEN_CAPTURE_ACCELERATOR} received: listening=${runtimeState.listening} sessionId=${runtimeState.activeSessionId ?? "none"}.`);
+    if (!runtimeState.listening) {
+      showToolbar();
+      log(`Global shortcut ${SCREEN_CAPTURE_ACCELERATOR} ignored: start listening before capturing screen context.`);
+      return;
+    }
+    sendCommand("capture-context");
+  });
+  log(`Global shortcut ${SCREEN_CAPTURE_ACCELERATOR} ${registered ? "registered" : "registration failed"}.`);
 }
 
 function sendCommand(command: string): void {
@@ -340,6 +354,7 @@ await app.whenReady();
 log("Electron app is ready.");
 createTray();
 await createWindows();
+registerGlobalShortcuts();
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) void createWindows();
@@ -347,4 +362,8 @@ app.on("activate", () => {
 
 app.on("before-quit", () => {
   appIsQuitting = true;
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
 });

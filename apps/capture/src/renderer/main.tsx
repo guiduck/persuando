@@ -1,5 +1,6 @@
+import { Camera, House, MessageCircleQuestion, Minus } from "lucide-react";
 import { createRoot } from "react-dom/client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import type { ConsentGrant, ConsentType, ProviderCredentialMetadata, UserSettings } from "@persuando/contracts";
 
 import {
@@ -425,6 +426,26 @@ function Dashboard({
   );
 }
 
+function ToolbarButton({
+  children,
+  className,
+  label,
+  shortcut,
+  ...buttonProps
+}: Readonly<{
+  children: ReactNode;
+  label: string;
+  shortcut?: string;
+} & ButtonHTMLAttributes<HTMLButtonElement>>) {
+  const tooltip = shortcut ? `${label} (${shortcut})` : label;
+  return (
+    <span className="toolbar-button-wrap" title={tooltip}>
+      <button {...buttonProps} aria-label={tooltip} className={className} type="button">
+        {children}
+      </button>
+    </span>
+  );
+}
 function Toolbar({
   audioLevel,
   captureError,
@@ -460,18 +481,29 @@ function Toolbar({
   return (
     <main className="floating-shell">
       <section className="floating-toolbar">
-        <button aria-label="Open dashboard" className="icon-button" onClick={() => void window.persuandoCapture?.showDashboard()} type="button">
-          H
-        </button>
-        <button aria-label="Hide toolbar" className="icon-button" onClick={() => void window.persuandoCapture?.hideToolbar()} type="button">
-          -
-        </button>
-        <button aria-label="Open assistant prompt" className="icon-button" disabled={!runtimeState.listening} onClick={() => void sendPracticeContext(contextText, "hint", setCaptureError, consentGrants)} type="button">
-          A
-        </button>
-        <button aria-label="Capture screen context" className="icon-button" disabled={!runtimeState.listening} onClick={() => void captureScreenContext(setCaptureError, consentGrants)} type="button">
-          S
-        </button>
+        <ToolbarButton className="icon-button" label="Open the Capture dashboard and settings" onClick={() => void window.persuandoCapture?.showDashboard()}>
+          <House aria-hidden="true" size={17} />
+        </ToolbarButton>
+        <ToolbarButton className="icon-button" label="Hide the floating toolbar; reopen it from the system tray" onClick={() => void window.persuandoCapture?.hideToolbar()}>
+          <Minus aria-hidden="true" size={18} />
+        </ToolbarButton>
+        <ToolbarButton
+          className="icon-button"
+          disabled={!runtimeState.listening}
+          label="Send the text in Ask to Code Practice as a hint"
+          onClick={() => void sendPracticeContext(contextText, "hint", setCaptureError, consentGrants)}
+        >
+          <MessageCircleQuestion aria-hidden="true" size={18} />
+        </ToolbarButton>
+        <ToolbarButton
+          className="icon-button screenshot-button"
+          disabled={!runtimeState.listening}
+          label="Take a screenshot and send it to Screen context"
+          onClick={() => void captureScreenContext(setCaptureError, consentGrants)}
+          shortcut="Ctrl+E"
+        >
+          <Camera aria-hidden="true" size={18} />
+        </ToolbarButton>
         <span className={runtimeState.listening ? "status active" : "status"}>{status}</span>
         {runtimeState.listening ? <span className="timer">{elapsed}</span> : null}
         <span className="mini-meter" aria-label="Microphone input level">
@@ -487,17 +519,17 @@ function Toolbar({
         />
         {runtimeState.listening ? (
           <>
-            <button onClick={() => void togglePaused(runtimeState, setRuntimeState)} type="button">
+            <ToolbarButton label={runtimeState.paused ? "Resume microphone capture" : "Pause microphone capture without ending the session"} onClick={() => void togglePaused(runtimeState, setRuntimeState)}>
               {runtimeState.paused ? "Resume" : "Pause"}
-            </button>
-            <button className="danger" onClick={() => void toggleListening(runtimeState, setRuntimeState, settings, setCaptureError, selectedMicrophoneId, consentGrants, setAudioLevel)} type="button">
+            </ToolbarButton>
+            <ToolbarButton className="danger" label="End the current capture session" onClick={() => void toggleListening(runtimeState, setRuntimeState, settings, setCaptureError, selectedMicrophoneId, consentGrants, setAudioLevel)}>
               End
-            </button>
+            </ToolbarButton>
           </>
         ) : (
-          <button className="primary" onClick={() => void toggleListening(runtimeState, setRuntimeState, settings, setCaptureError, selectedMicrophoneId, consentGrants, setAudioLevel)} type="button">
+          <ToolbarButton className="primary" label="Start a new microphone capture session" onClick={() => void toggleListening(runtimeState, setRuntimeState, settings, setCaptureError, selectedMicrophoneId, consentGrants, setAudioLevel)}>
             Start listening
-          </button>
+          </ToolbarButton>
         )}
         {captureError ? <span className="status error">Error</span> : null}
       </section>

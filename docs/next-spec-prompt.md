@@ -134,3 +134,7 @@ Produce a concise feature specification with acceptance criteria, failure states
 ## Additional Source Context - 2026-08-23 Incremental Tutoring
 
 The implemented baseline now performs two OpenAI-compatible calls for Code Practice: `visual_analysis` receives all current screenshots and extracts exact structured evidence; `answer` receives that analysis plus the last four completed explanations. Manual guidance is persisted in the existing CodeCopilotContext table, and the Response panel exposes `N/30` FIFO order. The next `/speckit-specify` must preserve this truthful two-phase behavior and define fixture-based quality gates for function signatures, provided node fields, method-only submissions, print/return semantics, output whitespace, current code, failed test evidence, correction of prior advice, OCR uncertainty, latency, and image/token cost. It must not introduce fabricated fallback content or automated code execution.
+
+## Additional Source Context - 2026-08-23 Capture Toolbar Ergonomics
+
+The floating Capture toolbar now uses explanatory native tooltips and accessible labels for every action. Its camera action remains visible and is also available through the Electron global accelerator `CommandOrControl+E`, which reuses the existing consented manual `capture-context` flow only during an active listening session. Future Capture UI specs must preserve discoverability, visible capture state, accelerator conflict handling, and the product's consent and responsible-use boundaries.

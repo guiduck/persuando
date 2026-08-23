@@ -230,9 +230,25 @@ kbd {
   -webkit-app-region: no-drag;
 }
 
+.toolbar-button-wrap {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .icon-button {
+  display: inline-grid;
+  place-items: center;
   width: 36px;
   padding: 0;
+}
+
+.icon-button svg {
+  pointer-events: none;
+}
+
+.screenshot-button {
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
 }
 
 .status {

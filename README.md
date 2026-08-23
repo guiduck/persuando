@@ -291,6 +291,13 @@ Screenshot troubleshooting:
 - If the Capture debug log says periodicScreenshotCaptureDefault=false or Periodic screen context not started: setting disabled, enable Periodic screen context default in the Capture App Features panel and start capture again.
 - If the feature is on, the debug log should show Screen capture requested, Screen capture completed, and Sending copilot.context with hasImage=true.
 
+### Floating Capture Toolbar
+
+- Hover any toolbar action to see what it does. Disabled actions keep their tooltip.
+- The camera button is always visible. During an active listening session, click it or press `Ctrl+E` from any focused Windows app to capture and send the current screen context.
+- If no session is listening, `Ctrl+E` opens the toolbar and logs that the screenshot was ignored instead of sending context without an active session.
+- The Electron log reports whether `CommandOrControl+E` registered successfully and when the shortcut is received.
+
 ## Validation
 
 Run the main checks:

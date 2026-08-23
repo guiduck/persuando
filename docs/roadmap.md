@@ -116,3 +116,7 @@ Phase 3 Production MVP now sends the latest 30 visual contexts to real Code Prac
 ## Update - 2026-08-23 Incremental Code Practice Tutoring
 
 Phase 3 now includes a two-pass real-provider Code Practice flow: structured visual extraction across all 30 FIFO screenshots, followed by a grounded tutoring response that receives up to four persisted prior explanations. Manual guidance is stored without a schema migration, remains available despite intervening periodic captures, and must diagnose the latest code/test failure while honoring the exact platform signature and output contract. The Response panel exposes the actual screenshot count/order. Remaining gate: real-provider VPS evaluation for accuracy, OCR uncertainty, latency, and cost. Deferred: semantic screenshot deduplication, model routing, automated execution of generated code, and durable image-object storage.
+
+## Update - 2026-08-23 Capture Toolbar Tooltips And Screenshot Shortcut
+
+Phase 3 Capture ergonomics now include explanatory hover tooltips and accessible labels for every floating-toolbar action. The screenshot camera remains visible and `CommandOrControl+E` globally invokes the existing manual screen-context flow while listening. Remaining gate: packaged Windows smoke for tooltip visibility, active/inactive session behavior, and accelerator conflicts. Deferred and unchanged: configurable shortcuts, multi-shortcut profiles, and any consent or capture-policy changes.

@@ -71,3 +71,26 @@ test("Capture app exposes native screen capture bridge", () => {
   assert.match(`${renderer}
 ${electronMain}`, /captureScreenImage|capture-screen-image/);
 });
+
+test("floating toolbar explains every action and keeps a global screenshot shortcut", () => {
+  for (const expected of [
+    "Open the Capture dashboard and settings",
+    "Hide the floating toolbar; reopen it from the system tray",
+    "Send the text in Ask to Code Practice as a hint",
+    "Take a screenshot and send it to Screen context",
+    "Pause microphone capture without ending the session",
+    "Resume microphone capture",
+    "End the current capture session",
+    "Start a new microphone capture session"
+  ]) {
+    assert.ok(renderer.includes(expected));
+  }
+
+  assert.match(renderer, /<Camera[^>]+aria-hidden="true"/);
+  assert.match(renderer, /shortcut="Ctrl\+E"/);
+  assert.match(renderer, /toolbar-button-wrap/);
+  assert.match(electronMain, /globalShortcut\.register\(SCREEN_CAPTURE_ACCELERATOR/);
+  assert.match(electronMain, /CommandOrControl\+E/);
+  assert.match(electronMain, /sendCommand\("capture-context"\)/);
+  assert.match(electronMain, /globalShortcut\.unregisterAll\(\)/);
+});

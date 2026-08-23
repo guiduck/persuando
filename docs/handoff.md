@@ -111,3 +111,12 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Validation: `npm.cmd run build` passed; `npm.cmd run test` passed 115/115; focused provider/realtime/Response tests passed 37/37; `npm.cmd run typecheck` passed. The regression confirms previous guidance survives fifteen intervening periodic screenshots.
 - Remaining work: deploy API and Response together and run a real-provider smoke with a new session containing the statement, method signature, one wrong attempt, and its failed test result. Two sequential calls intentionally trade additional latency/cost for grounding quality; production evaluation should measure both phases.
 - Recommended next Spec Kit step: specify a real-provider visual-tutoring evaluation suite with fixtures for exact platform contracts, iterative failed attempts, OCR uncertainty, context deduplication, latency, and token/image cost budgets.
+
+## Implementation Update - 2026-08-23 Capture Toolbar Tooltips And Screenshot Shortcut
+
+- Current status: every floating-toolbar action exposes an explanatory native tooltip and accessible label, including disabled actions.
+- Decision: keep the camera action permanently visible and register `CommandOrControl+E` in Electron. It dispatches the existing `capture-context` command only while a session is listening; otherwise it reveals the toolbar and logs the ignored request.
+- Lifecycle: the shortcut is registered after the Capture windows are created and all global shortcuts are unregistered during `will-quit`.
+- Validation: the focused Capture test passed 6/6; the Capture production bundle passed; `npm.cmd run build` passed; `npm.cmd run test` passed 116/116; and `npm.cmd run lint` passed.
+- Remaining work: manually confirm native tooltip timing and global shortcut behavior in packaged Windows Electron, including shortcut-registration conflicts with other applications.
+- Recommended next Spec Kit step: keep the existing visual-context production-hardening spec as the next major slice; include packaged-toolbar accelerator conflict and discoverability checks in its Electron smoke criteria.

@@ -40,7 +40,9 @@ test("Response session UI retains, displays, and sends up to 30 screen contexts"
   assert.match(sessionPage, /MAX_SCREEN_CONTEXTS = 30/);
   assert.match(sessionPage, /history\.screenContexts \?\? \[\]/);
   assert.match(sessionPage, /screenContexts\.slice\(-MAX_SCREEN_CONTEXTS\)/);
-  assert.match(sessionPage, /newestFirstContexts\.map\(\(context, index\)/);
+  assert.ok(sessionPage.includes("newestFirstContexts.map((context, index)"));
+  assert.ok(sessionPage.includes('scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" })'));
+  assert.ok(sessionPage.includes('if (event.type === "copilot.context") return true'));
   assert.match(sessionPage, /contexts\.length}\/\{MAX_SCREEN_CONTEXTS} newest to oldest/);
   assert.match(sessionPage, /newest/);
   assert.doesNotMatch(sessionPage, /contexts\.slice\(-3\)/);

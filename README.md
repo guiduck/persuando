@@ -359,3 +359,17 @@ Manual Code Practice generation logs a `generationId` across `visual_analysis` a
 ```bash
 pm2 logs persuando-api --lines 500 --nostream | grep -E "Manual generation|Generation provider|generationId|invalid JSON|network request|HTTP request"
 ```
+### Realtime screenshots and provider recovery
+
+A received `copilot.context` event bypasses generation-panel filters in Response Mode. The screen-context list immediately scrolls to the top so the newest screenshot is visible without a refresh or manual scrolling.
+
+Code Practice generation retries one transient network, HTTP 408/429, or HTTP 5xx failure after 500 ms. Provider logs include `attempt`, `retrying`, `httpStatus`, and a safe `causeCode`. The selected programming language overrides an unknown visual-language result. For public practice exercises, an answer without a non-empty fenced block in that language is retried once with a repair instruction; a second invalid answer becomes `PROVIDER_RESPONSE_INVALID` instead of being displayed as complete guidance.
+
+Useful VPS filter:
+
+```bash
+pm2 logs persuando-api --lines 500 --nostream | grep -E "Manual generation|Generation provider|Provider network|Provider HTTP|missing required code|retrying"
+```
+### Switching coding exercises in one session
+
+Code Practice groups the latest 30 screenshots by visible exercise title, URL, function signature, statement, and editor state. The newest identifiable exercise is active. Older screenshots and prior guidance are used only when they match that active exercise; evidence from another challenge is treated as stale context. When an exact public practice challenge is identifiable but the newest screenshot is partial, the tutor may use the established challenge contract, label the assumption, and must still provide the complete solution in the Capture-selected language. Big-O must be derived from the loops, traversals, recursion, and data structures in that proposed solution.

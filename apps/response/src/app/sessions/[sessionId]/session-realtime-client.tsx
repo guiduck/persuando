@@ -458,14 +458,21 @@ function SuggestionPanel({
 }
 
 function ScreenContextPanel({ contexts }: Readonly<{ contexts: ScreenContext[] }>) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const newestContextId = contexts.at(-1)?.id;
   const newestFirstContexts = [...contexts].reverse();
+
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [newestContextId]);
+
   return (
     <section className="panel">
       <div className="panel-heading">
         <h2>Screen context</h2>
         <span className="pill">{contexts.length}/{MAX_SCREEN_CONTEXTS} newest to oldest</span>
       </div>
-      <div className="artifact-list panel-scroll">
+      <div className="artifact-list panel-scroll" ref={scrollContainerRef}>
         {contexts.length === 0 ? (
           <span className="pill empty">No screen context yet.</span>
         ) : (
@@ -743,6 +750,7 @@ function shouldAcceptGeneratedEvent(
   panelModes: Record<PanelKey, PanelMode>,
   pendingManualModes: Set<GenerateMode>
 ): boolean {
+  if (event.type === "copilot.context") return true;
   if (event.type === "summary.updated") return panelModes.summary === "automatic" || consumePendingMode(pendingManualModes, "summary");
   if (event.type === "insight.created") return panelModes.insights === "automatic" || consumePendingMode(pendingManualModes, "insights");
   if (event.type === "suggestion.created") {

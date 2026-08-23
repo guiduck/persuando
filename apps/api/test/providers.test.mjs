@@ -167,6 +167,39 @@ test("OpenAiCompatibleProviderAdapter maps missing key, network failure, and unk
   assert.equal(JSON.stringify(safe).includes("sk-provider-secret"), false);
 });
 
+test("OpenAiCompatibleProviderAdapter retries one transient generation network failure", async () => {
+  let requestCount = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      const error = new TypeError("fetch failed");
+      error.cause = { code: "UND_ERR_SOCKET" };
+      throw error;
+    }
+    return jsonResponse(200, {
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            summary: { content: "Recovered response." },
+            insights: [],
+            suggestions: []
+          })
+        }
+      }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    transcriptText: "retry this generation"
+  });
+
+  assert.equal(requestCount, 2);
+  assert.equal(output.summary.content, "Recovered response.");
+});
 test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output", async () => {
   const requests = [];
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (url, init) => {
@@ -186,6 +219,8 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
                     "Este texto e longo o suficiente para passar pela validacao de qualidade. ".repeat(40),
                     "## Técnica escolhida",
                     "Usar algoritmo recursivo passo a passo.",
+                    "## Solução atualizada",
+                    "```javascript\nfunction getHeight(root) { return root === null ? -1 : 1 + Math.max(getHeight(root.left), getHeight(root.right)); }\n```",
                     "## Complexidade Big-O",
                     "Tempo O(n) e espaco O(h)."
                   ].join("\n"),
@@ -248,7 +283,7 @@ test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accep
     JSON.stringify({
       summary: { content: "Use BFS em JavaScript." },
       insights: [],
-      suggestions: [{ category: "response", content: "Implemente levelOrder com uma fila em JavaScript.", urgency: "high" }]
+      suggestions: [{ category: "response", content: "## Solução atualizada\n```javascript\nfunction levelOrder(root) { const queue = [root]; }\n```\nPasso a passo.", urgency: "high" }]
     })
   ];
   let requestCount = 0;
@@ -270,7 +305,51 @@ test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accep
   });
 
   assert.equal(requestCount, 3);
-  assert.match(output.suggestions[0].content, /JavaScript/);
+  assert.match(output.suggestions[0].content, /```javascript/);
+});
+test("OpenAiCompatibleProviderAdapter retries a Code Practice answer that omits the selected-language solution", async () => {
+  const requests = [];
+  const responses = [
+    JSON.stringify({ problemTitle: "Swap Nodes [Algo]", language: "unknown", functionSignature: null }),
+    JSON.stringify({
+      summary: { content: "Explique com travessia." },
+      insights: [],
+      suggestions: [{ category: "response", content: "Use uma fila, mas preciso ver o editor.", urgency: "high" }]
+    }),
+    JSON.stringify({
+      summary: { content: "Solução corrigida." },
+      insights: [],
+      suggestions: [{
+        category: "response",
+        content: "## Solução atualizada\n```javascript\nfunction swapNodes(indexes, queries) { return []; }\n```\n## Passo a passo\nA função segue o contrato selecionado.",
+        urgency: "high"
+      }]
+    })
+  ];
+  let requestCount = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{ finish_reason: "stop", message: { content: responses[requestCount++] } }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/jpeg;base64,swap-nodes"],
+    programmingLanguage: "javascript",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Public HackerRank practice page"
+  });
+
+  assert.equal(requestCount, 3);
+  assert.match(requests[1].messages[1].content, /"language":"javascript"/);
+  assert.match(requests[1].messages[1].content, /"selectedProgrammingLanguageIsAuthoritative":true/);
+  assert.match(requests[2].messages[1].content, /REPAIR REQUIRED/);
+  assert.match(output.suggestions[0].content, /```javascript/);
 });
 test("OpenAiCompatibleProviderAdapter preserves genuine short Code Practice output without hardcoded replacement", async () => {
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>

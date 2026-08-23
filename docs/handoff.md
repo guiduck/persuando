@@ -144,3 +144,19 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Validation: `npm.cmd run build` passed; focused Capture/API/Response tests passed 36/36; `npm.cmd run test` passed 123/123; the Capture production bundle passed; and `npm.cmd run lint` passed.
 - Remaining work: deploy API and Response, rebuild/restart the Windows Capture artifact, then correlate `[screen:<debugId>]` and `transportLatencyMs` during a new session. Confirm JPEG OCR quality on small editor text.
 - Recommended next Spec Kit step: preserve the provider-reliability prompt and add measurable Capture-to-Response latency, payload-size, persistence-failure, and screenshot readability acceptance criteria.
+## Implementation Update - 2026-08-23 Immediate Screenshot UI And Provider Recovery
+
+- Current status: Response accepts every `copilot.context` event independently of generation panel modes and automatically returns the screen-context scroller to the newest item as soon as state is applied.
+- Recent decision: OpenAI-compatible chat requests retry one transient network, 408, 429, or 5xx failure with a 500 ms delay. Logs expose attempt count, retry decision, HTTP status, and safe network cause code.
+- Code Practice quality: the Capture-selected language now overrides unknown/conflicting visual inference. Public practice output must contain a non-empty fenced solution in that language; one answer-repair attempt is allowed, then the API returns `PROVIDER_RESPONSE_INVALID` rather than presenting an incomplete answer.
+- Latest validation: `npm.cmd run build` passed; `npm.cmd run test` passed 125/125, including the explicit transient-recovery regression; `npm.cmd run lint` passed; and the Response production build passed.
+- Remaining work: deploy API and Response, rebuild/restart Capture locally, and perform a real-provider VPS smoke. Correlate `[screen:<debugId>]`, `transportLatencyMs`, `generationId`, provider phase, and retry attempt.
+- Recommended next Spec Kit step: specify measurable screenshot delivery latency and provider reliability/quality evaluation, including payload limits, OCR quality, error attribution by generation mode, and bounded retry budgets.
+## Implementation Update - 2026-08-23 Multi-Exercise Context Segmentation
+
+- Current status: visual analysis groups screenshots by exercise and selects the newest identifiable challenge as active. Screenshots and previous guidance from another title, URL, signature, or behavior are excluded from the active contract and attempt.
+- Decision: an exact public practice challenge may use its established standard contract when the latest screenshot is partial, with assumptions labeled. The tutor must not withhold the selected-language solution solely because the final screenshot omits the stub.
+- Explanation quality: Big-O must define the actual input variables and connect the final bound to the implementation's traversals, loops, recursion depth, and data structures rather than reciting a generic definition.
+- Validation: `npm.cmd run test` passed 125/125, including prompt contract assertions; the prior full build, lint, and Response production build remain green.
+- Remaining work: deploy API and Response, then test two different HackerRank exercises in one session and verify the second answer ignores stale first-exercise code while still using recent screenshots from the second.
+- Recommended next Spec Kit step: add multi-exercise visual fixtures and measurable active-problem classification accuracy to the provider reliability evaluation.

@@ -58,9 +58,20 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     const visualAnalysis = input.task === "code_practice"
       ? await this.analyzeCodePracticeVisuals(input, generationId)
       : undefined;
+    return this.generateAnswer(input, generationId, imageCount, visualAnalysis);
+  }
+
+  private async generateAnswer(
+    input: ProviderGenerationInput,
+    generationId: string,
+    imageCount: number,
+    visualAnalysis: string | undefined,
+    attempt = 1
+  ): Promise<ProviderGenerationOutput> {
+    if (!input.apiKey) throw new ProviderAdapterError("PROVIDER_KEY_INVALID", "Provider API key is missing.", false);
     const startedAt = Date.now();
     this.logger.log(
-      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} transcriptLength=${input.transcriptText.length}`
+      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} transcriptLength=${input.transcriptText.length}`
     );
     const response = await this.fetchProvider("/chat/completions", input.apiKey, {
       body: JSON.stringify({
@@ -71,7 +82,7 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           },
           {
             role: "user",
-            content: generationUserContent(input, visualAnalysis)
+            content: generationUserContent(input, visualAnalysis) + codePracticeRepairInstruction(input, attempt)
           }
         ],
         model: input.analysisModel,
@@ -87,9 +98,21 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
       : "";
     const finishReason = payload.choices?.[0]?.finish_reason ?? "missing";
     this.logger.log(
-      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
+      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
     );
-    return parseGenerationContent(responseContent, input.transcriptText, input.task);
+    const output = parseGenerationContent(responseContent, input.transcriptText, input.task);
+    if (input.task === "code_practice" && input.programmingLanguage && !hasRequiredCodeSolution(output, input.programmingLanguage)) {
+      this.logger.warn(
+        `Generation provider answer missing required code solution: generationId=${generationId} sessionId=${input.sessionId} phase=answer attempt=${attempt} programmingLanguage=${input.programmingLanguage}.`
+      );
+      if (attempt === 1) return this.generateAnswer(input, generationId, imageCount, visualAnalysis, 2);
+      throw new ProviderAdapterError(
+        "PROVIDER_RESPONSE_INVALID",
+        `Provider did not return the required ${input.programmingLanguage} solution after repair.`,
+        true
+      );
+    }
+    return output;
   }
 
   private async analyzeCodePracticeVisuals(
@@ -130,7 +153,14 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     );
 
     const parsed = parseJsonObject(responseContent);
-    if (parsed) return JSON.stringify(parsed);
+    if (parsed) {
+      if (input.programmingLanguage) {
+        parsed.language = input.programmingLanguage;
+        parsed.selectedProgrammingLanguage = input.programmingLanguage;
+        parsed.selectedProgrammingLanguageIsAuthoritative = true;
+      }
+      return JSON.stringify(parsed);
+    }
 
     this.logger.warn(
       `Generation provider invalid JSON: generationId=${generationId} sessionId=${input.sessionId} phase=visual_analysis attempt=${attempt} model=${input.analysisModel} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} startsWithBrace=${responseContent.trimStart().startsWith("{")}`
@@ -181,28 +211,54 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     return payload as ChatCompletionPayload;
   }
   private async fetchProvider(path: string, apiKey: string, init: RequestInit): Promise<Response> {
-    let response: Response;
-    try {
-      response = await this.fetchFn(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
-        ...init,
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          ...(init.headers ?? {})
+    const maxAttempts = path.includes("chat/completions") ? 2 : 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      let response: Response;
+      try {
+        response = await this.fetchFn(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
+          ...init,
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            ...(init.headers ?? {})
+          }
+        });
+      } catch (error) {
+        const retrying = attempt < maxAttempts;
+        this.logger.warn(
+          `Provider network request failed: path=${path} attempt=${attempt}/${maxAttempts} retrying=${retrying} errorType=${error instanceof Error ? error.name : "unknown"} causeCode=${providerNetworkCauseCode(error)}.`
+        );
+        if (retrying) {
+          await delay(500);
+          continue;
         }
-      });
-    } catch (error) {
-      this.logger.warn(
-        `Provider network request failed: path=${path} errorType=${error instanceof Error ? error.name : "unknown"}.`
-      );
-      throw new ProviderAdapterError("PROVIDER_UNAVAILABLE", "Provider network request failed.", true);
-    }
+        throw new ProviderAdapterError("PROVIDER_UNAVAILABLE", "Provider network request failed after retry.", true);
+      }
 
-    if (!response.ok) {
-      this.logger.warn(`Provider HTTP request rejected: path=${path} httpStatus=${response.status}.`);
-      throw providerErrorForStatus(response.status, path);
+      if (response.ok) return response;
+      const providerError = providerErrorForStatus(response.status, path);
+      const retrying = attempt < maxAttempts && providerError.retryable;
+      this.logger.warn(
+        `Provider HTTP request rejected: path=${path} attempt=${attempt}/${maxAttempts} retrying=${retrying} httpStatus=${response.status}.`
+      );
+      if (retrying) {
+        await delay(500);
+        continue;
+      }
+      throw providerError;
     }
-    return response;
+    throw new ProviderAdapterError("PROVIDER_UNAVAILABLE", "Provider request failed after retry.", true);
   }
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function providerNetworkCauseCode(error: unknown): string {
+  if (!error || typeof error !== "object" || !("cause" in error)) return "none";
+  const cause = error.cause;
+  if (!cause || typeof cause !== "object" || !("code" in cause)) return "none";
+  return typeof cause.code === "string" ? cause.code : "unknown";
 }
 
 function contentTypeForCodec(codec: ProviderTranscriptionInput["codec"]): string {
@@ -268,15 +324,19 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"]): string {
     return [
       "You are Persuando Code Practice, a meticulous coding tutor for self-study, preparation, and review.",
       "The visual-analysis JSON is the factual source for the current problem, platform contract, student code, and test results. Screenshots were analyzed oldest to newest; recent evidence overrides stale evidence.",
+      "Screenshots may contain multiple exercises from the same session. Use only screenshots assigned to the active problem identified by the newest recognizable title, URL, function signature, or editor state. Never carry code, contracts, or test results from a different exercise into the active answer.",
+      "The explicitly selected programming language is authoritative and overrides a missing, unknown, or conflicting language inferred from screenshots.",
       "Before suggesting code, compare the current attempt with the exact contract: requested function name/signature, provided node fields/types, whether to print or return, separators/newlines, and whether the platform wants method-only code.",
       "Treat previous guidance as fallible history. Check it against the newest evidence, explicitly correct any prior mistake, and do not restart from zero when the student is iterating on code.",
       "If test results are visible, diagnose the current failure first. Quote the relevant expected/actual behavior without inventing hidden test details, then give the smallest correction and an updated solution.",
       "Never invent scaffolding, classes, field names, input parsing, or output behavior that the platform already supplies. Preserve visible identifiers such as root, data, left, right, and the exact required function signature.",
       "For output-format problems, verify spaces, line breaks, trailing separators, and print-versus-return semantics explicitly.",
-      "Responsible-use boundary: for a clearly proctored exam, hiring assessment, live interview, or active contest, provide conceptual debugging and pseudocode rather than copy-paste final code. A public practice page without proctoring signals may receive a complete taught solution.",
+      "Responsible-use boundary: for a clearly proctored exam, hiring assessment, live interview, or active contest, provide conceptual debugging and pseudocode rather than copy-paste final code. For a public self-study or practice page without visible proctoring signals, always provide a complete taught solution in the selected language.",
+      "If the public exercise title, URL, and behavior are clear but the editor signature is not visible, state the signature assumption briefly and still provide the standard platform function solution. Do not withhold the solution merely to request another screenshot.",
+      "Explain Big-O for the actual proposed solution: define the problem variables, connect each traversal, loop, recursion, queue, heap, or sort to its cost, and explain why the final bound follows. Do not give a generic definition of Big-O.",
       "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the main answer in suggestions[0].content with category='response' and urgency='high'.",
       "Write explanations in the requested response language, but write every code block in the explicitly selected programming language. Never substitute pseudocode or another language when a programming language is provided.",
-      "Use concise Markdown headings, exact same-language snippets, Big-O, and a final contract checklist. Prefer 500 to 1200 useful words over repetitive boilerplate.",
+      "A Code Practice response is invalid unless Solução atualizada contains a non-empty fenced code block labeled with the selected programming language, followed by a step-by-step explanation. Use concise Markdown headings, Big-O, and a final contract checklist. Prefer 500 to 1200 useful words over repetitive boilerplate.",
       "Do not include secrets."
     ].join(" ");
   }
@@ -300,9 +360,12 @@ function codePracticeVisualAnalysisSystemPrompt(): string {
   return [
     "You are a visual evidence analyst for a coding tutor. Do not solve the exercise and do not teach yet.",
     "Read every attached screenshot in chronological order from oldest to newest. Extract exact visible facts and distinguish old attempts from the newest state.",
-    "Return STRICT JSON with: problemTitle, platform, language, functionSignature, requiredBehavior, outputContract, providedScaffolding, providedFieldNames, currentAttempt, observedTestResults, chronologicalProgress, staleOrConflictingEvidence, uncertainties.",
+    "First group screenshots by exercise using visible title, URL, function name/signature, statement text, and editor content. The active problem is the newest identifiable exercise. A partial newest screenshot may use immediately older screenshots only when they belong to that same exercise.",
+    "Exclude screenshots from other exercises from the active contract, attempt, test results, and progress. Record them only as staleOrConflictingEvidence.",
+    "If an exact public practice challenge is identifiable by title or URL, you may fill missing contract details from the established standard challenge, but mark those fields in inferredFromKnownPublicProblem and keep visible facts separate.",
+    "Return STRICT JSON with: activeProblemTitle, activeProblemEvidence, screenshotGroups, problemTitle, platform, language, functionSignature, requiredBehavior, outputContract, providedScaffolding, providedFieldNames, currentAttempt, observedTestResults, chronologicalProgress, inferredFromKnownPublicProblem, staleOrConflictingEvidence, uncertainties.",
     "Transcribe identifiers and output requirements exactly. For test results, capture pass/fail counts, runtime/compiler messages, expected output, actual output, and the newest visible status when available.",
-    "Do not infer a function contract from generic knowledge when the screenshot shows one. Use null or an empty array for facts that are not visible. Do not include image data or secrets."
+    "Never override a visible function contract with generic knowledge. When the active public challenge is not identifiable, use null or an empty array for facts that are not visible. Do not include image data or secrets."
   ].join(" ");
 }
 
@@ -349,18 +412,32 @@ Produce the next tutoring turn, not a fresh generic solution. Follow this order:
 2. "Contrato exato da plataforma": state the exact function signature, provided fields/types, print-versus-return behavior, and output formatting. Do not add scaffolding the editor already provides.
 3. "Correção do histórico": identify any incorrect or stale prior guidance and correct it explicitly. If prior guidance was sound, say what remains applicable.
 4. "Correção mínima": show the smallest change that addresses the newest visible failure.
-5. "Solução atualizada": provide the method/function in the selected programming language and exact platform format when allowed. Match identifiers and output format exactly.
+5. "Solução atualizada": for a public self-study or practice page, provide the complete method/function in the selected programming language and exact platform format. Match identifiers and output format exactly.
 6. "Por que funciona": walk through the visible sample or newest test evidence.
 7. "Complexidade Big-O" and "Checklist antes de enviar".
 
 Hard requirements:
 - Use the latest screenshot state as authoritative while using older screenshots to understand progress.
+- Treat the newest identifiable exercise as the active problem. Use older screenshots only when they belong to that same exercise; ignore previous guidance for a different title, URL, signature, or behavior.
+- When an exact public practice challenge is identifiable but its latest screenshot is partial, use the standard challenge contract and clearly label the assumption instead of withholding code.
 - Use the selected programming language for every code block. If it is provided, do not output language-neutral pseudocode even when the editor language is not visible.
 - Never use generic node fields such as value when the provided type uses data.
 - Never print one item per line when the output contract requires one space-separated line.
 - Never recreate Node, Tree, main, stdin parsing, or sample construction in a method-only submission.
 - Do not claim the solution passes when the newest screenshot shows a failure; explain what still needs verification.
+- Make Big-O specific to the proposed implementation: name the input variables and tie each cost to the traversals, loops, recursion depth, and data structures actually used.
 - Return strict JSON with the complete Markdown answer in suggestions[0].content.`;
+}
+function codePracticeRepairInstruction(input: ProviderGenerationInput, attempt: number): string {
+  if (input.task !== "code_practice" || attempt === 1 || !input.programmingLanguage) return "";
+  return `\n\nREPAIR REQUIRED: The previous answer was rejected because it did not contain a complete, non-empty fenced ${input.programmingLanguage} code block. Return the full strict JSON again. In suggestions[0].content, include the complete platform solution under "Solução atualizada" in a fenced code block labeled ${input.programmingLanguage}, then explain it step by step. Do not replace it with pseudocode and do not merely ask for another screenshot.`;
+}
+
+function hasRequiredCodeSolution(output: ProviderGenerationOutput, programmingLanguage: string): boolean {
+  const content = output.suggestions[0]?.content ?? output.summary.content;
+  const normalizedLanguage = programmingLanguage.trim().toLowerCase();
+  const codeBlocks = [...content.matchAll(/```([^\r\n]*)[\r\n]+([\s\S]*?)```/g)];
+  return codeBlocks.some((match) => match[1]?.trim().toLowerCase() === normalizedLanguage && Boolean(match[2]?.trim()));
 }
 function parseJsonObject(content: string): Record<string, unknown> | undefined {
   const trimmed = content.trim();

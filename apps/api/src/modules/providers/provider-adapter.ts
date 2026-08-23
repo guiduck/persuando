@@ -18,6 +18,7 @@ export interface ProviderGenerationInput {
   task?: "session_assistance" | "summary" | "insights" | "followups" | "code_practice";
   transcriptText: string;
   imageReferences?: string[];
+  previousCodePracticeGuidance?: string[];
 }
 
 export interface ProviderTranscriptionOutput {

@@ -554,6 +554,9 @@ export class RealtimeService {
       ? requestedScreenContexts
       : mergeScreenContexts([...persistedScreenContexts, ...cachedScreenContexts]).slice(-MAX_SCREEN_CONTEXTS);
     const screenContextSource = requestedScreenContexts.length > 0 ? "response_payload" : "session_history";
+    const previousCodePracticeGuidance = event.payload.mode === "code_practice"
+      ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
+      : [];
     const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
     const imageReferences = event.payload.mode === "code_practice"
       ? screenContexts
@@ -566,7 +569,7 @@ export class RealtimeService {
     }
 
     this.logger.log(
-      `Manual generation requested: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} hasCredential=${Boolean(apiKey)}`
+      `Manual generation requested: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} hasCredential=${Boolean(apiKey)}`
     );
 
     let output: ProviderGenerationOutput;
@@ -578,7 +581,8 @@ export class RealtimeService {
         sessionId: event.sessionId,
         task: event.payload.mode,
         transcriptText,
-        imageReferences
+        imageReferences,
+        previousCodePracticeGuidance
       });
     } catch (error) {
       const safeError = toSafeProviderError(error);
@@ -609,6 +613,26 @@ export class RealtimeService {
 
     const contextId = randomUUID();
     const guidance = output.suggestions[0]?.content ?? output.summary.content;
+    await this.database.codeCopilotContext.create({
+      data: {
+        id: contextId,
+        sessionId: event.sessionId,
+        programmingLanguage: settings.preferredProgrammingLanguage || "javascript",
+        explanationMode: "explain",
+        problemContext: JSON.stringify({
+          version: 1,
+          kind: "manual_generation",
+          screenContextSource,
+          screenContextCount: screenContexts.length,
+          imageReferenceCount: imageReferences?.length ?? 0
+        }),
+        generatedGuidance: guidance,
+        status: "completed"
+      }
+    });
+    this.logger.log(
+      `Manual Code Practice guidance persisted: sessionId=${event.sessionId} contextId=${contextId} guidanceLength=${guidance.length} previousGuidance=${previousCodePracticeGuidance.length}`
+    );
     this.publishServerEvent({
       version: 1,
       type: "copilot.explanation",
@@ -723,6 +747,7 @@ export class RealtimeService {
     const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
+    const previousCodePracticeGuidance = await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId);
     const output = await this.providersService.generate({
       apiKey,
       analysisModel: settings.analysisModel,
@@ -734,7 +759,8 @@ export class RealtimeService {
         `Programming language: ${event.payload.programmingLanguage}`,
         `Visible/context notes: ${event.payload.textContext ?? "screen context attached"}`
       ].join("\n"),
-      imageReferences: event.payload.imageReference ? [event.payload.imageReference] : undefined
+      imageReferences: event.payload.imageReference ? [event.payload.imageReference] : undefined,
+      previousCodePracticeGuidance
     });
     await this.assertCodeCopilotConsent(await this.consentService.listGrants(client.user.id, event.sessionId));
     const guidance = output.suggestions[0]?.content ?? output.summary.content;

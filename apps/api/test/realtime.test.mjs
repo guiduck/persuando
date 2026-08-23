@@ -497,7 +497,7 @@ test("RealtimeService sends all 30 requested screenshots to the real Code Practi
       };
     }
   };
-  const { consentService, realtimeService, session } = await buildHarness({ providersService });
+  const { consentService, realtimeService, sessionsService, session } = await buildHarness({ providersService });
   await grantCopilotConsent(consentService, session.id);
   realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
   await realtimeService.handleClientEvent(
@@ -513,6 +513,21 @@ test("RealtimeService sends all 30 requested screenshots to the real Code Practi
     "response-1",
     event("response.generate", session.id, { mode: "code_practice", screenContexts })
   );
+  await sessionsService.markActive(session.id);
+  realtimeService.connectClient({ clientId: "capture-history", user: user(), clientType: "capture" });
+  for (let index = 1; index <= 15; index += 1) {
+    await realtimeService.handleClientEvent(
+      "capture-history",
+      copilotContext(session.id, `history-screen-${index}`, {
+        imageReference: `data:image/png;base64,history-${index}`,
+        textContext: `Periodic screen context captured ${index}`
+      })
+    );
+  }
+  await realtimeService.handleClientEvent(
+    "response-1",
+    event("response.generate", session.id, { mode: "code_practice", screenContexts })
+  );
   const replay = await realtimeService.handleClientEvent(
     "response-1",
     event("response.subscribe", session.id, { lastSeenSequence: 0 })
@@ -520,8 +535,12 @@ test("RealtimeService sends all 30 requested screenshots to the real Code Practi
   const explanation = replay.replayedEvents.find((storedEvent) => storedEvent.type === "copilot.explanation");
 
   assert.equal(result.action, "accepted");
-  assert.equal(generationInputs.length, 1);
+  assert.equal(generationInputs.length, 2);
   assert.equal(generationInputs[0].task, "code_practice");
+  assert.deepEqual(generationInputs[0].previousCodePracticeGuidance, []);
+  assert.deepEqual(generationInputs[1].previousCodePracticeGuidance, [
+    "Use BFS com uma fila e visite os nós nível por nível."
+  ]);
   assert.equal(generationInputs[0].imageReferences.length, 30);
   assert.equal(generationInputs[0].imageReferences[0], "data:image/png;base64,image-1");
   assert.equal(generationInputs[0].imageReferences.at(-1), "data:image/png;base64,image-30");

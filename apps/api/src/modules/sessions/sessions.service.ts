@@ -102,6 +102,20 @@ export class SessionsService {
       .reverse();
   }
 
+  async getRecentCodePracticeGuidance(sessionId: string, limit = 4): Promise<string[]> {
+    const records = await this.database.codeCopilotContext.findMany({
+      where: { sessionId, status: "completed" },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    });
+    return records
+      .map((record) => record.generatedGuidance?.trim())
+      .filter((guidance): guidance is string => Boolean(guidance))
+      .slice(0, limit)
+      .reverse()
+      .map((guidance) => guidance.slice(0, 6_000));
+  }
+
   async listVisibleSessionsForUser(userId: string, now = new Date()): Promise<Session[]> {
     await this.endStaleOpenSessions(userId, now);
     const sessions = await this.database.session.findMany({

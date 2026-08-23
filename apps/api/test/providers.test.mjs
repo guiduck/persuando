@@ -176,25 +176,35 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
     responseLanguage: "pt-BR",
     sessionId: "session-1",
     task: "code_practice",
-    transcriptText: "HackerRank tree height getHeight"
+    transcriptText: "HackerRank tree height getHeight",
+    previousCodePracticeGuidance: ["A orientação anterior usou o campo value e precisa ser revisada."]
   });
 
-  const body = JSON.parse(requests[0].init.body);
-  assert.equal(body.max_tokens, 3200);
-  assert.equal(body.temperature, 0.15);
-  assert.match(body.messages[0].content, /900 to 1500 words/);
-  assert.match(body.messages[0].content, /Markdown plain text/);
-  assert.match(body.messages[0].content, /fenced code blocks/);
-  assert.match(body.messages[0].content, /Detect the programming language/);
-  assert.match(body.messages[0].content, /every major step must include a small code snippet/);
-  assert.match(body.messages[1].content[0].text, /Quality bar/);
-  assert.match(body.messages[1].content[0].text, /fenced code blocks/);
-  assert.match(body.messages[1].content[0].text, /Linguagem detectada/);
-  assert.match(body.messages[1].content[0].text, /Passo a passo com trechos de código/);
-  const imageParts = body.messages[1].content.filter((part) => part.type === "image_url");
+  assert.equal(requests.length, 2);
+  const analysisBody = JSON.parse(requests[0].init.body);
+  const answerBody = JSON.parse(requests[1].init.body);
+
+  assert.equal(analysisBody.max_tokens, 1800);
+  assert.equal(analysisBody.temperature, 0);
+  assert.match(analysisBody.messages[0].content, /visual evidence analyst/i);
+  assert.match(analysisBody.messages[0].content, /functionSignature/);
+  assert.match(analysisBody.messages[0].content, /observedTestResults/);
+  const imageParts = analysisBody.messages[1].content.filter((part) => part.type === "image_url");
   assert.equal(imageParts.length, 30);
   assert.equal(imageParts[0].image_url.url, "data:image/png;base64,image-1");
   assert.equal(imageParts.at(-1).image_url.url, "data:image/png;base64,image-30");
+
+  assert.equal(answerBody.max_tokens, 3200);
+  assert.equal(answerBody.temperature, 0.15);
+  assert.match(answerBody.messages[0].content, /exact contract/i);
+  assert.match(answerBody.messages[0].content, /previous guidance as fallible history/i);
+  assert.equal(typeof answerBody.messages[1].content, "string");
+  assert.match(answerBody.messages[1].content, /Structured visual analysis of all current screenshots/);
+  assert.match(answerBody.messages[1].content, /Previous Code Practice guidance/);
+  assert.match(answerBody.messages[1].content, /campo value e precisa ser revisada/);
+  assert.match(answerBody.messages[1].content, /Diagnóstico da tentativa atual/);
+  assert.match(answerBody.messages[1].content, /print-versus-return/);
+  assert.match(answerBody.messages[1].content, /Never recreate Node, Tree, main, stdin parsing/);
 });
 
 test("OpenAiCompatibleProviderAdapter preserves genuine short Code Practice output without hardcoded replacement", async () => {
@@ -232,12 +242,14 @@ test("OpenAiCompatibleProviderAdapter preserves genuine short Code Practice outp
   assert.doesNotMatch(output.suggestions[0].content, /altura|getHeight/i);
 });
 
-test("OpenAiCompatibleProviderAdapter reports invalid Code Practice JSON instead of inventing guidance", async () => {
-  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
-    jsonResponse(200, {
-      choices: [{ message: { content: "not-json" } }]
-    })
-  );
+test("OpenAiCompatibleProviderAdapter reports invalid final Code Practice JSON instead of inventing guidance", async () => {
+  let requestCount = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+    requestCount += 1;
+    return jsonResponse(200, {
+      choices: [{ message: { content: requestCount === 1 ? JSON.stringify({ problemTitle: "Tree: Level Order Traversal" }) : "not-json" } }]
+    });
+  });
 
   await assert.rejects(
     () => adapter.generate({
@@ -253,6 +265,25 @@ test("OpenAiCompatibleProviderAdapter reports invalid Code Practice JSON instead
       error instanceof ProviderAdapterError &&
       error.code === "PROVIDER_RESPONSE_INVALID" &&
       /invalid JSON/i.test(error.message)
+  );
+});
+test("OpenAiCompatibleProviderAdapter maps rejected generation requests separately from audio format errors", async () => {
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => jsonResponse(400, {}));
+
+  await assert.rejects(
+    () => adapter.generate({
+      apiKey: "sk-provider-secret",
+      analysisModel: "gpt-4o-mini",
+      imageReferences: ["data:image/png;base64,level-order"],
+      responseLanguage: "pt-BR",
+      sessionId: "session-1",
+      task: "code_practice",
+      transcriptText: "Tree: Level Order Traversal"
+    }),
+    (error) =>
+      error instanceof ProviderAdapterError &&
+      error.code === "PROVIDER_RESPONSE_INVALID" &&
+      /generation request/i.test(error.message)
   );
 });
 function jsonResponse(status, payload) {

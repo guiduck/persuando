@@ -36,7 +36,9 @@ test("Response session UI retains, displays, and sends up to 30 screen contexts"
   assert.match(sessionPage, /MAX_SCREEN_CONTEXTS = 30/);
   assert.match(sessionPage, /history\.screenContexts \?\? \[\]/);
   assert.match(sessionPage, /screenContexts\.slice\(-MAX_SCREEN_CONTEXTS\)/);
-  assert.match(sessionPage, /contexts\.map\(\(context\)/);
+  assert.match(sessionPage, /contexts\.map\(\(context, index\)/);
+  assert.match(sessionPage, /contexts\.length}\/\{MAX_SCREEN_CONTEXTS} oldest to newest/);
+  assert.match(sessionPage, /newest/);
   assert.doesNotMatch(sessionPage, /contexts\.slice\(-3\)/);
 });
 

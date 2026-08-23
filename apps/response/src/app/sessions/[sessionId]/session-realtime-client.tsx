@@ -22,7 +22,7 @@ type PanelMode = "automatic" | "on_demand";
 type PanelKey = "summary" | "answers" | "insights" | "followups" | "code";
 
 const MAX_SCREEN_CONTEXTS = 30;
-const GENERATION_TIMEOUT_MS = 120_000;
+const GENERATION_TIMEOUT_MS = 180_000;
 
 interface SessionRealtimeClientProps {
   history: SessionHistoryResponse;
@@ -444,14 +444,17 @@ function SuggestionPanel({
 function ScreenContextPanel({ contexts }: Readonly<{ contexts: ScreenContext[] }>) {
   return (
     <section className="panel">
-      <h2>Screen context</h2>
+      <div className="panel-heading">
+        <h2>Screen context</h2>
+        <span className="pill">{contexts.length}/{MAX_SCREEN_CONTEXTS} oldest to newest</span>
+      </div>
       <div className="artifact-list panel-scroll">
         {contexts.length === 0 ? (
           <span className="pill empty">No screen context yet.</span>
         ) : (
-          contexts.map((context) => (
+          contexts.map((context, index) => (
             <article className="artifact" key={context.id}>
-              <span className="pill active">screen</span>
+              <span className="pill active">screen {index + 1}{index === contexts.length - 1 ? " newest" : ""}</span>
               {context.imageReference ? <img alt="Captured screen context" className="screen-preview" src={context.imageReference} /> : null}
               {context.textContext ? <p>{context.textContext}</p> : null}
             </article>

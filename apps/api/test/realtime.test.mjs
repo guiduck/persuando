@@ -477,6 +477,99 @@ test("RealtimeService stops copilot output if copilot consent is revoked mid-fli
   assert.equal(replay.replayedEvents.some((storedEvent) => storedEvent.type === "provider.error"), false);
 });
 
+test("RealtimeService sends all 30 requested screenshots to the real Code Practice generation input", async () => {
+  const generationInputs = [];
+  const providersService = {
+    getActiveAdapterName: () => "mock",
+    transcribe: async () => {
+      throw new Error("should not transcribe");
+    },
+    generate: async (input) => {
+      generationInputs.push(input);
+      return {
+        summary: { content: "Level Order Traversal usa BFS." },
+        insights: [],
+        suggestions: [{
+          category: "response",
+          content: "Use BFS com uma fila e visite os nós nível por nível.",
+          urgency: "high"
+        }]
+      };
+    }
+  };
+  const { consentService, realtimeService, session } = await buildHarness({ providersService });
+  await grantCopilotConsent(consentService, session.id);
+  realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
+  await realtimeService.handleClientEvent(
+    "response-1",
+    event("response.subscribe", session.id, { lastSeenSequence: 0 })
+  );
+  const screenContexts = Array.from({ length: 30 }, (_, index) => ({
+    imageReference: `data:image/png;base64,image-${index + 1}`,
+    textContext: `Screenshot ${index + 1}`
+  }));
+
+  const result = await realtimeService.handleClientEvent(
+    "response-1",
+    event("response.generate", session.id, { mode: "code_practice", screenContexts })
+  );
+  const replay = await realtimeService.handleClientEvent(
+    "response-1",
+    event("response.subscribe", session.id, { lastSeenSequence: 0 })
+  );
+  const explanation = replay.replayedEvents.find((storedEvent) => storedEvent.type === "copilot.explanation");
+
+  assert.equal(result.action, "accepted");
+  assert.equal(generationInputs.length, 1);
+  assert.equal(generationInputs[0].task, "code_practice");
+  assert.equal(generationInputs[0].imageReferences.length, 30);
+  assert.equal(generationInputs[0].imageReferences[0], "data:image/png;base64,image-1");
+  assert.equal(generationInputs[0].imageReferences.at(-1), "data:image/png;base64,image-30");
+  assert.match(explanation?.payload.content ?? "", /BFS com uma fila/i);
+  assert.doesNotMatch(explanation?.payload.content ?? "", /altura|getHeight/i);
+});
+
+test("RealtimeService rejects more than 30 requested screenshots", async () => {
+  const { realtimeService, session } = await buildHarness();
+  realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
+  const screenContexts = Array.from({ length: 31 }, (_, index) => ({
+    imageReference: `data:image/png;base64,image-${index + 1}`
+  }));
+
+  await assert.rejects(
+    () => realtimeService.handleClientEvent(
+      "response-1",
+      event("response.generate", session.id, { mode: "code_practice", screenContexts })
+    ),
+    /at most 30 screen contexts/i
+  );
+});
+
+test("Session history keeps the latest 30 persisted screenshots in FIFO order", async () => {
+  const { consentService, realtimeService, sessionsService, session } = await buildHarness();
+  await sessionsService.markActive(session.id);
+  await grantCopilotConsent(consentService, session.id);
+  realtimeService.connectClient({ clientId: "capture-1", user: user(), clientType: "capture" });
+
+  for (let index = 1; index <= 31; index += 1) {
+    await realtimeService.handleClientEvent(
+      "capture-1",
+      copilotContext(session.id, `periodic-context-${index}`, {
+        debugId: `periodic-debug-${index}`,
+        imageReference: `data:image/png;base64,image-${index}`,
+        textContext: `Periodic screen context captured ${index}`
+      })
+    );
+  }
+
+  const history = await sessionsService.getSessionHistory(session.id);
+
+  assert.equal(history?.screenContexts.length, 30);
+  assert.equal(history?.screenContexts[0].imageReference, "data:image/png;base64,image-2");
+  assert.equal(history?.screenContexts.at(-1).imageReference, "data:image/png;base64,image-31");
+  assert.equal(history?.screenContexts.at(-1).debugId, "periodic-debug-31");
+});
+
 function createDeferred() {
   let resolve;
   const promise = new Promise((innerResolve) => {

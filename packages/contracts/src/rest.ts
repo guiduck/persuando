@@ -32,11 +32,20 @@ export interface SessionResponse {
   consentGrants: ConsentGrant[];
 }
 
+export interface SessionScreenContext {
+  id: string;
+  debugId?: string;
+  imageReference?: string;
+  textContext?: string;
+  capturedAt: string;
+}
+
 export interface SessionHistoryResponse extends SessionResponse {
   transcriptSegments: TranscriptSegment[];
   summaries: Summary[];
   insights: Insight[];
   suggestions: Suggestion[];
+  screenContexts?: SessionScreenContext[];
 }
 
 export interface SettingsResponse {

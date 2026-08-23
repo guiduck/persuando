@@ -172,7 +172,7 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   await adapter.generate({
     apiKey: "sk-provider-secret",
     analysisModel: "gpt-4o-mini",
-    imageReferences: ["data:image/png;base64,abc"],
+    imageReferences: Array.from({ length: 30 }, (_, index) => `data:image/png;base64,image-${index + 1}`),
     responseLanguage: "pt-BR",
     sessionId: "session-1",
     task: "code_practice",
@@ -191,19 +191,26 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   assert.match(body.messages[1].content[0].text, /fenced code blocks/);
   assert.match(body.messages[1].content[0].text, /Linguagem detectada/);
   assert.match(body.messages[1].content[0].text, /Passo a passo com trechos de código/);
-  assert.equal(body.messages[1].content.filter((part) => part.type === "image_url").length, 1);
+  const imageParts = body.messages[1].content.filter((part) => part.type === "image_url");
+  assert.equal(imageParts.length, 30);
+  assert.equal(imageParts[0].image_url.url, "data:image/png;base64,image-1");
+  assert.equal(imageParts.at(-1).image_url.url, "data:image/png;base64,image-30");
 });
 
-test("OpenAiCompatibleProviderAdapter replaces short Code Practice output with structured guidance", async () => {
+test("OpenAiCompatibleProviderAdapter preserves genuine short Code Practice output without hardcoded replacement", async () => {
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
     jsonResponse(200, {
       choices: [
         {
           message: {
             content: JSON.stringify({
-              summary: { content: "Voce precisa calcular a altura de uma arvore." },
+              summary: { content: "Level Order Traversal usa uma fila." },
               insights: [],
-              suggestions: [{ category: "response", content: "Calcule a altura da arvore.", urgency: "medium" }]
+              suggestions: [{
+                category: "response",
+                content: "Use BFS com uma fila para visitar a árvore nível por nível.",
+                urgency: "medium"
+              }]
             })
           }
         }
@@ -214,23 +221,39 @@ test("OpenAiCompatibleProviderAdapter replaces short Code Practice output with s
   const output = await adapter.generate({
     apiKey: "sk-provider-secret",
     analysisModel: "gpt-4o-mini",
-    imageReferences: ["data:image/png;base64,abc"],
+    imageReferences: ["data:image/png;base64,level-order"],
     responseLanguage: "pt-BR",
     sessionId: "session-1",
     task: "code_practice",
-    transcriptText: "Tree Height of a Binary Tree getHeight root"
+    transcriptText: "Tree: Level Order Traversal"
   });
 
-  const guidance = output.suggestions[0].content;
-  assert.equal(output.suggestions[0].urgency, "high");
-  assert.match(guidance, /Problema em palavras simples/);
-  assert.match(guidance, /Linguagem detectada/);
-  assert.match(guidance, /Passo a passo com trechos de código/);
-  assert.match(guidance, /Complexidade Big-O/);
-  assert.match(guidance, /O\(n\)/);
-  assert.match(guidance, /```javascript/);
-  assert.match(guidance, /getHeight/);
-  assert.ok(guidance.length > 900);
+  assert.equal(output.suggestions[0].content, "Use BFS com uma fila para visitar a árvore nível por nível.");
+  assert.doesNotMatch(output.suggestions[0].content, /altura|getHeight/i);
+});
+
+test("OpenAiCompatibleProviderAdapter reports invalid Code Practice JSON instead of inventing guidance", async () => {
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
+    jsonResponse(200, {
+      choices: [{ message: { content: "not-json" } }]
+    })
+  );
+
+  await assert.rejects(
+    () => adapter.generate({
+      apiKey: "sk-provider-secret",
+      analysisModel: "gpt-4o-mini",
+      imageReferences: ["data:image/png;base64,level-order"],
+      responseLanguage: "pt-BR",
+      sessionId: "session-1",
+      task: "code_practice",
+      transcriptText: "Tree: Level Order Traversal"
+    }),
+    (error) =>
+      error instanceof ProviderAdapterError &&
+      error.code === "PROVIDER_RESPONSE_INVALID" &&
+      /invalid JSON/i.test(error.message)
+  );
 });
 function jsonResponse(status, payload) {
   return {

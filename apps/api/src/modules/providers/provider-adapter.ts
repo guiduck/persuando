@@ -44,6 +44,7 @@ export class ProviderAdapterError extends Error {
       | "PROVIDER_QUOTA_EXCEEDED"
       | "PROVIDER_TIMEOUT"
       | "PROVIDER_UNAVAILABLE"
+      | "PROVIDER_RESPONSE_INVALID"
       | "AUDIO_FORMAT_UNSUPPORTED",
     message: string,
     readonly retryable: boolean

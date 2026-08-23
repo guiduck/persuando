@@ -7,6 +7,7 @@ import type {
   Session,
   SessionHistoryResponse,
   SessionId,
+  SessionScreenContext,
   Suggestion,
   SuggestionId,
   Summary,
@@ -72,19 +73,33 @@ export class SessionsService {
   async getSessionHistory(sessionId: string): Promise<Omit<SessionHistoryResponse, "consentGrants"> | undefined> {
     const session = await this.getSession(sessionId);
     if (!session) return undefined;
-    const [transcriptSegments, summaries, insights, suggestions] = await Promise.all([
+    const [transcriptSegments, summaries, insights, suggestions, screenContexts] = await Promise.all([
       this.database.transcriptSegment.findMany({ where: { sessionId }, orderBy: { startMs: "asc" } }),
       this.database.summary.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } }),
       this.database.insight.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } }),
-      this.database.suggestion.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } })
+      this.database.suggestion.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } }),
+      this.getRecentScreenContexts(sessionId)
     ]);
     return {
       session,
       transcriptSegments: transcriptSegments.map(toTranscriptSegment),
       summaries: summaries.map(toSummary),
       insights: insights.map(toInsight),
-      suggestions: suggestions.map(toSuggestion)
+      suggestions: suggestions.map(toSuggestion),
+      screenContexts
     };
+  }
+
+  async getRecentScreenContexts(sessionId: string, limit = 30): Promise<SessionScreenContext[]> {
+    const records = await this.database.codeCopilotContext.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    });
+    return records
+      .map(toSessionScreenContext)
+      .filter((context): context is SessionScreenContext => Boolean(context?.imageReference))
+      .reverse();
   }
 
   async listVisibleSessionsForUser(userId: string, now = new Date()): Promise<Session[]> {
@@ -234,6 +249,36 @@ function toSession(record: SessionRecord): Session {
     activeCaptureClientId: record.activeCaptureClientId ?? undefined,
     activeResponseClientIds: []
   };
+}
+
+interface ScreenContextRecord {
+  id: string;
+  problemContext: string;
+  createdAt: Date | string;
+}
+
+function toSessionScreenContext(record: ScreenContextRecord): SessionScreenContext | undefined {
+  try {
+    const parsed = JSON.parse(record.problemContext) as {
+      debugId?: unknown;
+      imageReference?: unknown;
+      textContext?: unknown;
+    };
+    return {
+      id: record.id,
+      debugId: typeof parsed.debugId === "string" ? parsed.debugId : undefined,
+      imageReference: typeof parsed.imageReference === "string" ? parsed.imageReference : undefined,
+      textContext: typeof parsed.textContext === "string" ? parsed.textContext : undefined,
+      capturedAt: toIso(record.createdAt)!
+    };
+  } catch {
+    if (!record.problemContext.startsWith("data:image/")) return undefined;
+    return {
+      id: record.id,
+      imageReference: record.problemContext,
+      capturedAt: toIso(record.createdAt)!
+    };
+  }
 }
 
 interface TranscriptSegmentRecord {

@@ -32,6 +32,14 @@ test("Response session UI includes topic, direct answer, and code-practice surfa
   assert.match(sessionPage, /copilot\.explanation/);
 });
 
+test("Response session UI retains, displays, and sends up to 30 screen contexts", () => {
+  assert.match(sessionPage, /MAX_SCREEN_CONTEXTS = 30/);
+  assert.match(sessionPage, /history\.screenContexts \?\? \[\]/);
+  assert.match(sessionPage, /screenContexts\.slice\(-MAX_SCREEN_CONTEXTS\)/);
+  assert.match(sessionPage, /contexts\.map\(\(context\)/);
+  assert.doesNotMatch(sessionPage, /contexts\.slice\(-3\)/);
+});
+
 test("Response app copy avoids forbidden responsible-use claims", () => {
   const combined = `${homePage}\n${sessionPage}\n${loadingPage}\n${errorPage}`.toLowerCase();
   for (const forbidden of ["stealth", "invisible", "proctor", "bypass", "evade", "cheat"]) {

@@ -176,7 +176,7 @@ export function createFakeDatabase() {
     },
     codeCopilotContext: {
       async create({ data }) {
-        const record = { createdAt: new Date(), generatedGuidance: null, ...data };
+        const record = { createdAt: new Date(Date.now() + codeCopilotContexts.size), generatedGuidance: null, ...data };
         codeCopilotContexts.set(record.id, record);
         return record;
       },
@@ -188,6 +188,16 @@ export function createFakeDatabase() {
       },
       async findFirst({ where }) {
         return Array.from(codeCopilotContexts.values()).find((record) => matches(record, where)) ?? null;
+      },
+      async findMany({ where = {}, orderBy, take } = {}) {
+        const records = Array.from(codeCopilotContexts.values()).filter((record) => matches(record, where));
+        if (orderBy?.createdAt === "asc") {
+          records.sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+        }
+        if (orderBy?.createdAt === "desc") {
+          records.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+        }
+        return typeof take === "number" ? records.slice(0, take) : records;
       }
     },
     auditEvent: {

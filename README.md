@@ -250,7 +250,29 @@ shows `setting=false`, enable `Periodic screen context default` in Capture befor
 shows `copilot.context sent` but API does not show `Copilot context received`, the WebSocket upload is
 failing. If API receives it but Response does not apply it, the bug is in Response realtime/subscription.
 
-### 12. Stop Everything
+### 12. Code Practice Visual Generation Diagnostics
+
+Code Practice now uses the actual OpenAI-compatible provider response. It does not replace short,
+invalid, or failed responses with hardcoded tutoring content. A malformed or empty provider response
+is published as `PROVIDER_RESPONSE_INVALID` so the failure remains visible and debuggable.
+
+The Response App retains and displays the latest 30 screenshots, sends them oldest-to-newest with a
+manual generation request, and replaces the oldest entry when a 31st screenshot arrives. Session
+history hydrates the same persisted window after a refresh. For a generation request, look for:
+
+```text
+[Persuando Response] Manual generation requested: ... screenContexts=30 imageReferences=30
+[RealtimeService] Manual generation requested: ... screenContextSource=response_payload screenContexts=30 imageReferences=30
+[OpenAiCompatibleProviderAdapter] Generation provider request: ... task=code_practice ... imageCount=30
+[OpenAiCompatibleProviderAdapter] Generation provider response: ... contentLength=... durationMs=...
+[RealtimeService] Manual generation completed: ... imageReferences=30 ...
+```
+
+On failure, the API logs `Manual generation failed` with the safe provider error code and the browser
+receives `provider.error`. Use a newly created session for deployment smoke tests: screenshots stored
+before this persistence fix may have kept only their text label, so their original image bytes cannot
+be recovered.
+### 13. Stop Everything
 
 Stop app terminals with `Ctrl+C`.
 
@@ -308,8 +330,3 @@ Current handoff and next prompt:
 - `docs/handoff.md`
 - `docs/roadmap.md`
 - `docs/next-spec-prompt.md`
-
-
-
-
-

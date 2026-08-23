@@ -98,3 +98,35 @@ Use:
 ## Additional Source Context - 2026-08-22 Screenshot Debug Trace
 
 Recent implementation fixed the runtime Capture preload mismatch for periodic screen context IPC and added optional `debugId` propagation for manual and periodic screenshots. The next spec should preserve this traceability requirement in manual smoke criteria: every screenshot should be debuggable with one `[screen:<debugId>]` across Capture renderer, Electron main, WebSocket `copilot.context`, API validation/persist/publish, and Response screen-context apply. Build validation for this update: `npm.cmd run build` passed.
+
+## Next Spec Prompt - 2026-08-23 Visual Context Production Hardening
+
+```text
+/speckit-specify Specify production hardening for Persuando Code Practice visual context.
+
+Objective:
+Make real OpenAI-compatible visual generation reliably grounded in the current coding problem while controlling latency, payload size, retention, and cost.
+
+Source request/context:
+The 2026-08-23 fix removed an incorrect Tree Height hardcoded fallback and established a 30-screenshot FIFO window. Preserve truthful provider errors and the real-model-only generation path.
+
+Project context:
+Use README.md, docs/architecture.md, docs/domain-model.md, docs/handoff.md, docs/roadmap.md, specs/001-persuando-mvp/, and the existing Capture -> realtime API -> Response architecture.
+
+Requirements:
+- Preserve explicit consent and visible Code Practice state.
+- Define screenshot compression, deduplication, durable storage, retention, and deletion behavior.
+- Define an adaptive model-input policy that prioritizes recent/non-duplicate screenshots without silently using stale sessions.
+- Keep every generation addressable in logs by session, model, context source, image count, latency, and safe provider error code without logging images, prompts, keys, or secrets.
+- Add real-provider smoke criteria proving that the generated explanation matches the visible problem title, requested function, input/output behavior, and selected language.
+- Never fabricate fallback tutoring content; provider failures must stay visible and retryable where appropriate.
+
+Artifact considerations:
+Prefer additive contracts and migrations. Document compatibility for existing text-only CodeCopilotContext rows and keep the current 30-item UI behavior until a replacement policy is approved.
+
+Risks/assumptions:
+Thirty full-screen data URLs can increase latency and cost. Older persisted rows may not contain recoverable image bytes. Real-provider tests require external credentials and must not commit secrets.
+
+Expected output:
+Produce a concise feature specification with acceptance criteria, failure states, observability requirements, migration/rollback considerations, and manual Electron-to-VPS smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
+```

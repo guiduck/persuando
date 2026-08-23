@@ -1,12 +1,15 @@
+import { Logger } from "@nestjs/common";
+
 import { ProviderAdapterError, type ProviderAdapter, type ProviderGenerationInput, type ProviderGenerationOutput, type ProviderTranscriptionInput, type ProviderTranscriptionOutput } from "./provider-adapter.js";
 
 type FetchLike = typeof fetch;
-const CODE_PRACTICE_MIN_CONTENT_LENGTH = 900;
 const CODE_PRACTICE_MAX_TOKENS = 3200;
 const DEFAULT_GENERATION_MAX_TOKENS = 900;
+const MAX_CODE_PRACTICE_IMAGES = 30;
 
 export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
   readonly name = "openai-compatible" as const;
+  private readonly logger = new Logger(OpenAiCompatibleProviderAdapter.name);
 
   constructor(
     private readonly baseUrl = "https://api.openai.com/v1",
@@ -45,6 +48,11 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
   async generate(input: ProviderGenerationInput): Promise<ProviderGenerationOutput> {
     if (!input.apiKey) throw new ProviderAdapterError("PROVIDER_KEY_INVALID", "Provider API key is missing.", false);
 
+    const imageCount = input.imageReferences?.filter(Boolean).length ?? 0;
+    const startedAt = Date.now();
+    this.logger.log(
+      `Generation provider request: sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} model=${input.analysisModel} imageCount=${imageCount} transcriptLength=${input.transcriptText.length}`
+    );
     const response = await this.fetchProvider("/chat/completions", input.apiKey, {
       body: JSON.stringify({
         messages: [
@@ -66,7 +74,11 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
       method: "POST"
     });
     const payload = (await response.json()) as { choices?: { message?: { content?: string } }[] };
-    return parseGenerationContent(payload.choices?.[0]?.message?.content ?? "", input.transcriptText, input.task);
+    const content = payload.choices?.[0]?.message?.content ?? "";
+    this.logger.log(
+      `Generation provider response: sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} model=${input.analysisModel} imageCount=${imageCount} contentLength=${content.length} durationMs=${Date.now() - startedAt}`
+    );
+    return parseGenerationContent(content, input.transcriptText, input.task);
   }
 
   private async fetchProvider(path: string, apiKey: string, init: RequestInit): Promise<Response> {
@@ -141,6 +153,7 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"]): string {
     return [
       "You are Persuando Code Practice, a patient coding teacher for study, practice, preparation, and review.",
       "Use screenshots as primary context to identify the coding exercise, function signature, visible code, constraints, examples, errors, and the user's current attempt.",
+      "Screenshots are ordered from oldest to newest. Treat the newest screenshots as authoritative when older screenshots show a different exercise or earlier editor state.",
       "Do not narrate the UI as the final answer and do not merely restate the prompt. Produce useful coaching for the programming problem itself.",
       "Responsible-use boundary: if the image or transcript appears to show a proctored exam, hiring assessment, interview assessment, live contest, or platform challenge where direct answers may be disallowed, do not provide copy-paste final code. Give conceptual coaching, hints, pseudocode, complexity analysis, and debugging direction instead.",
       "If the context clearly appears to be self-study, preparation, local practice, review, or a user-owned sandbox, you may include complete final code while teaching the reasoning.",
@@ -178,7 +191,7 @@ ${input.transcriptText}`;
   if (imageReferences.length === 0) return text;
   return [
     { type: "text", text },
-    ...imageReferences.slice(-4).map((url) => ({ type: "image_url" as const, image_url: { url } }))
+    ...imageReferences.slice(-MAX_CODE_PRACTICE_IMAGES).map((url) => ({ type: "image_url" as const, image_url: { url } }))
   ];
 }
 
@@ -187,6 +200,8 @@ function codePracticeUserText(input: ProviderGenerationInput): string {
 Language: ${input.responseLanguage}
 
 Read the attached screenshots as the primary source. Look for a programming exercise, selected programming language, function signature, existing code, examples, constraints, and error messages.
+
+The screenshots are ordered from oldest to newest. The newest screenshot is the source of truth. If older screenshots show another exercise or stale code, ignore that conflicting older context.
 
 Focus on teaching the programming problem. Do not describe the screenshot unless it is necessary to explain the reasoning. If the screenshot looks like an active assessment, platform challenge, proctored environment, or hiring/interview evaluation, give hints, same-language pseudocode, reasoning, and complexity analysis instead of copy-paste final code.
 
@@ -221,152 +236,41 @@ ${input.transcriptText}`;
 function parseGenerationContent(content: string, fallbackTranscript: string, task: ProviderGenerationInput["task"]): ProviderGenerationOutput {
   try {
     const parsed = JSON.parse(content) as Partial<ProviderGenerationOutput>;
-    return normalizeGenerationOutput(
-      {
-        summary: parsed.summary?.content ? parsed.summary : { content: fallbackSummary(fallbackTranscript) },
-        insights: Array.isArray(parsed.insights) ? parsed.insights : [],
-        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : []
-      },
-      fallbackTranscript,
-      task
-    );
-  } catch {
-    return normalizeGenerationOutput(
-      {
-        summary: { content: fallbackSummary(fallbackTranscript) },
-        insights: [],
-        suggestions: [
-          {
-            category: "response",
-            content,
-            urgency: "medium"
-          }
-        ]
-      },
-      fallbackTranscript,
-      task
-    );
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const summaryContent = parsed.summary?.content?.trim() ?? "";
+    const primaryContent = suggestions[0]?.content?.trim() ?? summaryContent;
+
+    if (task === "code_practice" && !primaryContent) {
+      throw new ProviderAdapterError(
+        "PROVIDER_RESPONSE_INVALID",
+        "Provider returned an empty Code Practice response.",
+        true
+      );
+    }
+
+    return {
+      summary: { content: summaryContent || primaryContent || fallbackSummary(fallbackTranscript) },
+      insights: Array.isArray(parsed.insights) ? parsed.insights : [],
+      suggestions
+    };
+  } catch (error) {
+    if (error instanceof ProviderAdapterError) throw error;
+    if (task === "code_practice") {
+      throw new ProviderAdapterError(
+        "PROVIDER_RESPONSE_INVALID",
+        "Provider returned invalid JSON for Code Practice generation.",
+        true
+      );
+    }
+
+    return {
+      summary: { content: fallbackSummary(fallbackTranscript) },
+      insights: [],
+      suggestions: content
+        ? [{ category: "response", content, urgency: "medium" }]
+        : []
+    };
   }
-}
-
-function normalizeGenerationOutput(output: ProviderGenerationOutput, fallbackTranscript: string, task: ProviderGenerationInput["task"]): ProviderGenerationOutput {
-  if (task !== "code_practice") return output;
-  const primary = output.suggestions[0]?.content?.trim() ?? "";
-  if (isUsefulCodePracticeGuidance(primary)) return output;
-
-  return {
-    ...output,
-    suggestions: [
-      {
-        category: "response",
-        content: codePracticeQualityFallback(primary || output.summary.content, fallbackTranscript),
-        urgency: "high"
-      },
-      ...output.suggestions.slice(1)
-    ]
-  };
-}
-
-function isUsefulCodePracticeGuidance(content: string): boolean {
-  if (content.length < CODE_PRACTICE_MIN_CONTENT_LENGTH) return false;
-  if (!/(big-?o|o\()/i.test(content)) return false;
-  if (!/(passo|step|algorithm|algoritmo|técnica|technique)/i.test(content)) return false;
-  if (!/```(?:javascript|typescript|python|java|cpp|csharp|go|ruby|php|swift|kotlin)/i.test(content)) return false;
-  if (!/(linguagem detectada|detected language|language detected)/i.test(content)) return false;
-  return true;
-}
-
-function codePracticeQualityFallback(shortAnswer: string, fallbackTranscript: string): string {
-  const context = `${shortAnswer}\n${fallbackTranscript}`.trim();
-  if (/tree|árvore|arvore|height|altura|getheight|binary/i.test(context)) {
-    return [
-      "## Problema em palavras simples",
-      "Pelo contexto visível, o exercício parece ser sobre calcular a altura de uma árvore binária. A altura é o maior caminho que sai da raiz e chega até uma folha. Em plataformas como HackerRank, esse problema costuma medir altura em arestas, então uma árvore com apenas a raiz tem altura 0.",
-      "",
-      "## Linguagem detectada",
-      "Não deu para confirmar a linguagem com total segurança pelo fallback, então vou usar JavaScript. Se o editor mostrar outra linguagem, mantenha a mesma ideia e troque apenas a sintaxe.",
-      "",
-      "## Ideia como para uma criança de 5 anos",
-      "Imagine que cada nó é uma pecinha de brinquedo. Para saber a altura de uma pecinha, você pergunta para os dois lados: quantas pecinhas existem no caminho da esquerda? E quantas existem no caminho da direita? O lado que tiver o maior caminho ganha. A resposta da pecinha atual é esse maior caminho mais um passo para chegar nela.",
-      "",
-      "## Técnica escolhida",
-      "Use DFS com recursão. DFS combina com árvore porque você resolve o mesmo mini-problema em cada nó: calcular a altura do filho esquerdo, calcular a altura do filho direito e escolher o maior resultado.",
-      "",
-      "## Passo a passo com trechos de código",
-      "1. Comece criando a função com o mesmo nome que a plataforma pediu. No HackerRank em JavaScript, normalmente a assinatura é `function getHeight(root) { ... }`.",
-      "```javascript\nfunction getHeight(root) {\n  // vamos preencher aqui dentro\n}\n```",
-      "2. Trate o caso em que o nó não existe. Como o enunciado conta arestas, retornar `-1` faz uma árvore com só a raiz virar `0`.",
-      "```javascript\nif (root === null) {\n  return -1;\n}\n```",
-      "3. Pergunte a altura do lado esquerdo chamando a própria função. Isso desce pela árvore até encontrar uma folha.",
-      "```javascript\nconst leftHeight = getHeight(root.left);\n```",
-      "4. Faça a mesma coisa para o lado direito. A função não precisa saber se o lado é grande ou pequeno; ela só calcula.",
-      "```javascript\nconst rightHeight = getHeight(root.right);\n```",
-      "5. Escolha o maior lado, porque altura é o caminho mais longo até uma folha.",
-      "```javascript\nconst tallestChild = Math.max(leftHeight, rightHeight);\n```",
-      "6. Some `1` para contar a aresta que liga o nó atual ao filho mais alto.",
-      "```javascript\nreturn 1 + tallestChild;\n```",
-      "",
-      "## Pseudocódigo ou código quando permitido",
-      "Se este for um ambiente de estudo, preparação ou prática, a versão completa em JavaScript fica assim:",
-      "```javascript\nfunction getHeight(root) {\n  if (root === null) {\n    return -1;\n  }\n\n  const leftHeight = getHeight(root.left);\n  const rightHeight = getHeight(root.right);\n\n  return 1 + Math.max(leftHeight, rightHeight);\n}\n```",
-      "Se a plataforma contar altura em número de nós, troque o caso base para `return 0`. Mas se o enunciado disser que altura é número de arestas, mantenha `return -1` para nó vazio.",
-      "",
-      "## Complexidade Big-O",
-      "Tempo: O(n), porque cada nó da árvore é visitado uma única vez. Se existem 20 nós, a função chama a lógica para cada um dos 20 nós.",
-      "",
-      "Espaço: O(h), onde `h` é a altura da árvore. Esse espaço vem da pilha de chamadas da recursão. Em uma árvore equilibrada, `h` fica perto de `log n`; em uma árvore muito torta, `h` pode chegar a `n`.",
-      "",
-      "## Casos de borda",
-      "- Árvore vazia: retorna `-1` se contar arestas, ou `0` se contar nós.",
-      "- Árvore com só a raiz: retorna `0` quando conta arestas.",
-      "- Árvore só para a esquerda: a recursão ainda funciona.",
-      "- Árvore só para a direita: a recursão também funciona.",
-      "- Árvore equilibrada: o maior entre esquerda e direita decide a altura.",
-      "",
-      "## Exemplo rápido",
-      "Se a raiz tem um caminho maior que passa por três arestas, as folhas retornam `0`, os pais retornam `1`, o próximo nível retorna `2`, e a raiz retorna `3`. É como subir a resposta de baixo para cima."
-    ].join("\n");
-  }
-
-  return [
-    "## Problema em palavras simples",
-    "A resposta automática anterior veio curta demais para ser útil. Use o print mais recente para identificar o enunciado, a assinatura da função, exemplos e restrições antes de continuar.",
-    "",
-    "## Linguagem detectada",
-    "Não deu para confirmar a linguagem com segurança, então use JavaScript como fallback. Se o editor mostrar Python, Java, C++ ou outra linguagem, mantenha a ideia e adapte a sintaxe.",
-    "",
-    "## Ideia como para uma criança de 5 anos",
-    "Primeiro descubra qual brinquedo precisa montar. Depois separe as peças: entrada, saída, regra principal e casos estranhos. Só então monte uma solução pequena e teste com um exemplo.",
-    "",
-    "## Técnica escolhida",
-    "Escolha a técnica pelo formato do problema: árvore/grafo sugere DFS ou BFS; lista ordenada sugere dois ponteiros ou busca binária; subproblemas repetidos sugerem programação dinâmica; contagem/frequência sugere mapa/hash.",
-    "",
-    "## Passo a passo com trechos de código",
-    "1. Guarde a entrada em nomes claros.",
-    "```javascript\nconst input = readInput();\n```",
-    "2. Crie uma função pequena para resolver o núcleo do problema.",
-    "```javascript\nfunction solve(input) {\n  // escolha a técnica aqui\n}\n```",
-    "3. Percorra apenas o que for necessário e atualize uma resposta.",
-    "```javascript\nlet answer = null;\nfor (const item of input) {\n  // atualize answer usando item\n}\n```",
-    "4. Retorne exatamente o formato pedido pelo enunciado.",
-    "```javascript\nreturn answer;\n```",
-    "",
-    "## Pseudocódigo ou código quando permitido",
-    "```javascript\nfunction solve(input) {\n  const state = new Map();\n\n  for (const item of input) {\n    // aplique a regra principal do problema\n    state.set(item, (state.get(item) ?? 0) + 1);\n  }\n\n  return computeAnswerFrom(state);\n}\n```",
-    "",
-    "## Complexidade Big-O",
-    "Tempo: explique quantas vezes cada item é visitado. Se cada item é lido uma vez, normalmente é O(n). Espaço: explique quais estruturas extras são criadas; por exemplo, um mapa pode custar O(n).",
-    "",
-    "## Casos de borda",
-    "- Entrada vazia.",
-    "- Entrada com um elemento.",
-    "- Valores repetidos.",
-    "- Valores já ordenados ou totalmente desordenados.",
-    "- Resultado inexistente.",
-    "",
-    "## Exemplo rápido",
-    "Pegue o menor exemplo do enunciado e simule cada linha do algoritmo. Se uma variável muda, mostre o valor novo dela."
-  ].join("\n");
 }
 function fallbackSummary(transcriptText: string): string {
   return `Current session summary: ${transcriptText.trim().slice(0, 120)}`;

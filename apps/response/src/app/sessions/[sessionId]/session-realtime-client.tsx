@@ -22,6 +22,7 @@ type PanelMode = "automatic" | "on_demand";
 type PanelKey = "summary" | "answers" | "insights" | "followups" | "code";
 
 const MAX_SCREEN_CONTEXTS = 30;
+const GENERATION_TIMEOUT_MS = 120_000;
 
 interface SessionRealtimeClientProps {
   history: SessionHistoryResponse;
@@ -44,7 +45,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
   const [insights, setInsights] = useState<Insight[]>(history.insights);
   const [suggestions, setSuggestions] = useState<Suggestion[]>(history.suggestions);
   const [copilotExplanations, setCopilotExplanations] = useState<CopilotExplanation[]>([]);
-  const [screenContexts, setScreenContexts] = useState<ScreenContext[]>([]);
+  const [screenContexts, setScreenContexts] = useState<ScreenContext[]>((history.screenContexts ?? []).slice(-MAX_SCREEN_CONTEXTS));
   const [newInsightIds, setNewInsightIds] = useState<Set<string>>(new Set());
   const [newSuggestionIds, setNewSuggestionIds] = useState<Set<string>>(new Set());
   const [providerError, setProviderError] = useState<string | undefined>();
@@ -128,6 +129,20 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
               setSummaries
             });
           }
+          if (accepted) {
+            const completedMode = generatedModeForEvent(event);
+            if (completedMode) {
+              setGeneratingModes((values) => {
+                const next = new Set(values);
+                next.delete(completedMode);
+                return next;
+              });
+            }
+          }
+          if (event.type === "provider.error") {
+            setGeneratingModes(new Set());
+            pendingManualModesRef.current.clear();
+          }
           ack(socket, history.session.id, event.sequence);
           if (event.sequence) lastSequenceRef.current = Math.max(lastSequenceRef.current, event.sequence);
         }
@@ -166,7 +181,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
     if (source === "manual") pendingManualModesRef.current.add(mode);
     setGeneratingModes((values) => new Set([...values, mode]));
     const requestScreenContexts = mode === "code_practice"
-      ? screenContexts.slice(-4).map((context) => ({
+      ? screenContexts.slice(-MAX_SCREEN_CONTEXTS).map((context) => ({
           imageReference: context.imageReference,
           textContext: context.textContext
         }))
@@ -180,13 +195,16 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
       payload: { mode, screenContexts: requestScreenContexts }
     });
     window.setTimeout(() => {
+      const timedOut = source === "manual" && pendingManualModesRef.current.delete(mode);
       setGeneratingModes((values) => {
         const next = new Set(values);
         next.delete(mode);
-        if (source === "manual") pendingManualModesRef.current.delete(mode);
         return next;
       });
-    }, 12000);
+      if (timedOut) {
+        setProviderError("Generation timed out before the provider returned a usable response. Check the API generation logs.");
+      }
+    }, GENERATION_TIMEOUT_MS);
   };
   const updatePanelMode = (panel: PanelKey, mode: PanelMode) => {
     setPanelModes((current) => ({ ...current, [panel]: mode }));
@@ -431,7 +449,7 @@ function ScreenContextPanel({ contexts }: Readonly<{ contexts: ScreenContext[] }
         {contexts.length === 0 ? (
           <span className="pill empty">No screen context yet.</span>
         ) : (
-          contexts.slice(-3).map((context) => (
+          contexts.map((context) => (
             <article className="artifact" key={context.id}>
               <span className="pill active">screen</span>
               {context.imageReference ? <img alt="Captured screen context" className="screen-preview" src={context.imageReference} /> : null}
@@ -708,6 +726,14 @@ function shouldAcceptGeneratedEvent(
   }
   if (event.type === "copilot.explanation") return panelModes.code === "automatic" || consumePendingMode(pendingManualModes, "code_practice");
   return true;
+}
+
+function generatedModeForEvent(event: PersuandoWebSocketEvent): GenerateMode | undefined {
+  if (event.type === "summary.updated") return "summary";
+  if (event.type === "insight.created") return "insights";
+  if (event.type === "suggestion.created") return "followups";
+  if (event.type === "copilot.explanation") return "code_practice";
+  return undefined;
 }
 
 function consumePendingMode(pendingManualModes: Set<GenerateMode>, mode: GenerateMode): boolean {

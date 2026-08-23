@@ -37,7 +37,7 @@ import type { AuthenticatedUser } from "../auth/auth.service.js";
 import { ConsentService } from "../consent/consent.service.js";
 import { CredentialsService } from "../credentials/credentials.service.js";
 import { DatabaseService } from "../database/database.service.js";
-import { ProviderAdapterError, toSafeProviderError } from "../providers/provider-adapter.js";
+import { ProviderAdapterError, toSafeProviderError, type ProviderGenerationOutput } from "../providers/provider-adapter.js";
 import { ProvidersService } from "../providers/providers.service.js";
 import { SessionsService } from "../sessions/sessions.service.js";
 import { SettingsService } from "../settings/settings.service.js";
@@ -63,6 +63,8 @@ export type RealtimeHandleResult =
 
 export const REALTIME_INGESTION_OPTIONS = "REALTIME_INGESTION_OPTIONS";
 const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
+const MAX_SCREEN_CONTEXTS = 30;
+const MAX_SCREEN_IMAGE_REFERENCE_LENGTH = 5_000_000;
 
 @Injectable()
 export class RealtimeService {
@@ -524,29 +526,71 @@ export class RealtimeService {
       throw new ForbiddenException("Client is not subscribed to session");
     }
 
+    const consentGrants = await this.consentService.listGrants(client.user.id, event.sessionId);
+    await this.assertCodeCopilotConsent(consentGrants);
+    if (this.providersService.getActiveAdapterName() !== "mock") {
+      const providerConsentDecision = this.consentService.requireExternalProviderConsent(consentGrants);
+      if (!providerConsentDecision.ok) {
+        throw new ForbiddenException(`Manual generation provider blocked: ${providerConsentDecision.code}`);
+      }
+    }
+
     const settings = await this.settingsService.getSettings(client.user.id);
     const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
     const contextSegments = await this.getRecentTranscriptSegments(event.sessionId);
     const sourceSegmentIds = contextSegments.map((segment) => segment.id);
-    const screenContexts = this.getRecentScreenContexts(event.sessionId);
+    const requestedScreenContexts = event.payload.mode === "code_practice"
+      ? event.payload.screenContexts?.slice(-MAX_SCREEN_CONTEXTS) ?? []
+      : [];
+    const persistedScreenContexts = requestedScreenContexts.length === 0
+      ? await this.sessionsService.getRecentScreenContexts(event.sessionId, MAX_SCREEN_CONTEXTS)
+      : [];
+    const cachedScreenContexts = requestedScreenContexts.length === 0
+      ? this.getCachedScreenContexts(event.sessionId)
+      : [];
+    const screenContexts = requestedScreenContexts.length > 0
+      ? requestedScreenContexts
+      : mergeScreenContexts([...persistedScreenContexts, ...cachedScreenContexts]).slice(-MAX_SCREEN_CONTEXTS);
+    const screenContextSource = requestedScreenContexts.length > 0 ? "response_payload" : "session_history";
     const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
-    const imageReferences = event.payload.mode === "code_practice" ? screenContexts.map((context) => context.imageReference).filter((value): value is string => Boolean(value)).slice(-4) : undefined;
+    const imageReferences = event.payload.mode === "code_practice"
+      ? screenContexts
+          .map((context) => context.imageReference)
+          .filter((value): value is string => Boolean(value))
+      : undefined;
+
+    if (event.payload.mode === "code_practice" && imageReferences?.length === 0) {
+      throw new BadRequestException("Code Practice generation requires at least one screenshot context.");
+    }
+
     this.logger.log(
-      `Manual generation requested: sessionId=${event.sessionId} mode=${event.payload.mode} transcriptSegments=${contextSegments.length} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} hasCredential=${Boolean(apiKey)}`
+      `Manual generation requested: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} hasCredential=${Boolean(apiKey)}`
     );
 
-    const output = await this.providersService.generate({
-      apiKey,
-      analysisModel: settings.analysisModel,
-      responseLanguage: settings.responseLanguage,
-      sessionId: event.sessionId,
-      task: event.payload.mode,
-      transcriptText,
-      imageReferences
-    });
-    this.logger.log(`Manual generation completed: sessionId=${event.sessionId} mode=${event.payload.mode} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`);
+    let output: ProviderGenerationOutput;
+    try {
+      output = await this.providersService.generate({
+        apiKey,
+        analysisModel: settings.analysisModel,
+        responseLanguage: settings.responseLanguage,
+        sessionId: event.sessionId,
+        task: event.payload.mode,
+        transcriptText,
+        imageReferences
+      });
+    } catch (error) {
+      const safeError = toSafeProviderError(error);
+      this.logger.warn(
+        `Manual generation failed: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} screenContextSource=${screenContextSource} imageReferences=${imageReferences?.length ?? 0} code=${safeError.code} retryable=${safeError.retryable} message=${safeError.message}`
+      );
+      throw error;
+    }
+
+    this.logger.log(
+      `Manual generation completed: sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} imageReferences=${imageReferences?.length ?? 0} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`
+    );
 
     if (event.payload.mode === "summary") {
       await this.publishSummary(event.sessionId, output.summary.content, sourceSegmentIds);
@@ -656,7 +700,7 @@ export class RealtimeService {
   }
 
   private async persistCopilotContext(event: CopilotContextEvent): Promise<CodeCopilotContext> {
-    const problemContext = event.payload.textContext ?? event.payload.imageReference ?? "Context reference received.";
+    const problemContext = serializeScreenContext(event);
     const created = await this.database.codeCopilotContext.create({
       data: {
         id: event.payload.contextId,
@@ -769,10 +813,10 @@ export class RealtimeService {
     return records.map(toTranscriptSegment).sort((left, right) => left.startMs - right.startMs);
   }
 
-  private getRecentScreenContexts(sessionId: SessionId): { imageReference?: string; textContext?: string }[] {
+  private getCachedScreenContexts(sessionId: SessionId): { imageReference?: string; textContext?: string }[] {
     return (this.eventsBySessionId.get(sessionId) ?? [])
       .filter((storedEvent): storedEvent is CopilotContextEvent => storedEvent.type === "copilot.context" && Boolean(storedEvent.payload.imageReference))
-      .slice(-30)
+      .slice(-MAX_SCREEN_CONTEXTS)
       .map((storedEvent) => ({
         imageReference: storedEvent.payload.imageReference,
         textContext: storedEvent.payload.textContext
@@ -785,7 +829,7 @@ export class RealtimeService {
     screenContexts: { textContext?: string }[]
   ): string {
     const transcript = contextSegments.map((segment) => `${Math.floor(segment.startMs / 1000)}s: ${segment.text}`).join("\n");
-    const screens = screenContexts.map((context, index) => `Screen ${index + 1}: ${context.textContext ?? "screen image attached"}`).join("\n");
+    const screens = screenContexts.map((context, index) => `Screen ${index + 1} (oldest to newest): ${context.textContext ?? "screen image attached"}`).join("\n");
     return [
       `Requested output: ${mode}`,
       transcript ? `Recent transcript:\n${transcript}` : "Recent transcript: no transcript text is available yet.",
@@ -1037,6 +1081,56 @@ function toCodeCopilotContext(record: CodeCopilotContextRecord): CodeCopilotCont
   };
 }
 
+function serializeScreenContext(event: CopilotContextEvent): string {
+  return JSON.stringify({
+    version: 1,
+    debugId: event.payload.debugId,
+    imageReference: event.payload.imageReference,
+    textContext: event.payload.textContext
+  });
+}
+
+function mergeScreenContexts(
+  contexts: { imageReference?: string; textContext?: string }[]
+): { imageReference?: string; textContext?: string }[] {
+  const byImageReference = new Map<string, { imageReference?: string; textContext?: string }>();
+  for (const context of contexts) {
+    if (!context.imageReference) continue;
+    byImageReference.set(context.imageReference, context);
+  }
+  return [...byImageReference.values()];
+}
+
+function validateRequestedScreenContexts(event: ResponseGenerateEvent): void {
+  const { screenContexts } = event.payload;
+  if (screenContexts === undefined) return;
+  if (!Array.isArray(screenContexts) || screenContexts.length > MAX_SCREEN_CONTEXTS) {
+    throw new BadRequestException(`Realtime generate accepts at most ${MAX_SCREEN_CONTEXTS} screen contexts`);
+  }
+
+  for (const context of screenContexts) {
+    if (!context || typeof context !== "object" || Array.isArray(context)) {
+      throw new BadRequestException("Realtime generate screen context is invalid");
+    }
+    const { imageReference, textContext } = context;
+    if (!imageReference && !textContext) {
+      throw new BadRequestException("Realtime generate screen context requires an image or text");
+    }
+    if (imageReference !== undefined) {
+      if (
+        typeof imageReference !== "string" ||
+        imageReference.length > MAX_SCREEN_IMAGE_REFERENCE_LENGTH ||
+        !imageReference.startsWith("data:image/")
+      ) {
+        throw new BadRequestException("Realtime generate screen image is invalid");
+      }
+    }
+    if (textContext !== undefined && (typeof textContext !== "string" || textContext.length > 12000)) {
+      throw new BadRequestException("Realtime generate screen text is invalid");
+    }
+  }
+}
+
 function screenLogPrefix(event: CopilotContextEvent): string {
   return event.payload.debugId ? `[screen:${event.payload.debugId}] ` : "";
 }
@@ -1086,6 +1180,7 @@ function parseRealtimeEvent(event: unknown): PersuandoWebSocketEvent {
     if (!["summary", "insights", "followups", "code_practice"].includes(generate.payload.mode)) {
       throw new BadRequestException("Realtime generate mode is invalid");
     }
+    validateRequestedScreenContexts(generate);
   }
 
   if (candidate.type === "response.unsubscribe") {

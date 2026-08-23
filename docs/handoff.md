@@ -84,3 +84,11 @@ pm.cmd run capture:start:vps`, packaged as `release/capture/win-unpacked/Persuan
 ## Recommended Next Spec Kit Step
 
 Run `/speckit-specify` for the next focused feature. Recommended prompt: use `docs/next-spec-prompt.md` to specify the Windows packaged Capture App, UI polish, and production hardening slice, including toolbar/tray polish, installer/dev distribution, visible permission education, production auth bridge hardening, screen context hardening, and manual end-to-end browser/Electron smoke.
+
+## Implementation Update - 2026-08-22 Screenshot Debug Trace
+
+- Current status: periodic screenshot flow was corrected and instrumented end to end for Capture renderer, Electron preload/main, realtime `copilot.context`, API ingest/persist/publish, and Response apply.
+- Recent change: aligned runtime `apps/capture/preload.cjs` with `apps/capture/src/preload.ts` by exposing `startPeriodicScreenContext` and `stopPeriodicScreenContext`; added optional `debugId` to `CopilotContextEvent` and propagated `manual-<timestamp>-<random>` / `periodic-<timestamp>-<random>` through screenshot capture and realtime logs.
+- Latest validation: `npm.cmd run build` passed (`tsc -b`).
+- Remaining work: manual VPS smoke still needs to confirm a single `[screen:<debugId>]` appears from Capture through API logs and Response console while screenshots render in Screen context.
+- Recommended next Spec Kit step: keep the next `/speckit-specify` focused on production hardening, including durable screenshot storage/limits, visual-context retention/deletion behavior, and an explicit manual Electron-to-VPS smoke checklist for debug trace IDs.

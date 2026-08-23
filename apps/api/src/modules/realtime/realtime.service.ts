@@ -351,6 +351,10 @@ export class RealtimeService {
   }
 
   private async ingestCopilotContext(client: RealtimeClient, event: CopilotContextEvent): Promise<RealtimeHandleResult> {
+    const screenPrefix = screenLogPrefix(event);
+    this.logger.log(
+      `${screenPrefix}copilot.context received: sessionId=${event.sessionId} contextId=${event.payload.contextId} debugId=${event.payload.debugId ?? "none"} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} textLength=${event.payload.textContext?.length ?? 0}`
+    );
     if (client.clientType !== "capture") {
       throw new ForbiddenException("Only Capture Mode clients can upload copilot context");
     }
@@ -361,20 +365,27 @@ export class RealtimeService {
     }
     this.workspaceAccessService.assertSessionAccess(client.user, session);
     this.logger.log(
-      `Copilot context access ok: sessionId=${event.sessionId} contextId=${event.payload.contextId} sessionStatus=${session.status} clientId=${client.clientId}`
+      `${screenPrefix}Copilot context access ok: sessionId=${event.sessionId} contextId=${event.payload.contextId} sessionStatus=${session.status} clientId=${client.clientId}`
     );
 
     if (session.status !== "active") {
       throw new ForbiddenException("Session must be active before copilot context upload");
     }
 
-    validateCopilotContextPayload(event);
-    this.logger.log(
-      `Copilot context received: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} textLength=${event.payload.textContext?.length ?? 0} programmingLanguage=${event.payload.programmingLanguage}`
-    );
+    try {
+      validateCopilotContextPayload(event);
+      this.logger.log(
+        `${screenPrefix}copilot.context validation passed: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} programmingLanguage=${event.payload.programmingLanguage}`
+      );
+    } catch (error) {
+      this.logger.warn(
+        `${screenPrefix}copilot.context validation failed: sessionId=${event.sessionId} contextId=${event.payload.contextId ?? "missing"} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} message=${error instanceof Error ? error.message : "unknown"}`
+      );
+      throw error;
+    }
     const consentGrants = await this.consentService.listGrants(client.user.id, event.sessionId);
     this.logger.log(
-      `Copilot context consent check: sessionId=${event.sessionId} contextId=${event.payload.contextId} grantCount=${consentGrants.length} adapter=${this.providersService.getActiveAdapterName()}`
+      `${screenPrefix}Copilot context consent check: sessionId=${event.sessionId} contextId=${event.payload.contextId} grantCount=${consentGrants.length} adapter=${this.providersService.getActiveAdapterName()}`
     );
     await this.assertCodeCopilotConsent(consentGrants);
     if (this.providersService.getActiveAdapterName() !== "mock") {
@@ -386,16 +397,16 @@ export class RealtimeService {
 
     const context = await this.persistCopilotContext(event);
     this.logger.log(
-      `Copilot context persisted: sessionId=${event.sessionId} contextId=${context.id} hasImage=${Boolean(event.payload.imageReference)} status=${context.status}`
+      `${screenPrefix}copilot.context persisted: sessionId=${event.sessionId} contextId=${context.id} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} status=${context.status}`
     );
     const appendedContext = this.appendEvent(event);
     this.logger.log(
-      `Copilot context fanout queued: sessionId=${event.sessionId} contextId=${context.id} sequence=${appendedContext.sequence ?? "none"} listeners=${this.eventListeners.size}`
+      `${screenPrefix}copilot.context realtime event published: sessionId=${event.sessionId} contextId=${context.id} sequence=${appendedContext.sequence ?? "none"} listeners=${this.eventListeners.size}`
     );
 
     if (isPeriodicScreenContext(event)) {
       this.logger.log(
-        `Periodic screen context accepted without generation: sessionId=${event.sessionId} contextId=${context.id}`
+        `${screenPrefix}Periodic screen context accepted without generation: sessionId=${event.sessionId} contextId=${context.id}`
       );
       return { action: "accepted" };
     }
@@ -822,7 +833,7 @@ export class RealtimeService {
     for (const listener of this.eventListeners) listener(withSequence);
     if (withSequence.type === "copilot.context") {
       this.logger.log(
-        `Realtime event appended: type=copilot.context sessionId=${withSequence.sessionId} sequence=${withSequence.sequence ?? "none"} hasImage=${Boolean(withSequence.payload.imageReference)} listeners=${this.eventListeners.size}`
+        `${screenLogPrefix(withSequence)}Realtime event appended: type=copilot.context sessionId=${withSequence.sessionId} sequence=${withSequence.sequence ?? "none"} hasImage=${Boolean(withSequence.payload.imageReference)} imageLength=${withSequence.payload.imageReference?.length ?? 0} listeners=${this.eventListeners.size}`
       );
     }
     return withSequence;
@@ -875,11 +886,14 @@ function captureStatusMessage(status: CaptureStatusEvent["payload"]["status"]): 
 }
 
 function validateCopilotContextPayload(event: CopilotContextEvent): void {
-  const { contextId, explanationMode, imageReference, textContext } = event.payload;
+  const { contextId, debugId, explanationMode, imageReference, textContext } = event.payload;
   event.payload.programmingLanguage = normalizeCopilotProgrammingLanguage(event.payload.programmingLanguage);
 
   if (!contextId || contextId.length > 128) {
     throw new BadRequestException("Copilot contextId is required");
+  }
+  if (debugId !== undefined && (typeof debugId !== "string" || debugId.length > 128)) {
+    throw new BadRequestException("Copilot debugId must be 128 characters or less");
   }
   if (explanationMode !== "hint" && explanationMode !== "explain" && explanationMode !== "review") {
     throw new BadRequestException("Copilot explanationMode is invalid");
@@ -1021,6 +1035,10 @@ function toCodeCopilotContext(record: CodeCopilotContextRecord): CodeCopilotCont
     generatedGuidance: record.generatedGuidance ?? undefined,
     status: record.status as CodeCopilotContext["status"]
   };
+}
+
+function screenLogPrefix(event: CopilotContextEvent): string {
+  return event.payload.debugId ? `[screen:${event.payload.debugId}] ` : "";
 }
 
 function isPeriodicScreenContext(event: CopilotContextEvent): boolean {

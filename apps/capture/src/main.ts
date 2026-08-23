@@ -156,7 +156,18 @@ function hideToolbar(): void {
 
 function sendCommand(command: string): void {
   const target = toolbarWindow && !toolbarWindow.isDestroyed() ? toolbarWindow : dashboardWindow;
+  log(`Sending command "${command}" to ${target === toolbarWindow ? "toolbar" : "dashboard"} renderer.`);
   target?.webContents.send("capture:command", command);
+}
+
+function broadcastCommand(command: string): void {
+  const targets = [dashboardWindow, toolbarWindow].filter(
+    (target): target is ElectronBrowserWindow => Boolean(target && !target.isDestroyed())
+  );
+  log(`Broadcasting command "${command}" to ${targets.length} renderer window(s).`);
+  for (const target of targets) {
+    target.webContents.send("capture:command", command);
+  }
 }
 
 function broadcastState(): void {
@@ -166,19 +177,20 @@ function broadcastState(): void {
   }
 }
 
-async function capturePrimaryScreenImage(): Promise<{ dataUrl: string; sourceLabel: string }> {
-  log("Screen capture requested.");
+async function capturePrimaryScreenImage(debugId?: string): Promise<{ dataUrl: string; sourceLabel: string }> {
+  const prefix = debugId ? `[screen:${debugId}] ` : "";
+  log(`${prefix}Screen capture requested.`);
   const sources = await desktopCapturer.getSources({
     thumbnailSize: { width: 1440, height: 900 },
     types: ["screen"]
   });
   const source = sources.find((item) => !item.thumbnail.isEmpty()) ?? sources[0];
   if (!source || source.thumbnail.isEmpty()) {
-    log(`Screen capture unavailable: sources=${sources.length}.`);
+    log(`${prefix}Screen capture unavailable: sources=${sources.length}.`);
     throw new Error("No screen source available for capture.");
   }
   const dataUrl = source.thumbnail.toDataURL();
-  log(`Screen capture completed: source=${source.name} sources=${sources.length} dataUrlLength=${dataUrl.length}.`);
+  log(`${prefix}Screen capture completed: source=${source.name} sources=${sources.length} dataUrlLength=${dataUrl.length}.`);
   return {
     dataUrl,
     sourceLabel: source.name
@@ -290,11 +302,19 @@ ipcMain.handle("capture:get-state", () => runtimeState);
 ipcMain.handle("capture:show-dashboard", () => showDashboard());
 ipcMain.handle("capture:show-toolbar", () => showToolbar());
 ipcMain.handle("capture:hide-toolbar", () => hideToolbar());
-ipcMain.handle("capture:start-periodic-screen-context", () => sendCommand("start-periodic-screen-context"));
-ipcMain.handle("capture:stop-periodic-screen-context", () => sendCommand("stop-periodic-screen-context"));
+ipcMain.handle("capture:start-periodic-screen-context", () => {
+  log("IPC start-periodic-screen-context received.");
+  broadcastCommand("start-periodic-screen-context");
+  log("IPC start-periodic-screen-context broadcast command sent.");
+});
+ipcMain.handle("capture:stop-periodic-screen-context", () => {
+  log("IPC stop-periodic-screen-context received.");
+  broadcastCommand("stop-periodic-screen-context");
+  log("IPC stop-periodic-screen-context broadcast command sent.");
+});
 ipcMain.handle("capture:login-google", (_event, loginUrl: string) => loginWithGoogle(loginUrl));
 ipcMain.handle("capture:get-auth-user", () => readAuthUserFromCookie());
-ipcMain.handle("capture:capture-screen-image", () => capturePrimaryScreenImage());
+ipcMain.handle("capture:capture-screen-image", (_event: IpcMainInvokeEvent, debugId?: string) => capturePrimaryScreenImage(debugId));
 ipcMain.handle("capture:set-listening", (_event: IpcMainInvokeEvent, listening: boolean) => {
   runtimeState.listening = listening;
   runtimeState.paused = false;

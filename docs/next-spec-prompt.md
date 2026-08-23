@@ -94,3 +94,7 @@ Use:
 - Preserve the current two-mode architecture.
 - Keep consent, privacy, responsible use, and documentation closeout enforceable.
 - Do not create implementation tasks until `/speckit-tasks` is invoked.
+
+## Additional Source Context - 2026-08-22 Screenshot Debug Trace
+
+Recent implementation fixed the runtime Capture preload mismatch for periodic screen context IPC and added optional `debugId` propagation for manual and periodic screenshots. The next spec should preserve this traceability requirement in manual smoke criteria: every screenshot should be debuggable with one `[screen:<debugId>]` across Capture renderer, Electron main, WebSocket `copilot.context`, API validation/persist/publish, and Response screen-context apply. Build validation for this update: `npm.cmd run build` passed.

@@ -15,7 +15,7 @@ const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 export interface ActiveCapture {
   pause(): void;
   resume(): void;
-  sendContext(input: { explanationMode: "hint" | "explain" | "review"; imageReference?: string; textContext?: string }): void;
+  sendContext(input: { debugId?: string; explanationMode: "hint" | "explain" | "review"; imageReference?: string; textContext?: string }): void;
   session: Session;
   stop(): void;
 }
@@ -128,6 +128,7 @@ export async function startMicrophoneCapture(
     sendContext(input) {
       if (socket.readyState !== WebSocket.OPEN) throw new Error("Capture WebSocket is not connected");
       const programmingLanguage = normalizeProgrammingLanguage(settings.preferredProgrammingLanguage);
+      const screenPrefix = input.debugId ? `[screen:${input.debugId}] ` : "";
       const contextEvent: CopilotContextEvent = {
         version: 1,
         type: "copilot.context",
@@ -135,6 +136,7 @@ export async function startMicrophoneCapture(
         sentAt: new Date().toISOString(),
         payload: {
           contextId: crypto.randomUUID(),
+          debugId: input.debugId,
           explanationMode: input.explanationMode,
           imageReference: input.imageReference,
           programmingLanguage,
@@ -142,12 +144,12 @@ export async function startMicrophoneCapture(
         }
       };
       console.info(
-        `[Persuando Capture] Sending copilot.context: sessionId=${session.id} contextId=${contextEvent.payload.contextId} hasImage=${Boolean(
+        `[Persuando Capture] ${screenPrefix}Sending copilot.context: sessionId=${session.id} contextId=${contextEvent.payload.contextId} websocketState=${socket.readyState} hasImage=${Boolean(
           input.imageReference
-        )} textLength=${input.textContext?.length ?? 0} programmingLanguage=${programmingLanguage}.`
+        )} imageLength=${input.imageReference?.length ?? 0} textLength=${input.textContext?.length ?? 0} programmingLanguage=${programmingLanguage}.`
       );
       socket.send(JSON.stringify(contextEvent));
-      console.info(`[Persuando Capture] copilot.context sent: sessionId=${session.id} contextId=${contextEvent.payload.contextId} socketState=${socket.readyState}.`);
+      console.info(`[Persuando Capture] ${screenPrefix}copilot.context event sent: sessionId=${session.id} contextId=${contextEvent.payload.contextId} socketState=${socket.readyState}.`);
     },
     session,
     stop() {

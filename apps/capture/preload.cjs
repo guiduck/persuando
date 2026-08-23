@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const api = {
-  captureScreenImage: () => ipcRenderer.invoke("capture:capture-screen-image"),
+  captureScreenImage: (debugId) => ipcRenderer.invoke("capture:capture-screen-image", debugId),
   getAuthUser: () => ipcRenderer.invoke("capture:get-auth-user"),
   getState: () => ipcRenderer.invoke("capture:get-state"),
   hideToolbar: () => ipcRenderer.invoke("capture:hide-toolbar"),
@@ -20,7 +20,9 @@ const api = {
   setPaused: (paused) => ipcRenderer.invoke("capture:set-paused", paused),
   setStatus: (patch) => ipcRenderer.invoke("capture:set-status", patch),
   showDashboard: () => ipcRenderer.invoke("capture:show-dashboard"),
-  showToolbar: () => ipcRenderer.invoke("capture:show-toolbar")
+  showToolbar: () => ipcRenderer.invoke("capture:show-toolbar"),
+  startPeriodicScreenContext: () => ipcRenderer.invoke("capture:start-periodic-screen-context"),
+  stopPeriodicScreenContext: () => ipcRenderer.invoke("capture:stop-periodic-screen-context")
 };
 
 contextBridge.exposeInMainWorld("persuandoCapture", api);

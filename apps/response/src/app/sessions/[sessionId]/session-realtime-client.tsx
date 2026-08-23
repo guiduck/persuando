@@ -658,11 +658,22 @@ function applyEvent(event: PersuandoWebSocketEvent, joinedAtIso: string, setters
     if (isAfterJoin) addSetValue(setters.setNewSuggestionIds, event.payload.suggestion.id);
   }
   if (event.type === "copilot.context") {
+    const screenPrefix = event.payload.debugId ? `[screen:${event.payload.debugId}] ` : "";
     console.info(
-      `[Persuando Response] Applying copilot.context: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} textLength=${event.payload.textContext?.length ?? 0}.`
+      `[Persuando Response] ${screenPrefix}copilot.context event received: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} textLength=${event.payload.textContext?.length ?? 0}.`
     );
     if (event.payload.imageReference) {
-      upsertByIdLimited(setters.setScreenContexts, toScreenContext(event), MAX_SCREEN_CONTEXTS);
+      const screenContext = toScreenContext(event);
+      setters.setScreenContexts((items) => {
+        const next = items.some((existing) => existing.id === screenContext.id)
+          ? items.map((existing) => (existing.id === screenContext.id ? screenContext : existing))
+          : [...items, screenContext];
+        const limited = next.slice(-MAX_SCREEN_CONTEXTS);
+        console.info(
+          `[Persuando Response] ${screenPrefix}screen context count after apply: sessionId=${event.sessionId} count=${limited.length} hasImage=${Boolean(screenContext.imageReference)} imageLength=${screenContext.imageReference?.length ?? 0}.`
+        );
+        return limited;
+      });
     }
   }
   if (event.type === "copilot.explanation") {
@@ -724,6 +735,7 @@ interface CopilotExplanation {
 }
 
 interface ScreenContext {
+  debugId?: string;
   id: string;
   imageReference?: string;
   textContext?: string;
@@ -783,6 +795,7 @@ function removeRepeatedTranscriptText(value: string): string {
 
 function toScreenContext(event: Extract<PersuandoWebSocketEvent, { type: "copilot.context" }>): ScreenContext {
   return {
+    debugId: event.payload.debugId,
     id: event.payload.contextId,
     imageReference: event.payload.imageReference,
     textContext: event.payload.textContext

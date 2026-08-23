@@ -16,7 +16,7 @@ export interface CaptureRuntimeState {
 }
 
 export interface PersuandoCaptureApi {
-  captureScreenImage(): Promise<{ dataUrl: string; sourceLabel: string }>;
+  captureScreenImage(debugId?: string): Promise<{ dataUrl: string; sourceLabel: string }>;
   getAuthUser(): Promise<{ id: string; email: string; displayName: string; provider: "google" | "local-dev" } | undefined>;
   getState(): Promise<CaptureRuntimeState>;
   hideToolbar(): Promise<void>;
@@ -33,7 +33,7 @@ export interface PersuandoCaptureApi {
 }
 
 const api: PersuandoCaptureApi = {
-  captureScreenImage: () => ipcRenderer.invoke("capture:capture-screen-image") as Promise<{ dataUrl: string; sourceLabel: string }>,
+  captureScreenImage: (debugId) => ipcRenderer.invoke("capture:capture-screen-image", debugId) as Promise<{ dataUrl: string; sourceLabel: string }>,
   getAuthUser: () => ipcRenderer.invoke("capture:get-auth-user") as Promise<
     { id: string; email: string; displayName: string; provider: "google" | "local-dev" } | undefined
   >,

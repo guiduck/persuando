@@ -104,3 +104,7 @@ Gate:
 - Do not build or market Persuando as an invisible app.
 - Do not bypass screen sharing, recording, browser focus detection, proctoring tools, or platform rules.
 - Do not make code copilot mode active without explicit consent and visible active state. Do not auto-generate copy-paste coding answers from live assessment, proctored, interview, contest, or platform-challenge screenshots.
+
+## Update - 2026-08-22 Screenshot Debug Trace
+
+Phase 3 Production MVP advanced by fixing the runtime Electron preload mismatch that prevented active-session periodic screen context commands from reaching the renderer in packaged/dev runtime. Periodic and manual screenshots now carry optional realtime `debugId` values and consistent `[screen:<debugId>]` logs across Capture, Electron main, API ingest/persist/fan-out, and Response apply. Gate remaining: manual Electron Capture against the VPS must verify screenshots render in Response Mode and that the same debug ID is visible end to end. Non-goal: this update does not add durable image storage, redaction, or broader visual-context policy changes.

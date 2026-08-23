@@ -54,6 +54,10 @@ const defaultState: CaptureRuntimeState = {
 const PERIODIC_SCREEN_CAPTURE_INTERVAL_MS = 5000;
 const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 
+function createScreenDebugId(kind: "manual" | "periodic"): string {
+  return `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 let activeCapture: ActiveCapture | undefined;
 let periodicScreenCapture: { stop(): void } | undefined;
 
@@ -711,7 +715,7 @@ async function maybeStartPeriodicScreenCapture(
   consentGrants: ConsentGrant[],
   setCaptureError: (error: string | undefined) => void
 ): Promise<{ stop(): void } | undefined> {
-  console.info(`[Persuando Capture] Periodic screen context evaluating: activeCapture=${Boolean(activeCapture)} setting=${settings.periodicScreenshotCaptureDefault} screenConsent=${hasConsentGrant(consentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(consentGrants, "code_copilot")} grantCount=${consentGrants.length}.`);
+  console.info(`[Persuando Capture] Periodic setting ${settings.periodicScreenshotCaptureDefault ? "enabled" : "disabled"}: activeCapture=${Boolean(activeCapture)} activeSessionId=${activeCapture?.session.id ?? "none"} screenConsent=${hasConsentGrant(consentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(consentGrants, "code_copilot")} grantCount=${consentGrants.length}.`);
   if (!settings.periodicScreenshotCaptureDefault) {
     console.info(
       "[Persuando Capture] Periodic screen context not started: setting disabled. Enable Periodic screen context default in Capture App > Features."
@@ -724,24 +728,27 @@ async function maybeStartPeriodicScreenCapture(
     return undefined;
   }
   try {
-    console.info("[Persuando Capture] Periodic screen context started.");
+    console.info(`[Persuando Capture] Periodic screen context timer started: activeSessionId=${activeCapture?.session.id ?? "none"} intervalMs=${PERIODIC_SCREEN_CAPTURE_INTERVAL_MS}.`);
     let stopped = false;
     const capture = async () => {
+      const debugId = createScreenDebugId("periodic");
+      const screenPrefix = `[screen:${debugId}] `;
       if (stopped) return;
       if (!activeCapture) {
-        console.warn("[Persuando Capture] Periodic screen context skipped: no active capture in this renderer.");
+        console.warn(`[Persuando Capture] ${screenPrefix}Periodic screen context skipped: no active capture in this renderer.`);
         return;
       }
-      console.info("[Persuando Capture] Periodic screen context capture tick.");
-      console.info("[Persuando Capture] Periodic screen context requesting image from capture bridge.");
-      const image = await captureScreenImageFallback();
-      console.info(`[Persuando Capture] Periodic screen context image captured: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
+      console.info(`[Persuando Capture] ${screenPrefix}Periodic tick fired: activeSessionId=${activeCapture.session.id}.`);
+      console.info(`[Persuando Capture] ${screenPrefix}Screen capture requested from capture bridge.`);
+      const image = await captureScreenImageFallback(debugId);
+      console.info(`[Persuando Capture] ${screenPrefix}Screen capture result: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
       activeCapture.sendContext({
+        debugId,
         explanationMode: "explain",
         imageReference: image.dataUrl,
         textContext: `Periodic screen context captured during the active session from ${image.sourceLabel}.`
       });
-      console.info("[Persuando Capture] Periodic screen context sent to realtime.");
+      console.info(`[Persuando Capture] ${screenPrefix}Context send called.`);
       setCaptureError(undefined);
     };
     const runCapture = async () => {
@@ -761,7 +768,7 @@ async function maybeStartPeriodicScreenCapture(
       stop() {
         stopped = true;
         window.clearInterval(interval);
-        console.info("[Persuando Capture] Periodic screen context stopped.");
+        console.info(`[Persuando Capture] Periodic screen context timer stopped: activeSessionId=${activeCapture?.session.id ?? "none"}.`);
       }
     };
   } catch (error) {
@@ -769,43 +776,51 @@ async function maybeStartPeriodicScreenCapture(
     return undefined;
   }
 }
-
 async function captureScreenContext(setCaptureError: (error: string | undefined) => void, consentGrants: ConsentGrant[]): Promise<void> {
+  const debugId = createScreenDebugId("manual");
+  const screenPrefix = `[screen:${debugId}] `;
   try {
-    console.info(`[Persuando Capture] Manual screen context requested: activeCapture=${Boolean(activeCapture)} screenConsent=${hasConsentGrant(consentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(consentGrants, "code_copilot")}.`);
+    console.info(`[Persuando Capture] ${screenPrefix}Manual screen context requested: activeCapture=${Boolean(activeCapture)} activeSessionId=${activeCapture?.session.id ?? "none"} screenConsent=${hasConsentGrant(consentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(consentGrants, "code_copilot")}.`);
     if (!activeCapture) throw new Error("Start listening before screen context capture.");
     const missingConsent = missingConsentLabels(consentGrants, requiredContextConsents);
     if (missingConsent.length > 0) throw new Error(`Enable consent before screen context: ${missingConsent.join(", ")}.`);
-    const image = await captureScreenImageFallback();
+    console.info(`[Persuando Capture] ${screenPrefix}Screen capture requested from capture bridge.`);
+    const image = await captureScreenImageFallback(debugId);
+    console.info(`[Persuando Capture] ${screenPrefix}Screen capture result: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
     activeCapture.sendContext({
+      debugId,
       explanationMode: "explain",
       imageReference: image.dataUrl,
       textContext: `Visible user-requested screen context capture from ${image.sourceLabel}.`
     });
+    console.info(`[Persuando Capture] ${screenPrefix}Context send called.`);
     setCaptureError(undefined);
   } catch (error) {
+    console.error(`[Persuando Capture] ${screenPrefix}Manual screen context failed: ${error instanceof Error ? error.message : "Could not capture screen context."}`);
     setCaptureError(error instanceof Error ? error.message : "Could not capture screen context.");
   }
 }
 
-async function captureScreenImageFallback(existingStream?: MediaStream): Promise<{ dataUrl: string; sourceLabel: string }> {
-  console.info(`[Persuando Capture] captureScreenImageFallback called: electronBridge=${Boolean(window.persuandoCapture?.captureScreenImage)} existingStream=${Boolean(existingStream)}.`);
-  const electronCapture = await window.persuandoCapture?.captureScreenImage();
+async function captureScreenImageFallback(debugId?: string, existingStream?: MediaStream): Promise<{ dataUrl: string; sourceLabel: string }> {
+  const screenPrefix = debugId ? `[screen:${debugId}] ` : "";
+  console.info(`[Persuando Capture] ${screenPrefix}captureScreenImageFallback called: electronBridge=${Boolean(window.persuandoCapture?.captureScreenImage)} existingStream=${Boolean(existingStream)}.`);
+  const electronCapture = await window.persuandoCapture?.captureScreenImage(debugId);
   if (electronCapture) {
-    console.info(`[Persuando Capture] Electron screen bridge returned image: source=${electronCapture.sourceLabel} dataUrlLength=${electronCapture.dataUrl.length}.`);
+    console.info(`[Persuando Capture] ${screenPrefix}Electron screen bridge returned image: source=${electronCapture.sourceLabel} dataUrlLength=${electronCapture.dataUrl.length}.`);
     return electronCapture;
   }
 
-  console.warn("[Persuando Capture] Electron screen bridge unavailable; falling back to getDisplayMedia.");
+  console.warn(`[Persuando Capture] ${screenPrefix}Electron screen bridge unavailable; falling back to getDisplayMedia.`);
   const stream = existingStream ?? (await navigator.mediaDevices.getDisplayMedia({ audio: false, video: true }));
   try {
     const canvas = await captureStreamFrame(stream);
-    return { dataUrl: canvas.toDataURL("image/jpeg", 0.55), sourceLabel: "selected screen" };
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.55);
+    console.info(`[Persuando Capture] ${screenPrefix}Fallback screen capture completed: source=selected screen dataUrlLength=${dataUrl.length}.`);
+    return { dataUrl, sourceLabel: "selected screen" };
   } finally {
     if (!existingStream) for (const streamTrack of stream.getTracks()) streamTrack.stop();
   }
 }
-
 async function captureStreamFrame(stream: MediaStream): Promise<HTMLCanvasElement> {
   const track = stream.getVideoTracks()[0];
   if (!track) throw new Error("No screen source selected.");

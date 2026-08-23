@@ -65,6 +65,7 @@ export type CopilotContextEvent = BaseWebSocketEvent<
   "copilot.context",
   {
     contextId: string;
+    debugId?: string;
     programmingLanguage: string;
     explanationMode: "hint" | "explain" | "review";
     textContext?: string;

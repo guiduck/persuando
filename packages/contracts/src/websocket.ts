@@ -53,7 +53,16 @@ export type ConsentRevokedEvent = BaseWebSocketEvent<"consent.revoked", { consen
 export type ResponseSubscribeEvent = BaseWebSocketEvent<"response.subscribe", { lastSeenSequence?: number }>;
 export type ResponseUnsubscribeEvent = BaseWebSocketEvent<"response.unsubscribe", Record<string, never>>;
 export type ResponseAckEvent = BaseWebSocketEvent<"response.ack", { lastReceivedSequence: number }>;
-export type ResponseGenerateEvent = BaseWebSocketEvent<"response.generate", { mode: "summary" | "insights" | "followups" | "code_practice" }>;
+export type ResponseGenerateEvent = BaseWebSocketEvent<
+  "response.generate",
+  {
+    mode: "summary" | "insights" | "followups" | "code_practice";
+    screenContexts?: {
+      imageReference?: string;
+      textContext?: string;
+    }[];
+  }
+>;
 export type SessionStatusEvent = BaseWebSocketEvent<"session.status", { status: SessionStatus; safeMessage?: string }>;
 export type TranscriptSegmentEvent = BaseWebSocketEvent<"transcript.segment", { segment: TranscriptSegment }>;
 export type SummaryUpdatedEvent = BaseWebSocketEvent<"summary.updated", { summary: Summary }>;

@@ -98,6 +98,8 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
         if (!parsed) return;
         if (parsed.type === "realtime.error") {
           setProviderError(parsed.safeMessage ?? "Realtime update failed.");
+          setGeneratingModes(new Set());
+          pendingManualModesRef.current.clear();
           return;
         }
 
@@ -163,13 +165,19 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
     setProviderError(undefined);
     if (source === "manual") pendingManualModesRef.current.add(mode);
     setGeneratingModes((values) => new Set([...values, mode]));
-    console.info(`[Persuando Response] ${source === "manual" ? "Manual" : "Automatic"} generation requested: sessionId=${history.session.id} mode=${mode}.`);
+    const requestScreenContexts = mode === "code_practice"
+      ? screenContexts.slice(-4).map((context) => ({
+          imageReference: context.imageReference,
+          textContext: context.textContext
+        }))
+      : undefined;
+    console.info(`[Persuando Response] ${source === "manual" ? "Manual" : "Automatic"} generation requested: sessionId=${history.session.id} mode=${mode} screenContexts=${requestScreenContexts?.length ?? 0} imageReferences=${requestScreenContexts?.filter((context) => Boolean(context.imageReference)).length ?? 0}.`);
     send(socketRef.current, {
       version: 1,
       type: "response.generate",
       sessionId: history.session.id,
       sentAt: new Date().toISOString(),
-      payload: { mode }
+      payload: { mode, screenContexts: requestScreenContexts }
     });
     window.setTimeout(() => {
       setGeneratingModes((values) => {
@@ -244,7 +252,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
           <InsightPanel insights={insights} isGenerating={generatingModes.has("insights")} mode={panelModes.insights} newInsightIds={newInsightIds} onGenerate={() => requestGeneration("insights")} onModeChange={(mode) => updatePanelMode("insights", mode)} />
           <SuggestionPanel isGenerating={generatingModes.has("followups")} mode={panelModes.followups} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("followups", mode)} suggestions={suggestions} />
           <ScreenContextPanel contexts={screenContexts} />
-          <CopilotPanel explanations={copilotExplanations} isGenerating={generatingModes.has("code_practice")} mode={panelModes.code} onGenerate={() => requestGeneration("code_practice")} onModeChange={(mode) => updatePanelMode("code", mode)} />
+          <CopilotPanel error={providerError} explanations={copilotExplanations} isGenerating={generatingModes.has("code_practice")} mode={panelModes.code} onGenerate={() => requestGeneration("code_practice")} onModeChange={(mode) => updatePanelMode("code", mode)} />
           <SessionMeta deleteState={deleteState} history={history} providerError={providerError} />
         </aside>
       </section>
@@ -436,11 +444,12 @@ function ScreenContextPanel({ contexts }: Readonly<{ contexts: ScreenContext[] }
   );
 }
 
-function CopilotPanel({ explanations, isGenerating, mode, onGenerate, onModeChange }: Readonly<GenerationPanelProps & { explanations: CopilotExplanation[] }>) {
+function CopilotPanel({ error, explanations, isGenerating, mode, onGenerate, onModeChange }: Readonly<GenerationPanelProps & { error?: string; explanations: CopilotExplanation[] }>) {
   return (
     <section className="panel">
       <PanelTitle isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title="Code practice" />
       <div className="artifact-list">
+        {error ? <span className="pill empty">{error}</span> : null}
         {explanations.length === 0 ? (
           <span className="pill empty">No code explanation yet.</span>
         ) : (

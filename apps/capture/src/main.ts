@@ -163,7 +163,7 @@ function registerGlobalShortcuts(): void {
       log(`Global shortcut ${SCREEN_CAPTURE_ACCELERATOR} ignored: start listening before capturing screen context.`);
       return;
     }
-    sendCommand("capture-context");
+    broadcastCommand("capture-context");
   });
   log(`Global shortcut ${SCREEN_CAPTURE_ACCELERATOR} ${registered ? "registered" : "registration failed"}.`);
 }
@@ -203,8 +203,8 @@ async function capturePrimaryScreenImage(debugId?: string): Promise<{ dataUrl: s
     log(`${prefix}Screen capture unavailable: sources=${sources.length}.`);
     throw new Error("No screen source available for capture.");
   }
-  const dataUrl = source.thumbnail.toDataURL();
-  log(`${prefix}Screen capture completed: source=${source.name} sources=${sources.length} dataUrlLength=${dataUrl.length}.`);
+  const dataUrl = `data:image/jpeg;base64,${source.thumbnail.toJPEG(70).toString("base64")}`;
+  log(`${prefix}Screen capture completed: source=${source.name} sources=${sources.length} format=jpeg quality=70 dataUrlLength=${dataUrl.length}.`);
   return {
     dataUrl,
     sourceLabel: source.name
@@ -298,7 +298,7 @@ function updateTrayMenu(): void {
         label: runtimeState.paused ? "Resume capture" : "Pause capture",
         click: () => sendCommand(runtimeState.paused ? "resume-capture" : "pause-capture")
       },
-      { enabled: runtimeState.listening, label: "Capture context", click: () => sendCommand("capture-context") },
+      { enabled: runtimeState.listening, label: "Capture context", click: () => broadcastCommand("capture-context") },
       { enabled: runtimeState.listening, label: "Revoke capture", click: () => sendCommand("revoke-capture") },
       { type: "separator" },
       {

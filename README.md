@@ -308,6 +308,7 @@ Screenshot troubleshooting:
 - The camera button is always visible. During an active listening session, click it or press `Ctrl+E` from any focused Windows app to capture and send the current screen context.
 - If no session is listening, `Ctrl+E` opens the toolbar and logs that the screenshot was ignored instead of sending context without an active session.
 - The Electron log reports whether `CommandOrControl+E` registered successfully and when the shortcut is received.
+- Screenshots run every 5 seconds independently of `Session timer`, which is stored in minutes. Native Electron captures are sent as JPEG quality 70, and Response logs `transportLatencyMs` when each context arrives.
 
 ## Validation
 

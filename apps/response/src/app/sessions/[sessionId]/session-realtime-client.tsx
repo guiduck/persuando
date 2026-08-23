@@ -711,7 +711,7 @@ function applyEvent(event: PersuandoWebSocketEvent, joinedAtIso: string, setters
   if (event.type === "copilot.context") {
     const screenPrefix = event.payload.debugId ? `[screen:${event.payload.debugId}] ` : "";
     console.info(
-      `[Persuando Response] ${screenPrefix}copilot.context event received: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} textLength=${event.payload.textContext?.length ?? 0}.`
+      `[Persuando Response] ${screenPrefix}copilot.context event received: sessionId=${event.sessionId} contextId=${event.payload.contextId} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} textLength=${event.payload.textContext?.length ?? 0} transportLatencyMs=${Math.max(0, Date.now() - Date.parse(event.sentAt))}.`
     );
     if (event.payload.imageReference) {
       const screenContext = toScreenContext(event);

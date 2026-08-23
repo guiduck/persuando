@@ -372,7 +372,7 @@ function Dashboard({
               </select>
             </label>
             <label>
-              Session timer
+              Session timer (minutes)
               <input
                 disabled={!settings}
                 min="5"
@@ -695,7 +695,11 @@ async function handleCaptureCommand(
     await togglePaused(runtimeState, setRuntimeState);
   }
   if (command === "capture-context") {
-    await captureScreenContext(setCaptureError, consentGrants);
+    if (activeCapture) {
+      await captureScreenContext(setCaptureError, consentGrants);
+    } else {
+      console.info("[Persuando Capture] capture-context ignored in renderer without the active capture session.");
+    }
   }
   if (command === "start-periodic-screen-context") {
     console.info("[Persuando Capture] Command received: start-periodic-screen-context.");

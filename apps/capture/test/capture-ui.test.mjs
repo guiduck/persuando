@@ -45,6 +45,10 @@ test("Capture app persists an explicit programming language selection", () => {
   assert.match(renderer, /<option value="javascript">JavaScript<\/option>/);
   assert.match(renderer, /<option value="typescript">TypeScript<\/option>/);
 });
+test("Capture app labels the session timer in minutes", () => {
+  assert.match(renderer, /Session timer \(minutes\)/);
+  assert.match(renderer, /sessionTimerMinutes/);
+});
 test("Capture app exposes visible error and permission failure paths", () => {
   const combined = `${renderer}\n${captureSession}`;
   assert.match(combined, /Capture error/);
@@ -101,6 +105,8 @@ test("floating toolbar explains every action and keeps a global screenshot short
   assert.match(renderer, /toolbar-button-wrap/);
   assert.match(electronMain, /globalShortcut\.register\(SCREEN_CAPTURE_ACCELERATOR/);
   assert.match(electronMain, /CommandOrControl\+E/);
-  assert.match(electronMain, /sendCommand\("capture-context"\)/);
+  assert.match(electronMain, /broadcastCommand\("capture-context"\)/);
+  assert.match(electronMain, /thumbnail\.toJPEG\(70\)/);
+  assert.match(renderer, /capture-context ignored in renderer without the active capture session/);
   assert.match(electronMain, /globalShortcut\.unregisterAll\(\)/);
 });

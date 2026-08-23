@@ -182,3 +182,6 @@ Model support and structured-output behavior differ across OpenAI-compatible pro
 Expected output:
 Produce a concise feature specification with measurable acceptance criteria, error taxonomy, observability fields, fixture matrix, deployment/rollback checks, and manual Electron-to-VPS smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
 ```
+## Additional Source Context - 2026-08-23 Screenshot Delivery Latency
+
+Manual `Ctrl+E`/tray capture now broadcasts across Electron windows so the renderer owning `activeCapture` handles it; non-owning renderers ignore the command. Native screenshots are JPEG quality 70 at the existing 1440x900 thumbnail size, and validated contexts are published to Response before PostgreSQL persistence completes. Response logs `transportLatencyMs`. The next specification must define an explicit latency target from shortcut/tick to Response apply, acceptable compressed-image OCR/readability quality, behavior when persistence fails after realtime fan-out, payload/backpressure limits, and a packaged Windows-to-VPS measurement procedure. Keep the periodic interval at five seconds unless a later product decision makes it configurable. `sessionTimerMinutes` is unrelated and automatic timeout enforcement remains deferred.

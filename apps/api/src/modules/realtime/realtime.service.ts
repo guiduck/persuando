@@ -397,13 +397,13 @@ export class RealtimeService {
       }
     }
 
+    const appendedContext = this.appendEvent(event);
+    this.logger.log(
+      `${screenPrefix}copilot.context realtime event published: sessionId=${event.sessionId} contextId=${event.payload.contextId} sequence=${appendedContext.sequence ?? "none"} listeners=${this.eventListeners.size}`
+    );
     const context = await this.persistCopilotContext(event);
     this.logger.log(
       `${screenPrefix}copilot.context persisted: sessionId=${event.sessionId} contextId=${context.id} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} status=${context.status}`
-    );
-    const appendedContext = this.appendEvent(event);
-    this.logger.log(
-      `${screenPrefix}copilot.context realtime event published: sessionId=${event.sessionId} contextId=${context.id} sequence=${appendedContext.sequence ?? "none"} listeners=${this.eventListeners.size}`
     );
 
     if (isPeriodicScreenContext(event)) {

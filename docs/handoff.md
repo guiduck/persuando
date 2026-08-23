@@ -136,3 +136,11 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Validation: `npm.cmd run build` passed; focused provider/realtime/Capture/Response tests passed 49/49; `npm.cmd run test` passed 122/122; and `npm.cmd run lint` passed.
 - Remaining work: deploy API, Response, and the rebuilt Capture app, then run a real-provider VPS smoke that captures a JavaScript editor/test failure and correlates one generation ID through `visual_analysis` and `answer`. Measure the two-call latency with the selected production model.
 - Recommended next Spec Kit step: specify provider capability validation, structured-output reliability, bounded retry policy, context freshness guarantees, and fixture-based visual tutoring quality checks.
+## Implementation Update - 2026-08-23 Screenshot Delivery Latency
+
+- Current status: the five-second periodic interval remains unchanged, while manual `Ctrl+E` and tray captures are now broadcast to both Electron renderers so the renderer that owns the active capture session responds immediately.
+- Decision: native 1440x900 screenshots use JPEG quality 70 instead of PNG, and API realtime fan-out occurs after access/consent validation but before the large image payload finishes persisting to PostgreSQL. Response logs `transportLatencyMs` from Capture event creation to browser receipt.
+- Settings clarification: `sessionTimerMinutes=30` means a 30-minute session setting and does not control screenshot cadence. It is currently persisted but not yet enforced as automatic session termination.
+- Validation: `npm.cmd run build` passed; focused Capture/API/Response tests passed 36/36; `npm.cmd run test` passed 123/123; the Capture production bundle passed; and `npm.cmd run lint` passed.
+- Remaining work: deploy API and Response, rebuild/restart the Windows Capture artifact, then correlate `[screen:<debugId>]` and `transportLatencyMs` during a new session. Confirm JPEG OCR quality on small editor text.
+- Recommended next Spec Kit step: preserve the provider-reliability prompt and add measurable Capture-to-Response latency, payload-size, persistence-failure, and screenshot readability acceptance criteria.

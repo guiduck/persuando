@@ -138,3 +138,14 @@ The implemented baseline now performs two OpenAI-compatible calls for Code Pract
 ## Additional Source Context - 2026-08-23 Capture Toolbar Ergonomics
 
 The floating Capture toolbar now uses explanatory native tooltips and accessible labels for every action. Its camera action remains visible and is also available through the Electron global accelerator `CommandOrControl+E`, which reuses the existing consented manual `capture-context` flow only during an active listening session. Future Capture UI specs must preserve discoverability, visible capture state, accelerator conflict handling, and the product's consent and responsible-use boundaries.
+
+## Additional Source Context - 2026-08-23 Realtime And Model Routing
+
+Response now receives `WEBSOCKET_URL` from the Next server at request time, displays actionable
+connection failures, and renders its 30 screenshots newest-to-oldest while sending them
+oldest-to-newest to the provider. Capture offers GPT-5.6 sol/terra/luna analysis choices and the
+OpenAI-compatible adapter maps GPT-5 models to `max_completion_tokens` without legacy temperature.
+The next `/speckit-specify` should define model capability discovery or an explicit allowlist,
+provider-specific compatibility checks, quality/latency/cost acceptance criteria, and a deployment
+smoke proving the browser connects to the production WSS endpoint rather than localhost. Preserve
+truthful provider errors and do not add silent model or content fallbacks.

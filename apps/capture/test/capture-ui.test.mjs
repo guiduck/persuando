@@ -35,6 +35,11 @@ test("Capture app includes settings, consent, toolbar, and microphone upload sur
   }
 });
 
+test("Capture app offers current GPT-5.6 analysis models", () => {
+  assert.match(renderer, /gpt-5\.6-sol/);
+  assert.match(renderer, /gpt-5\.6-terra/);
+  assert.match(renderer, /gpt-5\.6-luna/);
+});
 test("Capture app exposes visible error and permission failure paths", () => {
   const combined = `${renderer}\n${captureSession}`;
   assert.match(combined, /Capture error/);

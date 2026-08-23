@@ -69,9 +69,8 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           }
         ],
         model: input.analysisModel,
-        max_tokens: generationMaxTokens(input.task),
-        response_format: { type: "json_object" },
-        temperature: generationTemperature(input.task)
+        ...generationControls(input.analysisModel, generationMaxTokens(input.task), generationTemperature(input.task)),
+        response_format: { type: "json_object" }
       }),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -102,9 +101,8 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           { role: "user", content: codePracticeVisualAnalysisContent(input, imageReferences) }
         ],
         model: input.analysisModel,
-        max_tokens: 1800,
-        response_format: { type: "json_object" },
-        temperature: 0
+        ...generationControls(input.analysisModel, 1800, 0),
+        response_format: { type: "json_object" }
       }),
       headers: { "content-type": "application/json" },
       method: "POST"
@@ -187,6 +185,13 @@ function providerErrorForStatus(status: number, path: string): ProviderAdapterEr
     return new ProviderAdapterError("PROVIDER_UNAVAILABLE", "Provider is temporarily unavailable.", true);
   }
   return new ProviderAdapterError("PROVIDER_UNAVAILABLE", "Provider request failed.", false);
+}
+
+function generationControls(model: string, maxTokens: number, temperature: number): Record<string, number> {
+  if (/^gpt-5(?:\.|$)/i.test(model)) {
+    return { max_completion_tokens: maxTokens };
+  }
+  return { max_tokens: maxTokens, temperature };
 }
 
 function generationMaxTokens(task: ProviderGenerationInput["task"]): number {

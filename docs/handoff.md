@@ -120,3 +120,11 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Validation: the focused Capture test passed 6/6; the Capture production bundle passed; `npm.cmd run build` passed; `npm.cmd run test` passed 116/116; and `npm.cmd run lint` passed.
 - Remaining work: manually confirm native tooltip timing and global shortcut behavior in packaged Windows Electron, including shortcut-registration conflicts with other applications.
 - Recommended next Spec Kit step: keep the existing visual-context production-hardening spec as the next major slice; include packaged-toolbar accelerator conflict and discoverability checks in its Electron smoke criteria.
+
+## Implementation Update - 2026-08-23 Response Realtime And Model Selection
+
+- Current status: Response session pages receive the WebSocket endpoint from server runtime configuration, expose the actual endpoint when connection/retry fails, and keep generation disabled until the subscription is live.
+- Decision: render the 30-item screen-context window newest-to-oldest for usability while retaining and sending it oldest-to-newest for chronological model grounding. Capture model choices now include `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`; GPT-5 requests use `max_completion_tokens` and omit legacy temperature controls.
+- Latest validation: `npm.cmd run build` passed; `npm.cmd run test` passed 119/119; `npm.cmd run lint` passed; the focused provider/Capture/Response tests passed 23/23; and the Response production build passed.
+- Remaining work: redeploy API, Response, and Capture artifacts; load `.env.local` before the Next build and PM2 restart; then confirm browser console reports `Realtime socket opened` and perform a real-provider generation with the selected GPT-5.6 model.
+- Recommended next Spec Kit step: keep visual-context production hardening next, adding model capability/routing validation, latency and cost budgets for the two-call visual flow, and deployment checks that prove the runtime WebSocket endpoint is not localhost.

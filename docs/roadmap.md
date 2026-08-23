@@ -120,3 +120,7 @@ Phase 3 now includes a two-pass real-provider Code Practice flow: structured vis
 ## Update - 2026-08-23 Capture Toolbar Tooltips And Screenshot Shortcut
 
 Phase 3 Capture ergonomics now include explanatory hover tooltips and accessible labels for every floating-toolbar action. The screenshot camera remains visible and `CommandOrControl+E` globally invokes the existing manual screen-context flow while listening. Remaining gate: packaged Windows smoke for tooltip visibility, active/inactive session behavior, and accelerator conflicts. Deferred and unchanged: configurable shortcuts, multi-shortcut profiles, and any consent or capture-policy changes.
+
+## Update - 2026-08-23 Response Realtime Runtime Configuration And GPT-5.6
+
+Phase 3 now resolves the Response WebSocket endpoint from the server process at request time and reports actionable browser connection failures, eliminating dependence on a value compiled into the client bundle. The screen-context panel renders newest-first while preserving chronological model input. Capture exposes current GPT-5.6 quality/balance/efficiency options, and the provider adapter uses GPT-5-compatible completion controls. Remaining gate: redeploy with the VPS environment loaded, verify a live Response subscription, and run real-provider quality/latency/cost smoke. Deferred: automatic model capability discovery, provider-specific routing/fallback, and changing the persisted FIFO policy.

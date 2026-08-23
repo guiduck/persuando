@@ -256,8 +256,9 @@ Code Practice now uses the actual OpenAI-compatible provider response. It does n
 invalid, or failed responses with hardcoded tutoring content. A malformed or empty provider response
 is published as `PROVIDER_RESPONSE_INVALID` so the failure remains visible and debuggable.
 
-The Response App retains and displays the latest 30 screenshots, sends them oldest-to-newest with a
-manual generation request, and replaces the oldest entry when a 31st screenshot arrives. Session
+The Response App retains the latest 30 screenshots, displays them newest-to-oldest, sends them
+oldest-to-newest with a manual generation request, and replaces the oldest entry when a 31st
+screenshot arrives. Session
 history hydrates the same persisted window after a refresh. The panel shows the exact `N/30` count and marks the newest image. Code Practice first asks the provider to extract the exact platform contract, current attempt, and visible test results from all screenshots; a second provider call produces the tutoring answer using that analysis and up to four previous generated explanations. For a generation request, look for:
 
 ```text
@@ -275,6 +276,16 @@ On failure, the API logs `Manual generation failed` with the safe provider error
 receives `provider.error`. Use a newly created session for deployment smoke tests: screenshots stored
 before this persistence fix may have kept only their text label, so their original image bytes cannot
 be recovered.
+
+### Response Realtime Deployment Diagnostics
+
+If retained screenshots load but the page shows a live-update connection error, REST is working
+while the browser WebSocket is not. Check the browser console for `Realtime socket error`; it now
+shows the configured endpoint without query parameters. On the VPS, load `.env.local` before
+building and before `pm2 restart --update-env`. The session page reads `WEBSOCKET_URL` at server
+runtime, so a PM2 restart can correct the endpoint without compiling a localhost WebSocket fallback
+into the client bundle.
+
 ### 13. Stop Everything
 
 Stop app terminals with `Ctrl+C`.

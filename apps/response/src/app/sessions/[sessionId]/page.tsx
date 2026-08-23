@@ -12,6 +12,7 @@ export default async function SessionDetailPage({
 }>) {
   const { sessionId } = await params;
   const history = await getSessionHistory(sessionId);
+  const realtimeEndpoint = resolveRealtimeEndpoint();
 
   return (
     <main className="page">
@@ -20,7 +21,16 @@ export default async function SessionDetailPage({
           Back to workspace
         </Link>
       </nav>
-      <SessionHistoryLoader initialHistory={history} sessionId={sessionId} />
+      <SessionHistoryLoader initialHistory={history} realtimeEndpoint={realtimeEndpoint} sessionId={sessionId} />
     </main>
   );
+}
+
+function resolveRealtimeEndpoint(): string {
+  const configured = process.env.WEBSOCKET_URL ?? process.env.NEXT_PUBLIC_WEBSOCKET_URL;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("WEBSOCKET_URL or NEXT_PUBLIC_WEBSOCKET_URL must be configured for the Response app.");
+  }
+  return "ws://localhost:4000/realtime";
 }

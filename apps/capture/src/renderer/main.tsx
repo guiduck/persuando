@@ -315,6 +315,9 @@ function Dashboard({
                 onChange={(event) => void updateSettingsField(settings, setSettings, { analysisModel: event.currentTarget.value })}
                 value={settings?.analysisModel ?? "gpt-4o-mini"}
               >
+                <option value="gpt-5.6-sol">gpt-5.6-sol (best quality)</option>
+                <option value="gpt-5.6-terra">gpt-5.6-terra (balanced)</option>
+                <option value="gpt-5.6-luna">gpt-5.6-luna (fastest)</option>
                 <option value="gpt-4o-mini">gpt-4o-mini</option>
                 <option value="gpt-4.1">gpt-4.1</option>
                 <option value="gpt-4o">gpt-4o</option>

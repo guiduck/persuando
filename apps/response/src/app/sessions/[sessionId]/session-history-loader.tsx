@@ -7,12 +7,13 @@ import { SessionRealtimeClient } from "./session-realtime-client";
 
 interface SessionHistoryLoaderProps {
   initialHistory?: SessionHistoryResponse;
+  realtimeEndpoint: string;
   sessionId: string;
 }
 
 type LoadState = "loading" | "ready" | "unavailable";
 
-export function SessionHistoryLoader({ initialHistory, sessionId }: Readonly<SessionHistoryLoaderProps>) {
+export function SessionHistoryLoader({ initialHistory, realtimeEndpoint, sessionId }: Readonly<SessionHistoryLoaderProps>) {
   const [history, setHistory] = useState<SessionHistoryResponse | undefined>(initialHistory);
   const [state, setState] = useState<LoadState>(initialHistory ? "ready" : "loading");
 
@@ -40,7 +41,7 @@ export function SessionHistoryLoader({ initialHistory, sessionId }: Readonly<Ses
     };
   }, [initialHistory, sessionId]);
 
-  if (history) return <SessionRealtimeClient history={history} />;
+  if (history) return <SessionRealtimeClient history={history} realtimeEndpoint={realtimeEndpoint} />;
 
   return (
     <main className="page">

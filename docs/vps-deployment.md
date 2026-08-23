@@ -121,14 +121,21 @@ docker compose ps
 
 ## Build The Apps
 
+Load the production environment before both builds. This prevents browser-facing Next.js variables
+from being compiled with local fallback values:
+
 ```bash
+set -a
+source .env.local
+set +a
+
 npm run build
-NEXT_PUBLIC_API_BASE_URL=http://216.158.236.156:4100 \
-NEXT_PUBLIC_WEBSOCKET_URL=ws://216.158.236.156:4100/realtime \
 npm run --workspace @persuando/response build
 ```
 
-If using a domain, replace the URLs with HTTPS/WSS values before building Response Mode.
+The session page resolves its realtime endpoint at request time from `WEBSOCKET_URL`, with
+`NEXT_PUBLIC_WEBSOCKET_URL` kept as a compatibility fallback. Production session rendering fails clearly if
+neither value exists. Keep the domain deployment values as HTTPS/WSS in `.env.local`.
 
 ## Run With PM2
 
@@ -168,9 +175,9 @@ Check status and logs:
 
 ```bash
 pm2 status
-pm2 logs persuando-api
-pm2 logs persuando-worker
-pm2 logs persuando-response
+pm2 logs persuando-api --lines 200 --nostream
+pm2 logs persuando-worker --lines 200 --nostream
+pm2 logs persuando-response --lines 200 --nostream
 ```
 
 Health check:

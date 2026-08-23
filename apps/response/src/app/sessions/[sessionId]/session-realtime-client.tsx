@@ -26,6 +26,7 @@ const GENERATION_TIMEOUT_MS = 180_000;
 
 interface SessionRealtimeClientProps {
   history: SessionHistoryResponse;
+  realtimeEndpoint: string;
 }
 
 interface RealtimeWireMessage {
@@ -37,7 +38,7 @@ interface RealtimeWireMessage {
   safeMessage?: string;
 }
 
-export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClientProps>) {
+export function SessionRealtimeClient({ history, realtimeEndpoint }: Readonly<SessionRealtimeClientProps>) {
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(history.session.status);
   const [segments, setSegments] = useState<TranscriptSegment[]>(history.transcriptSegments);
@@ -49,6 +50,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
   const [newInsightIds, setNewInsightIds] = useState<Set<string>>(new Set());
   const [newSuggestionIds, setNewSuggestionIds] = useState<Set<string>>(new Set());
   const [providerError, setProviderError] = useState<string | undefined>();
+  const [connectionError, setConnectionError] = useState<string | undefined>();
   const [lastEventAt, setLastEventAt] = useState<string | undefined>();
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting" | "deleted" | "failed">("idle");
   const lastSequenceRef = useRef(maxInitialSequence(history));
@@ -77,13 +79,14 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
 
     const connect = () => {
       setConnectionState((current) => (current === "connecting" ? "connecting" : "reconnecting"));
-      const url = realtimeUrl("response");
+      const url = realtimeUrl(realtimeEndpoint, "response");
       console.info(`[Persuando Response] Opening realtime socket: ${url} sessionId=${history.session.id} lastSeenSequence=${lastSequenceRef.current}.`);
       socket = new WebSocket(url);
       socketRef.current = socket;
 
       socket.addEventListener("open", () => {
         console.info(`[Persuando Response] Realtime socket opened: sessionId=${history.session.id}.`);
+        setConnectionError(undefined);
         setConnectionState("live");
         send(socket, {
           version: 1,
@@ -148,11 +151,22 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
         }
       });
 
+      socket.addEventListener("error", () => {
+        const endpoint = safeRealtimeEndpoint(realtimeEndpoint);
+        console.error(
+          `[Persuando Response] Realtime socket error: sessionId=${history.session.id} endpoint=${endpoint}.`
+        );
+        setConnectionError(`Could not connect to live updates at ${endpoint}. Check the Response WebSocket configuration.`);
+      });
+
       socket.addEventListener("close", (event) => {
         console.warn(
           `[Persuando Response] Realtime socket closed: sessionId=${history.session.id} code=${event.code} reason=${event.reason || "none"} closedByComponent=${closedByComponent}.`
         );
         if (closedByComponent) return;
+        setConnectionError(
+          `Live updates disconnected from ${safeRealtimeEndpoint(realtimeEndpoint)} (code ${event.code}). Retrying automatically.`
+        );
         setConnectionState("offline");
         reconnectTimerRef.current = window.setTimeout(connect, 1500);
       });
@@ -166,7 +180,7 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
       if (socketRef.current === socket) socketRef.current = undefined;
       socket?.close();
     };
-  }, [history.session.id]);
+  }, [history.session.id, realtimeEndpoint]);
 
   const latestSummary = summaries.at(-1);
   const directAnswers = suggestions.filter((suggestion) => suggestion.category === "response");
@@ -174,7 +188,9 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
   const statusCopy = useMemo(() => statusLabel(connectionState, sessionStatus), [connectionState, sessionStatus]);
   const requestGeneration = (mode: GenerateMode, source: "manual" | "automatic" = "manual") => {
     if (connectionState !== "live") {
-      setProviderError("Connect live updates before generating assistance.");
+      setConnectionError(
+        `Cannot generate until live updates connect to ${safeRealtimeEndpoint(realtimeEndpoint)}. The app is retrying automatically.`
+      );
       return;
     }
     setProviderError(undefined);
@@ -270,8 +286,8 @@ export function SessionRealtimeClient({ history }: Readonly<SessionRealtimeClien
           <InsightPanel insights={insights} isGenerating={generatingModes.has("insights")} mode={panelModes.insights} newInsightIds={newInsightIds} onGenerate={() => requestGeneration("insights")} onModeChange={(mode) => updatePanelMode("insights", mode)} />
           <SuggestionPanel isGenerating={generatingModes.has("followups")} mode={panelModes.followups} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("followups", mode)} suggestions={suggestions} />
           <ScreenContextPanel contexts={screenContexts} />
-          <CopilotPanel error={providerError} explanations={copilotExplanations} isGenerating={generatingModes.has("code_practice")} mode={panelModes.code} onGenerate={() => requestGeneration("code_practice")} onModeChange={(mode) => updatePanelMode("code", mode)} />
-          <SessionMeta deleteState={deleteState} history={history} providerError={providerError} />
+          <CopilotPanel error={connectionError ?? providerError} explanations={copilotExplanations} isGenerating={generatingModes.has("code_practice")} mode={panelModes.code} onGenerate={() => requestGeneration("code_practice")} onModeChange={(mode) => updatePanelMode("code", mode)} />
+          <SessionMeta deleteState={deleteState} history={history} providerError={connectionError ?? providerError} />
         </aside>
       </section>
     </>
@@ -442,19 +458,20 @@ function SuggestionPanel({
 }
 
 function ScreenContextPanel({ contexts }: Readonly<{ contexts: ScreenContext[] }>) {
+  const newestFirstContexts = [...contexts].reverse();
   return (
     <section className="panel">
       <div className="panel-heading">
         <h2>Screen context</h2>
-        <span className="pill">{contexts.length}/{MAX_SCREEN_CONTEXTS} oldest to newest</span>
+        <span className="pill">{contexts.length}/{MAX_SCREEN_CONTEXTS} newest to oldest</span>
       </div>
       <div className="artifact-list panel-scroll">
         {contexts.length === 0 ? (
           <span className="pill empty">No screen context yet.</span>
         ) : (
-          contexts.map((context, index) => (
+          newestFirstContexts.map((context, index) => (
             <article className="artifact" key={context.id}>
-              <span className="pill active">screen {index + 1}{index === contexts.length - 1 ? " newest" : ""}</span>
+              <span className="pill active">screen {contexts.length - index}{index === 0 ? " newest" : ""}</span>
               {context.imageReference ? <img alt="Captured screen context" className="screen-preview" src={context.imageReference} /> : null}
               {context.textContext ? <p>{context.textContext}</p> : null}
             </article>
@@ -866,12 +883,21 @@ const commonTerms = new Set([
   "entao"
 ]);
 
-function realtimeUrl(clientType: "response"): string {
-  const configured = process.env.NEXT_PUBLIC_WEBSOCKET_URL;
-  const base = configured ?? "ws://localhost:4000/realtime";
+function realtimeUrl(realtimeEndpoint: string, clientType: "response"): string {
+  const base = realtimeEndpoint;
   const url = new URL(base);
   url.searchParams.set("clientType", clientType);
   return url.toString();
+}
+
+function safeRealtimeEndpoint(realtimeEndpoint: string): string {
+  try {
+    const url = new URL(realtimeEndpoint);
+    url.search = "";
+    return url.toString();
+  } catch {
+    return "the configured realtime endpoint";
+  }
 }
 
 function send(socket: WebSocket | undefined, event: PersuandoWebSocketEvent): void {

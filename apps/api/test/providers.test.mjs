@@ -88,6 +88,36 @@ test("OpenAiCompatibleProviderAdapter parses generation JSON", async () => {
   assert.equal(output.suggestions[0]?.content, "Eu sugiro confirmar o prazo.");
 });
 
+test("OpenAiCompatibleProviderAdapter uses GPT-5 completion controls without legacy temperature", async () => {
+  let requestBody;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return jsonResponse(200, {
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            summary: { content: "Resumo curto." },
+            insights: [],
+            suggestions: []
+          })
+        }
+      }]
+    });
+  });
+
+  await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-5.6-sol",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    transcriptText: "Falamos sobre prazo."
+  });
+
+  assert.equal(requestBody.max_completion_tokens, 900);
+  assert.equal("max_tokens" in requestBody, false);
+  assert.equal("temperature" in requestBody, false);
+});
+
 test("OpenAiCompatibleProviderAdapter maps provider failure status codes to safe errors", async () => {
   const cases = [
     [401, "PROVIDER_KEY_INVALID", false],

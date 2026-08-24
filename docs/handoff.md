@@ -160,3 +160,13 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Validation: `npm.cmd run test` passed 125/125, including prompt contract assertions; the prior full build, lint, and Response production build remain green.
 - Remaining work: deploy API and Response, then test two different HackerRank exercises in one session and verify the second answer ignores stale first-exercise code while still using recent screenshots from the second.
 - Recommended next Spec Kit step: add multi-exercise visual fixtures and measurable active-problem classification accuracy to the provider reliability evaluation.
+
+## Implementation Update - 2026-08-23 Exclusive Modes And Hot Screenshot Persistence
+
+- Current status: users can select exactly one persisted assistant mode: Conversation, Code Practice, or Exam Study. The API rejects generation from inactive modes.
+- Recent decision: Conversation alone captures/transcribes microphone audio. Code Practice and Exam Study use screenshots; Exam Study identifies the newest active public-exam question, subject/topic, alternatives, and teaches the solution step by step in simple language.
+- Realtime/persistence: validated image contexts fan out and enter API hot state immediately. Response sends its current 30-image state with visual generation requests. Image rows persist from a two-second background queue with retry and shutdown flush, so PostgreSQL is no longer on the screenshot display/model-context critical path.
+- Rate-limit effect: screenshot ingest no longer performs direct image generation. Response owns visual generation, removing the former Ctrl+E plus Auto duplicate request.
+- Latest validation: `npm.cmd run build` passed; `npm.cmd run test` passed 125/125 after migration, mode-routing, hot-state, and asynchronous-persistence test updates.
+- Remaining work: run packaged Electron-to-VPS smoke for all three modes; measure screenshot transport latency and provider latency; add operation-specific provider-error UI attribution and a transcription 429 cooldown.
+- Deployment: apply migration `0003_user_settings_assistant_mode.sql` through the normal API migration runner, then restart API, worker, and Response with their existing environment.

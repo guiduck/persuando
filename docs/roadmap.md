@@ -136,3 +136,9 @@ Phase 3 now makes newly received screenshots visible immediately: `copilot.conte
 ## Update - 2026-08-23 Multi-Exercise Context Segmentation
 
 Phase 3 Code Practice now segments screenshot history by exercise and grounds each answer in the newest identifiable challenge. Stale screenshots and guidance from earlier exercises remain available as chronology but cannot define the active contract, attempt, or tests. Exact public challenges may use a labeled standard-contract assumption when the newest capture is partial. Big-O explanations must be implementation-specific. Remaining gate: real-provider evaluation that switches challenges within one session and verifies title/signature/output isolation plus complete selected-language code.
+
+## Update - 2026-08-23 Exclusive Assistant Modes And Async Screenshot Durability
+
+Phase 3 now has one persisted active mode per user. Conversation exclusively owns microphone transcription and conversation artifacts; Code Practice exclusively owns coding visual tutoring; Exam Study exclusively owns didactic public-exam question solving. The backend enforces the selection instead of relying on UI state.
+
+Screenshot fan-out and hot context now precede durability: Response can render and submit a new image to the model immediately, while image rows flush to PostgreSQL in two-second background batches with retry and shutdown flush. This also centralizes visual generation in Response and removes duplicate Ctrl+E/Auto provider calls. Remaining gates are packaged VPS smoke, multi-instance/shared-hot-state design, operation-specific provider-error attribution, transcription cooldown, and measured latency/cost budgets. Deferred: external question-bank search and web research; Exam Study currently solves questions visible in captured context.

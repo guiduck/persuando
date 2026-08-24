@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AssistantMode,
   Insight,
   PersuandoWebSocketEvent,
   ProviderErrorEvent,
@@ -17,7 +18,7 @@ import type {
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "offline" | "deleted";
-type GenerateMode = "summary" | "insights" | "followups" | "code_practice";
+type GenerateMode = "summary" | "insights" | "followups" | "code_practice" | "exam_study";
 type PanelMode = "automatic" | "on_demand";
 type PanelKey = "summary" | "answers" | "insights" | "followups" | "code";
 
@@ -26,6 +27,7 @@ const GENERATION_TIMEOUT_MS = 180_000;
 
 interface SessionRealtimeClientProps {
   history: SessionHistoryResponse;
+  assistantMode: AssistantMode;
   realtimeEndpoint: string;
 }
 
@@ -38,7 +40,7 @@ interface RealtimeWireMessage {
   safeMessage?: string;
 }
 
-export function SessionRealtimeClient({ history, realtimeEndpoint }: Readonly<SessionRealtimeClientProps>) {
+export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint }: Readonly<SessionRealtimeClientProps>) {
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(history.session.status);
   const [segments, setSegments] = useState<TranscriptSegment[]>(history.transcriptSegments);
@@ -184,6 +186,8 @@ export function SessionRealtimeClient({ history, realtimeEndpoint }: Readonly<Se
 
   const latestSummary = summaries.at(-1);
   const directAnswers = suggestions.filter((suggestion) => suggestion.category === "response");
+  const visualMode: Extract<GenerateMode, "code_practice" | "exam_study"> = assistantMode === "exam_study" ? "exam_study" : "code_practice";
+  const visibleExplanations = copilotExplanations.filter((item) => (item.assistantMode ?? "code_practice") === visualMode);
   const topics = deriveTopics(segments, insights);
   const statusCopy = useMemo(() => statusLabel(connectionState, sessionStatus), [connectionState, sessionStatus]);
   const requestGeneration = (mode: GenerateMode, source: "manual" | "automatic" = "manual") => {
@@ -196,7 +200,7 @@ export function SessionRealtimeClient({ history, realtimeEndpoint }: Readonly<Se
     setProviderError(undefined);
     if (source === "manual") pendingManualModesRef.current.add(mode);
     setGeneratingModes((values) => new Set([...values, mode]));
-    const requestScreenContexts = mode === "code_practice"
+    const requestScreenContexts = mode === "code_practice" || mode === "exam_study"
       ? screenContexts.slice(-MAX_SCREEN_CONTEXTS).map((context) => ({
           imageReference: context.imageReference,
           textContext: context.textContext
@@ -227,21 +231,22 @@ export function SessionRealtimeClient({ history, realtimeEndpoint }: Readonly<Se
   };
 
   useEffect(() => {
+    if (assistantMode === "conversation") return;
     if (panelModes.code !== "automatic") return;
     if (connectionState !== "live" || sessionStatus !== "active") return;
-    if (screenContexts.length === 0 || generatingModes.has("code_practice")) return;
+    if (screenContexts.length === 0 || generatingModes.has(visualMode)) return;
 
     const now = Date.now();
-    const previous = lastAutomaticGenerationRef.current.code_practice;
+    const previous = lastAutomaticGenerationRef.current[visualMode];
     if (previous && (previous.itemCount === screenContexts.length || now - previous.requestedAt < 45000)) return;
 
-    lastAutomaticGenerationRef.current.code_practice = { itemCount: screenContexts.length, requestedAt: now };
+    lastAutomaticGenerationRef.current[visualMode] = { itemCount: screenContexts.length, requestedAt: now };
     console.info(
       `[Persuando Response] Code Practice auto trigger armed: sessionId=${history.session.id} screenContexts=${screenContexts.length}.`
     );
-    const timer = window.setTimeout(() => requestGeneration("code_practice", "automatic"), 1200);
+    const timer = window.setTimeout(() => requestGeneration(visualMode, "automatic"), 1200);
     return () => window.clearTimeout(timer);
-  }, [connectionState, generatingModes, history.session.id, panelModes.code, screenContexts.length, sessionStatus]);
+  }, [assistantMode, connectionState, generatingModes, history.session.id, panelModes.code, screenContexts.length, sessionStatus, visualMode]);
 
   return (
     <>
@@ -286,7 +291,7 @@ export function SessionRealtimeClient({ history, realtimeEndpoint }: Readonly<Se
           <InsightPanel insights={insights} isGenerating={generatingModes.has("insights")} mode={panelModes.insights} newInsightIds={newInsightIds} onGenerate={() => requestGeneration("insights")} onModeChange={(mode) => updatePanelMode("insights", mode)} />
           <SuggestionPanel isGenerating={generatingModes.has("followups")} mode={panelModes.followups} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("followups", mode)} suggestions={suggestions} />
           <ScreenContextPanel contexts={screenContexts} />
-          <CopilotPanel error={connectionError ?? providerError} explanations={copilotExplanations} isGenerating={generatingModes.has("code_practice")} mode={panelModes.code} onGenerate={() => requestGeneration("code_practice")} onModeChange={(mode) => updatePanelMode("code", mode)} />
+          {assistantMode !== "conversation" ? <CopilotPanel error={connectionError ?? providerError} explanations={visibleExplanations} isGenerating={generatingModes.has(visualMode)} mode={panelModes.code} onGenerate={() => requestGeneration(visualMode)} onModeChange={(mode) => updatePanelMode("code", mode)} title={visualMode === "exam_study" ? "Exam Study" : "Code practice"} /> : null}
           <SessionMeta deleteState={deleteState} history={history} providerError={connectionError ?? providerError} />
         </aside>
       </section>
@@ -489,10 +494,10 @@ function ScreenContextPanel({ contexts }: Readonly<{ contexts: ScreenContext[] }
   );
 }
 
-function CopilotPanel({ error, explanations, isGenerating, mode, onGenerate, onModeChange }: Readonly<GenerationPanelProps & { error?: string; explanations: CopilotExplanation[] }>) {
+function CopilotPanel({ error, explanations, isGenerating, mode, onGenerate, onModeChange, title }: Readonly<GenerationPanelProps & { error?: string; explanations: CopilotExplanation[]; title: string }>) {
   return (
     <section className="panel">
-      <PanelTitle isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title="Code practice" />
+      <PanelTitle isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title={title} />
       <div className="artifact-list">
         {error ? (
           <span className="pill empty">
@@ -500,7 +505,7 @@ function CopilotPanel({ error, explanations, isGenerating, mode, onGenerate, onM
           </span>
         ) : null}
         {explanations.length === 0 ? (
-          <span className="pill empty">No code explanation yet.</span>
+          <span className="pill empty">No {title.toLowerCase()} explanation yet.</span>
         ) : (
           explanations.map((explanation) => (
             <article className="artifact" key={explanation.contextId}>
@@ -756,7 +761,10 @@ function shouldAcceptGeneratedEvent(
   if (event.type === "suggestion.created") {
     return panelModes.answers === "automatic" || panelModes.followups === "automatic" || consumePendingMode(pendingManualModes, "followups");
   }
-  if (event.type === "copilot.explanation") return panelModes.code === "automatic" || consumePendingMode(pendingManualModes, "code_practice");
+  if (event.type === "copilot.explanation") {
+    const mode = event.payload.assistantMode ?? "code_practice";
+    return panelModes.code === "automatic" || consumePendingMode(pendingManualModes, mode);
+  }
   return true;
 }
 
@@ -764,7 +772,7 @@ function generatedModeForEvent(event: PersuandoWebSocketEvent): GenerateMode | u
   if (event.type === "summary.updated") return "summary";
   if (event.type === "insight.created") return "insights";
   if (event.type === "suggestion.created") return "followups";
-  if (event.type === "copilot.explanation") return "code_practice";
+  if (event.type === "copilot.explanation") return event.payload.assistantMode ?? "code_practice";
   return undefined;
 }
 
@@ -797,6 +805,7 @@ interface TopicExplanation {
 interface CopilotExplanation {
   id: string;
   contextId: string;
+  assistantMode?: Extract<AssistantMode, "code_practice" | "exam_study">;
   kind: CopilotExplanationEvent["payload"]["kind"];
   content: string;
 }
@@ -874,6 +883,7 @@ function toCopilotExplanation(event: CopilotExplanationEvent): CopilotExplanatio
     id: event.payload.contextId,
     contextId: event.payload.contextId,
     kind: event.payload.kind,
+    assistantMode: event.payload.assistantMode,
     content: event.payload.content
   };
 }

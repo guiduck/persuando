@@ -58,6 +58,7 @@ model ProviderCredential {
 
 model UserSettings {
   userId                           String              @id @map("user_id")
+  assistantMode                    String              @default("conversation") @map("assistant_mode")
   providerCredentialId             String?             @map("provider_credential_id") @db.Uuid
   primaryLanguage                  String              @default("en") @map("primary_language")
   responseLanguage                 String              @default("en") @map("response_language")

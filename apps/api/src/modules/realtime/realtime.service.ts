@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
   Optional,
   UnauthorizedException
 } from "@nestjs/common";
@@ -67,13 +68,21 @@ const MAX_SCREEN_CONTEXTS = 30;
 const MAX_SCREEN_IMAGE_REFERENCE_LENGTH = 5_000_000;
 
 @Injectable()
-export class RealtimeService {
+export class RealtimeService implements OnModuleDestroy {
   readonly moduleName = "realtime";
   private readonly logger = new Logger(RealtimeService.name);
   private readonly clients = new Map<string, RealtimeClient>();
   private readonly eventsBySessionId = new Map<string, PersuandoWebSocketEvent[]>();
   private readonly eventListeners = new Set<(event: PersuandoWebSocketEvent) => void>();
+  private readonly pendingScreenContextPersistence = new Map<string, CopilotContextEvent>();
+  private screenContextFlushInProgress = false;
+  private screenContextPersistenceTimer?: NodeJS.Timeout;
   private nextSequence = 1;
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.screenContextPersistenceTimer) clearInterval(this.screenContextPersistenceTimer);
+    await this.flushScreenContextPersistence();
+  }
 
   constructor(
     private readonly sessionsService: SessionsService,
@@ -253,6 +262,14 @@ export class RealtimeService {
 
     const session = await this.sessionsService.getSession(event.sessionId);
     if (!session) {
+    const settings = await this.settingsService.getSettings(client.user.id);
+    if (settings.assistantMode !== "conversation") {
+      this.logger.log(
+        `Audio chunk ignored because assistant mode is ${settings.assistantMode}: sessionId=${event.sessionId} chunkSequence=${event.payload.chunkSequence}`
+      );
+      return { action: "audio_chunk_accepted", chunkSequence: event.payload.chunkSequence };
+    }
+
       throw new NotFoundException("Session not found");
     }
     this.workspaceAccessService.assertSessionAccess(client.user, session);
@@ -401,17 +418,17 @@ export class RealtimeService {
     this.logger.log(
       `${screenPrefix}copilot.context realtime event published: sessionId=${event.sessionId} contextId=${event.payload.contextId} sequence=${appendedContext.sequence ?? "none"} listeners=${this.eventListeners.size}`
     );
+    if (event.payload.imageReference) {
+      this.enqueueScreenContextPersistence(event);
+      this.logger.log(
+        `${screenPrefix}Screen context queued for background persistence: sessionId=${event.sessionId} contextId=${event.payload.contextId} pending=${this.pendingScreenContextPersistence.size}`
+      );
+      return { action: "accepted" };
+    }
     const context = await this.persistCopilotContext(event);
     this.logger.log(
       `${screenPrefix}copilot.context persisted: sessionId=${event.sessionId} contextId=${context.id} hasImage=${Boolean(event.payload.imageReference)} imageLength=${event.payload.imageReference?.length ?? 0} status=${context.status}`
     );
-
-    if (isPeriodicScreenContext(event)) {
-      this.logger.log(
-        `${screenPrefix}Periodic screen context accepted without generation: sessionId=${event.sessionId} contextId=${context.id}`
-      );
-      return { action: "accepted" };
-    }
 
     try {
       const explanation = await this.generateCopilotExplanation(client, event, context);
@@ -500,6 +517,7 @@ export class RealtimeService {
     sourceSegment: TranscriptSegment
   ): Promise<void> {
     const settings = await this.settingsService.getSettings(client.user.id);
+    if (settings.assistantMode !== "conversation") return;
     const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
@@ -536,18 +554,26 @@ export class RealtimeService {
     }
 
     const settings = await this.settingsService.getSettings(client.user.id);
+    const activeMode = settings.assistantMode;
+    const requestedMode = event.payload.mode;
+    const allowed = activeMode === "conversation"
+      ? requestedMode === "summary" || requestedMode === "insights" || requestedMode === "followups"
+      : requestedMode === activeMode;
+    if (!allowed) throw new ForbiddenException(`Generation mode ${requestedMode} is disabled while ${activeMode} is active.`);
+    const isVisualMode = requestedMode === "code_practice" || requestedMode === "exam_study";
+
     const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
     const contextSegments = await this.getRecentTranscriptSegments(event.sessionId);
     const sourceSegmentIds = contextSegments.map((segment) => segment.id);
-    const requestedScreenContexts = event.payload.mode === "code_practice"
+    const requestedScreenContexts = isVisualMode
       ? event.payload.screenContexts?.slice(-MAX_SCREEN_CONTEXTS) ?? []
       : [];
-    const persistedScreenContexts = event.payload.mode === "code_practice"
+    const persistedScreenContexts = isVisualMode
       ? await this.sessionsService.getRecentScreenContexts(event.sessionId, MAX_SCREEN_CONTEXTS)
       : [];
-    const cachedScreenContexts = event.payload.mode === "code_practice"
+    const cachedScreenContexts = isVisualMode
       ? this.getCachedScreenContexts(event.sessionId)
       : [];
     const screenContexts = mergeScreenContexts([
@@ -558,20 +584,20 @@ export class RealtimeService {
     const screenContextSource = requestedScreenContexts.length > 0
       ? "response_payload+session_history"
       : "session_history";
-    const previousCodePracticeGuidance = event.payload.mode === "code_practice"
+    const previousCodePracticeGuidance = isVisualMode
       ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
       : [];
     const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
     const generationId = randomUUID();
     const programmingLanguage = settings.preferredProgrammingLanguage?.trim() || "javascript";
-    const imageReferences = event.payload.mode === "code_practice"
+    const imageReferences = isVisualMode
       ? screenContexts
           .map((context) => context.imageReference)
           .filter((value): value is string => Boolean(value))
       : undefined;
 
-    if (event.payload.mode === "code_practice" && imageReferences?.length === 0) {
-      throw new BadRequestException("Code Practice generation requires at least one screenshot context.");
+    if (isVisualMode && imageReferences?.length === 0) {
+      throw new BadRequestException("Visual assistance generation requires at least one screenshot context.");
     }
 
     this.logger.log(
@@ -641,7 +667,7 @@ export class RealtimeService {
       }
     });
     this.logger.log(
-      `Manual Code Practice guidance persisted: sessionId=${event.sessionId} contextId=${contextId} guidanceLength=${guidance.length} previousGuidance=${previousCodePracticeGuidance.length}`
+      `Manual visual guidance persisted: sessionId=${event.sessionId} mode=${event.payload.mode} contextId=${contextId} guidanceLength=${guidance.length} previousGuidance=${previousCodePracticeGuidance.length}`
     );
     this.publishServerEvent({
       version: 1,
@@ -651,7 +677,8 @@ export class RealtimeService {
       payload: {
         contextId,
         content: guidance,
-        kind: "explanation"
+        kind: "explanation",
+        assistantMode: event.payload.mode,
       }
     });
     return { action: "accepted" };
@@ -746,6 +773,42 @@ export class RealtimeService {
       }
     });
     return toCodeCopilotContext(created);
+  }
+  private enqueueScreenContextPersistence(event: CopilotContextEvent): void {
+    this.pendingScreenContextPersistence.set(event.payload.contextId, event);
+    if (this.screenContextPersistenceTimer) return;
+    this.screenContextPersistenceTimer = setInterval(() => void this.flushScreenContextPersistence(), this.options.screenContextPersistenceIntervalMs ?? 2000);
+    this.screenContextPersistenceTimer.unref();
+  }
+
+  private async flushScreenContextPersistence(): Promise<void> {
+    if (this.screenContextFlushInProgress || this.pendingScreenContextPersistence.size === 0) return;
+    this.screenContextFlushInProgress = true;
+    const batch = [...this.pendingScreenContextPersistence.values()];
+    for (const event of batch) this.pendingScreenContextPersistence.delete(event.payload.contextId);
+    const startedAt = Date.now();
+    try {
+      const results = await Promise.allSettled(batch.map((event) => this.persistCopilotContext(event)));
+      results.forEach((result, index) => {
+        const event = batch[index];
+        if (!event) return;
+        if (result.status === "fulfilled") {
+          this.logger.log(
+            `${screenLogPrefix(event)}copilot.context background persisted: sessionId=${event.sessionId} contextId=${event.payload.contextId}`
+          );
+          return;
+        }
+        this.pendingScreenContextPersistence.set(event.payload.contextId, event);
+        this.logger.error(
+          `${screenLogPrefix(event)}copilot.context background persistence failed: sessionId=${event.sessionId} contextId=${event.payload.contextId} message=${result.reason instanceof Error ? result.reason.message : "unknown"}`
+        );
+      });
+      this.logger.log(
+        `Screen context persistence flush completed: batch=${batch.length} pending=${this.pendingScreenContextPersistence.size} durationMs=${Date.now() - startedAt}`
+      );
+    } finally {
+      this.screenContextFlushInProgress = false;
+    }
   }
 
   private async generateCopilotExplanation(
@@ -923,6 +986,7 @@ export class RealtimeService {
 export interface RealtimeIngestionOptions {
   maxBufferedAudioChunksPerSession?: number;
   maxGenerationContextSegments?: number;
+  screenContextPersistenceIntervalMs?: number;
 }
 
 function validateAudioChunkPayload(event: CaptureAudioChunkEvent): void {
@@ -1171,10 +1235,6 @@ function screenLogPrefix(event: CopilotContextEvent): string {
   return event.payload.debugId ? `[screen:${event.payload.debugId}] ` : "";
 }
 
-function isPeriodicScreenContext(event: CopilotContextEvent): boolean {
-  return Boolean(event.payload.imageReference) && (event.payload.textContext ?? "").startsWith("Periodic screen context captured");
-}
-
 function copilotExplanationKind(explanationMode: CopilotContextEvent["payload"]["explanationMode"]): "hint" | "explanation" | "review" {
   if (explanationMode === "hint") return "hint";
   if (explanationMode === "review") return "review";
@@ -1213,7 +1273,7 @@ function parseRealtimeEvent(event: unknown): PersuandoWebSocketEvent {
 
   if (candidate.type === "response.generate") {
     const generate = candidate as ResponseGenerateEvent;
-    if (!["summary", "insights", "followups", "code_practice"].includes(generate.payload.mode)) {
+    if (!["summary", "insights", "followups", "code_practice", "exam_study"].includes(generate.payload.mode)) {
       throw new BadRequestException("Realtime generate mode is invalid");
     }
     validateRequestedScreenContexts(generate);

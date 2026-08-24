@@ -1,4 +1,4 @@
-import type { GetCurrentWorkspaceResponse, SessionHistoryResponse } from "@persuando/contracts";
+import type { GetCurrentWorkspaceResponse, SessionHistoryResponse, SettingsResponse } from "@persuando/contracts";
 import { cookies } from "next/headers";
 
 export interface AuthMeResponse {
@@ -37,6 +37,10 @@ export async function getSessionHistory(sessionId: string): Promise<SessionHisto
     if (error instanceof ApiError && (error.status === 401 || error.status === 404)) return undefined;
     throw error;
   }
+}
+
+export async function getSettings(): Promise<SettingsResponse> {
+  return fetchApi<SettingsResponse>("/settings");
 }
 
 async function fetchApi<TResponse>(path: string): Promise<TResponse> {

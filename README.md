@@ -373,3 +373,15 @@ pm2 logs persuando-api --lines 500 --nostream | grep -E "Manual generation|Gener
 ### Switching coding exercises in one session
 
 Code Practice groups the latest 30 screenshots by visible exercise title, URL, function signature, statement, and editor state. The newest identifiable exercise is active. Older screenshots and prior guidance are used only when they match that active exercise; evidence from another challenge is treated as stale context. When an exact public practice challenge is identifiable but the newest screenshot is partial, the tutor may use the established challenge contract, label the assumption, and must still provide the complete solution in the Capture-selected language. Big-O must be derived from the loops, traversals, recursion, and data structures in that proposed solution.
+
+### Exclusive assistant modes and hot screen context
+
+Each user selects one active mode in Capture: Conversation, Code Practice, or Exam Study. Conversation is the only mode that opens the microphone and runs transcription/meeting assistance. Code Practice and Exam Study use screen context without audio transcription, reducing provider traffic and latency.
+
+Validated screenshot events are published to Response listeners immediately and retained in the API hot event state. The Response generation request includes its current newest 30 contexts, while the API also merges hot and persisted session context. Consequently, a screenshot can be displayed and used by the model before PostgreSQL persistence completes.
+
+Image contexts are queued in memory and persisted in background batches every 2 seconds. The queue retries failed rows on a later flush and flushes again during API shutdown. Logs to monitor:
+
+- `Screen context queued for background persistence`
+- `copilot.context background persisted`
+- `Screen context persistence flush completed`

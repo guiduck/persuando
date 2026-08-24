@@ -1,4 +1,5 @@
 import type {
+  AssistantMode,
   ConsentGrant,
   ConsentType,
   Insight,
@@ -54,6 +55,7 @@ export interface SettingsResponse {
 }
 
 export interface UpdateSettingsRequest {
+  assistantMode: AssistantMode;
   providerCredentialId?: string;
   primaryLanguage: string;
   responseLanguage: string;

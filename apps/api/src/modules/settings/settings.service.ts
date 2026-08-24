@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import type { ProviderCredentialId, RetentionMode, UserId, UserSettings } from "@persuando/contracts";
+import type { AssistantMode, ProviderCredentialId, RetentionMode, UserId, UserSettings } from "@persuando/contracts";
 
 import { DatabaseService } from "../database/database.service.js";
 
 export interface UpdateUserSettingsInput {
+  assistantMode: AssistantMode;
   providerCredentialId?: string;
   primaryLanguage: string;
   responseLanguage: string;
@@ -43,6 +44,7 @@ export class SettingsService {
       where: { userId },
       create: {
         userId,
+        assistantMode: input.assistantMode,
         providerCredentialId: input.providerCredentialId,
         primaryLanguage: input.primaryLanguage,
         responseLanguage: input.responseLanguage,
@@ -57,6 +59,7 @@ export class SettingsService {
         retentionMode: input.retentionMode
       },
       update: {
+        assistantMode: input.assistantMode,
         providerCredentialId: input.providerCredentialId,
         primaryLanguage: input.primaryLanguage,
         responseLanguage: input.responseLanguage,
@@ -78,6 +81,7 @@ export class SettingsService {
 
 interface UserSettingsRecord {
   userId: string;
+  assistantMode: string;
   providerCredentialId: string | null;
   primaryLanguage: string;
   responseLanguage: string;
@@ -94,6 +98,7 @@ interface UserSettingsRecord {
 
 function defaultSettingsData() {
   return {
+    assistantMode: "conversation",
     primaryLanguage: "pt-BR",
     responseLanguage: "pt-BR",
     preferredProgrammingLanguage: "typescript",
@@ -111,6 +116,7 @@ function defaultSettingsData() {
 function toUserSettings(record: UserSettingsRecord): UserSettings {
   return {
       userId: record.userId as UserId,
+      assistantMode: normalizeAssistantMode(record.assistantMode),
       providerCredentialId: record.providerCredentialId as ProviderCredentialId | undefined,
       primaryLanguage: record.primaryLanguage,
       responseLanguage: record.responseLanguage,
@@ -126,6 +132,11 @@ function toUserSettings(record: UserSettingsRecord): UserSettings {
   };
 }
 
+
+function normalizeAssistantMode(value: string): AssistantMode {
+  if (value === "code_practice" || value === "exam_study") return value;
+  return "conversation";
+}
 async function ensureUser(database: DatabaseService, userId: string): Promise<void> {
   await database.user.upsert({
     where: { id: userId },

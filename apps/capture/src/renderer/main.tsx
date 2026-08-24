@@ -352,6 +352,18 @@ function Dashboard({
           </div>
           <div className="split">
             <label>
+              Assistant mode
+              <select
+                disabled={!settings || runtimeState.listening}
+                onChange={(event) => void updateSettingsField(settings, setSettings, { assistantMode: event.currentTarget.value as UserSettings["assistantMode"] })}
+                value={settings?.assistantMode ?? "conversation"}
+              >
+                <option value="conversation">Conversation</option>
+                <option value="code_practice">Code Practice</option>
+                <option value="exam_study">Exam Study</option>
+              </select>
+            </label>
+            <label>
               Programming language
               <select
                 disabled={!settings}
@@ -624,7 +636,10 @@ async function toggleListening(
       console.info(
         `[Persuando Capture] Capture start settings: periodicScreenshotCaptureDefault=${effectiveSettings.periodicScreenshotCaptureDefault} screenConsent=${hasConsentGrant(effectiveConsentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(effectiveConsentGrants, "code_copilot")} programmingLanguage=${normalizeProgrammingLanguageInput(effectiveSettings.preferredProgrammingLanguage)}.`
       );
-      const missingConsent = missingConsentLabels(effectiveConsentGrants, requiredCaptureConsents);
+      const missingConsent = missingConsentLabels(
+        effectiveConsentGrants,
+        effectiveSettings.assistantMode === "conversation" ? requiredCaptureConsents : requiredContextConsents
+      );
       if (missingConsent.length > 0) {
         setCaptureError(`Enable consent before listening: ${missingConsent.join(", ")}.`);
         return;
@@ -763,6 +778,10 @@ async function maybeStartPeriodicScreenCapture(
   setCaptureError: (error: string | undefined) => void
 ): Promise<{ stop(): void } | undefined> {
   console.info(`[Persuando Capture] Periodic setting ${settings.periodicScreenshotCaptureDefault ? "enabled" : "disabled"}: activeCapture=${Boolean(activeCapture)} activeSessionId=${activeCapture?.session.id ?? "none"} screenConsent=${hasConsentGrant(consentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(consentGrants, "code_copilot")} grantCount=${consentGrants.length}.`);
+  if (settings.assistantMode === "conversation") {
+    console.info("[Persuando Capture] Periodic screen context not started in conversation mode.");
+    return undefined;
+  }
   if (!settings.periodicScreenshotCaptureDefault) {
     console.info(
       "[Persuando Capture] Periodic screen context not started: setting disabled. Enable Periodic screen context default in Capture App > Features."

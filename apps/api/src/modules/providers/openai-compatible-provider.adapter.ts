@@ -55,7 +55,7 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
 
     const generationId = input.generationId ?? `${input.sessionId}-${Date.now()}`;
     const imageCount = input.imageReferences?.filter(Boolean).length ?? 0;
-    const visualAnalysis = input.task === "code_practice"
+    const visualAnalysis = input.task === "code_practice" || input.task === "exam_study"
       ? await this.analyzeCodePracticeVisuals(input, generationId)
       : undefined;
     return this.generateAnswer(input, generationId, imageCount, visualAnalysis);
@@ -312,11 +312,11 @@ function generationControls(model: string, maxTokens: number, temperature: numbe
 }
 
 function generationMaxTokens(task: ProviderGenerationInput["task"]): number {
-  return task === "code_practice" ? CODE_PRACTICE_MAX_TOKENS : DEFAULT_GENERATION_MAX_TOKENS;
+  return task === "code_practice" || task === "exam_study" ? CODE_PRACTICE_MAX_TOKENS : DEFAULT_GENERATION_MAX_TOKENS;
 }
 
 function generationTemperature(task: ProviderGenerationInput["task"]): number {
-  return task === "code_practice" ? 0.15 : 0.2;
+  return task === "code_practice" || task === "exam_study" ? 0.15 : 0.2;
 }
 
 function generationSystemPrompt(task: ProviderGenerationInput["task"]): string {
@@ -341,9 +341,25 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"]): string {
     ].join(" ");
   }
 
+  if (task === "exam_study") {
+    return [
+      "You are Persuando Exam Study, a patient tutor for Brazilian public-exam practice questions.",
+      "Use the visual-analysis JSON as factual evidence. Read screenshots oldest to newest and treat the newest identifiable question as active; older screenshots matter only when they belong to that same question.",
+      "Identify the subject, discipline, topic, command, alternatives, and newest attempt or marked answer. Never mix a previous question into the current answer.",
+      "Solve the active question when its complete statement exists across screenshots from the same question.",
+      "Explain the key concept briefly, then teach the reasoning step by step in extremely simple language, as if speaking to a five-year-old, without becoming inaccurate or patronizing.",
+      "For multiple choice, state the correct alternative and explain why it is correct and why each visible alternative is wrong. For open questions, provide the expected answer and reasoning.",
+      "Do not invent unreadable statement text, laws, dates, alternatives, answer keys, or current facts. Clearly label any necessary assumption.",
+      "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the complete Markdown lesson in suggestions[0].content with category='response' and urgency='high'.",
+      "Use headings: Questão identificada, Matéria cobrada, Conceito em poucas palavras, Resolução passo a passo, Resposta correta, Por que as outras estão erradas, and O que memorizar.",
+      "Write in the requested response language and do not include secrets."
+    ].join(" ");
+  }
+
   if (task === "insights") {
     return "Generate focused meeting or study insights. Return JSON with summary.content, insights[], and suggestions[]. Prioritize key concepts, questions being asked, terms to explain, and risks. Do not include secrets.";
   }
+
 
   if (task === "followups") {
     return "Generate practical follow-up suggestions and things the user can say next. Return JSON with summary.content, insights[], and suggestions[]. Keep suggestions actionable. Do not include secrets.";
@@ -384,6 +400,7 @@ function codePracticeVisualAnalysisContent(
 
 function generationUserContent(input: ProviderGenerationInput, visualAnalysis?: string): string {
   if (input.task === "code_practice") return codePracticeUserText(input, visualAnalysis ?? "{}");
+  if (input.task === "exam_study") return examStudyUserText(input, visualAnalysis ?? "{}");
   return `Task: ${input.task ?? "session_assistance"}\nLanguage: ${input.responseLanguage}\nTranscript and context:\n${input.transcriptText}`;
 }
 
@@ -428,6 +445,27 @@ Hard requirements:
 - Make Big-O specific to the proposed implementation: name the input variables and tie each cost to the traversals, loops, recursion depth, and data structures actually used.
 - Return strict JSON with the complete Markdown answer in suggestions[0].content.`;
 }
+function examStudyUserText(input: ProviderGenerationInput, visualAnalysis: string): string {
+  const previousGuidance = input.previousCodePracticeGuidance?.length
+    ? input.previousCodePracticeGuidance
+        .map((guidance, index) => `Previous study guidance ${index + 1} (oldest to newest):\n${guidance}`)
+        .join("\n\n")
+    : "No previous Exam Study guidance exists for this session.";
+  return `Task: exam_study
+Response language: ${input.responseLanguage}
+
+Structured visual analysis of all current screenshots:
+${visualAnalysis}
+
+Previous guidance, which may contain mistakes:
+${previousGuidance}
+
+Recent screen timeline notes:
+${input.transcriptText}
+
+Solve the newest active public-exam question. Identify the subject and exact topic, explain the concept briefly, then solve it step by step in very simple language. Use older screenshots only to complete the same question. If alternatives are visible, give the correct option and analyze every visible alternative. Correct stale prior guidance explicitly. Return strict JSON with the complete Markdown lesson in suggestions[0].content.`;
+}
+
 function codePracticeRepairInstruction(input: ProviderGenerationInput, attempt: number): string {
   if (input.task !== "code_practice" || attempt === 1 || !input.programmingLanguage) return "";
   return `\n\nREPAIR REQUIRED: The previous answer was rejected because it did not contain a complete, non-empty fenced ${input.programmingLanguage} code block. Return the full strict JSON again. In suggestions[0].content, include the complete platform solution under "Solução atualizada" in a fenced code block labeled ${input.programmingLanguage}, then explain it step by step. Do not replace it with pseudocode and do not merely ask for another screenshot.`;

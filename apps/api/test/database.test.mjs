@@ -26,7 +26,7 @@ test("MigrationRunner applies unapplied migrations transactionally", async () =>
   const runner = new MigrationRunner();
   const applied = await runner.run(client, getMigrationsDir(process.cwd()));
 
-  assert.deepEqual(applied, ["0001_initial.sql", "0002_user_settings_capture_models.sql"]);
+  assert.deepEqual(applied, ["0001_initial.sql", "0002_user_settings_capture_models.sql", "0003_user_settings_assistant_mode.sql"]);
   assert.ok(queries.some((query) => query.sql === "BEGIN"));
   assert.ok(queries.some((query) => query.sql === "COMMIT"));
   assert.ok(queries.some((query) => String(query.sql).includes("INSERT INTO schema_migrations")));

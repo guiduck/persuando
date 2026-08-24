@@ -113,6 +113,7 @@ export async function revokeConsent(grantId: string): Promise<ConsentGrant> {
 
 export function settingsRequestFrom(settings: UserSettings, patch: Partial<UpdateSettingsRequest>): UpdateSettingsRequest {
   return {
+    assistantMode: settings.assistantMode,
     providerCredentialId: settings.providerCredentialId,
     primaryLanguage: settings.primaryLanguage,
     responseLanguage: settings.responseLanguage,

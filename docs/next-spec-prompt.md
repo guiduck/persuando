@@ -191,3 +191,30 @@ The implemented baseline now accepts `copilot.context` independently from genera
 ## Additional Source Context - 2026-08-23 Multi-Exercise Sessions
 
 The provider prompt now groups screenshots by challenge, treats the newest identifiable exercise as active, excludes prior-exercise contracts/code/tests, permits labeled standard-contract completion for exact public practice titles or URLs, and requires implementation-specific Big-O reasoning. The next `/speckit-specify` should include multi-exercise fixtures that measure active-problem classification, stale-context rejection, same-problem chronology retention, complete selected-language solutions, and recovery when the newest screenshot is partial.
+
+## Next Spec Prompt - 2026-08-23 Mode Isolation And Durable Hot Context
+
+```text
+/speckit-specify Specify production hardening for exclusive assistant modes and hot screenshot context.
+
+Objective:
+Preserve immediate screenshot display/model grounding while making background durability reliable across API restarts and multiple instances, with isolated provider budgets and errors for Conversation, Code Practice, and Exam Study.
+
+Source request/context:
+The implemented baseline persists one active mode per user, prevents audio transcription outside Conversation, prevents cross-mode generation, publishes screenshots before persistence, sends Response hot state in visual generation requests, and batches image persistence every two seconds. Exam Study solves the newest visible public-exam question didactically.
+
+Requirements:
+- Define multi-instance ownership or shared hot-state behavior without delaying WebSocket fan-out.
+- Define at-least-once screenshot persistence, idempotency, bounded memory/backpressure, retry, shutdown, and crash-recovery behavior.
+- Preserve the newest 30 contexts and newest-active-question/exercise segmentation.
+- Attribute provider errors and rate limits to transcription, conversation, code_practice, or exam_study.
+- Define per-mode request concurrency, cooldown, latency, payload, token/image, and cost budgets.
+- Add real-provider fixtures for Code Practice correctness and Exam Study subject identification, alternative analysis, and child-simple step-by-step teaching.
+- Preserve consent, retention/deletion, safe logs, and no fabricated provider fallback content.
+
+Risks/assumptions:
+The current in-process queue cannot survive a hard crash or coordinate multiple API instances. Exam Study uses captured question context and does not yet browse an external question bank.
+
+Expected output:
+Produce measurable acceptance criteria, event/state diagrams, migration and rollback notes, failure taxonomy, observability fields, fixture matrix, and packaged Electron-to-VPS smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
+```

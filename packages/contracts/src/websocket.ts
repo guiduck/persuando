@@ -1,4 +1,4 @@
-import type { Insight, SafeError, SessionId, SessionStatus, Suggestion, Summary, TranscriptSegment } from "./types.js";
+import type { AssistantMode, Insight, ProviderOperation, SafeError, SessionId, SessionStatus, Suggestion, Summary, TranscriptSegment } from "./types.js";
 
 export const websocketEventTypes = [
   "capture.audio_chunk",
@@ -56,7 +56,7 @@ export type ResponseAckEvent = BaseWebSocketEvent<"response.ack", { lastReceived
 export type ResponseGenerateEvent = BaseWebSocketEvent<
   "response.generate",
   {
-    mode: "summary" | "insights" | "followups" | "code_practice";
+    mode: "summary" | "insights" | "followups" | "code_practice" | "exam_study";
     screenContexts?: {
       imageReference?: string;
       textContext?: string;
@@ -68,7 +68,7 @@ export type TranscriptSegmentEvent = BaseWebSocketEvent<"transcript.segment", { 
 export type SummaryUpdatedEvent = BaseWebSocketEvent<"summary.updated", { summary: Summary }>;
 export type InsightCreatedEvent = BaseWebSocketEvent<"insight.created", { insight: Insight }>;
 export type SuggestionCreatedEvent = BaseWebSocketEvent<"suggestion.created", { suggestion: Suggestion }>;
-export type ProviderErrorEvent = BaseWebSocketEvent<"provider.error", SafeError>;
+export type ProviderErrorEvent = BaseWebSocketEvent<"provider.error", SafeError & { operation?: ProviderOperation; generationId?: string }>;
 export type RetentionDeletedEvent = BaseWebSocketEvent<"retention.deleted", { deletedAt: string }>;
 export type CopilotContextEvent = BaseWebSocketEvent<
   "copilot.context",
@@ -87,6 +87,7 @@ export type CopilotExplanationEvent = BaseWebSocketEvent<
     contextId: string;
     content: string;
     kind: "hint" | "explanation" | "tradeoff" | "review";
+    assistantMode?: Extract<AssistantMode, "code_practice" | "exam_study">;
   }
 >;
 

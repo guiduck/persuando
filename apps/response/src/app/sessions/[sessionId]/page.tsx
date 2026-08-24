@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getSessionHistory } from "../../../lib/api";
+import { getSessionHistory, getSettings } from "../../../lib/api";
 import { SessionHistoryLoader } from "./session-history-loader";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ export default async function SessionDetailPage({
   params: Promise<{ sessionId: string }>;
 }>) {
   const { sessionId } = await params;
-  const history = await getSessionHistory(sessionId);
+  const [history, settingsResponse] = await Promise.all([getSessionHistory(sessionId), getSettings()]);
   const realtimeEndpoint = resolveRealtimeEndpoint();
 
   return (
@@ -21,7 +21,7 @@ export default async function SessionDetailPage({
           Back to workspace
         </Link>
       </nav>
-      <SessionHistoryLoader initialHistory={history} realtimeEndpoint={realtimeEndpoint} sessionId={sessionId} />
+      <SessionHistoryLoader assistantMode={settingsResponse.settings.assistantMode} initialHistory={history} realtimeEndpoint={realtimeEndpoint} sessionId={sessionId} />
     </main>
   );
 }

@@ -31,15 +31,21 @@ export async function startMicrophoneCapture(
   deviceId: string | undefined,
   callbacks: CaptureSessionCallbacks
 ): Promise<ActiveCapture> {
+  const audioEnabled = settings.assistantMode === "conversation" && settings.microphoneCaptureDefault;
   console.info(`[Persuando Capture] Creating capture session: microphoneDefault=${settings.microphoneCaptureDefault} periodicScreenDefault=${settings.periodicScreenshotCaptureDefault} transcriptionModel=${settings.transcriptionModel} analysisModel=${settings.analysisModel} programmingLanguage=${normalizeProgrammingLanguage(settings.preferredProgrammingLanguage)}.`);
   const { session } = await createSession(settings);
   console.info(`[Persuando Capture] Capture session created: sessionId=${session.id} status=${session.status}.`);
-  console.info(`[Persuando Capture] Requesting microphone stream: device=${deviceId ? "selected" : "default"}.`);
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: deviceId ? { deviceId: { exact: deviceId } } : true,
-    video: false
-  });
-  console.info(`[Persuando Capture] Microphone stream granted: audioTracks=${stream.getAudioTracks().length}.`);
+  let stream = new MediaStream();
+  if (audioEnabled) {
+    console.info(`[Persuando Capture] Requesting microphone stream: device=${deviceId ? "selected" : "default"}.`);
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      video: false
+    });
+    console.info(`[Persuando Capture] Microphone stream granted: audioTracks=${stream.getAudioTracks().length}.`);
+  } else {
+    console.info(`[Persuando Capture] Microphone disabled for assistantMode=${settings.assistantMode}; session will use screen context only.`);
+  }
   const socket = await connectCaptureSocket();
   console.info(`[Persuando Capture] Capture WebSocket connected: sessionId=${session.id}.`);
   const audioMeter = createAudioMeter(stream, callbacks.onAudioLevel);
@@ -60,6 +66,7 @@ export async function startMicrophoneCapture(
   };
 
   const startNextRecorder = () => {
+    if (!audioEnabled) return;
     if (captureState !== "recording" || socket.readyState !== WebSocket.OPEN) return;
     const chunks: Blob[] = [];
     const nextRecorder = new MediaRecorder(stream, { mimeType: preferredMimeType() });

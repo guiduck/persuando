@@ -39,7 +39,8 @@ async function buildHarness(overrides = {}) {
     settingsService,
     credentialsService,
     {
-      maxBufferedAudioChunksPerSession: 2
+      maxBufferedAudioChunksPerSession: 2,
+      screenContextPersistenceIntervalMs: 1
     }
   );
   const workspace = await workspacesService.getOrCreateCurrentWorkspace("google:user-1");
@@ -52,7 +53,7 @@ async function buildHarness(overrides = {}) {
     retentionMode: "seven_day_workspace",
     consentGrantIds: []
   });
-  return { consentService, realtimeService, sessionsService, session };
+  return { consentService, realtimeService, sessionsService, session, settingsService };
 }
 
 function testAudioPayload() {
@@ -497,8 +498,11 @@ test("RealtimeService sends all 30 requested screenshots to the real Code Practi
       };
     }
   };
-  const { consentService, realtimeService, sessionsService, session } = await buildHarness({ providersService });
+  const { consentService, realtimeService, sessionsService, session, settingsService } = await buildHarness({ providersService });
   await grantCopilotConsent(consentService, session.id);
+  const currentSettings = await settingsService.getSettings("google:user-1");
+  const { userId: _userId, ...settingsInput } = currentSettings;
+  await settingsService.updateSettings("google:user-1", { ...settingsInput, assistantMode: "code_practice" });
   realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
   await realtimeService.handleClientEvent(
     "response-1",
@@ -584,6 +588,7 @@ test("Session history keeps the latest 30 persisted screenshots in FIFO order", 
       })
     );
   }
+  await new Promise((resolve) => setTimeout(resolve, 20));
 
   const history = await sessionsService.getSessionHistory(session.id);
 

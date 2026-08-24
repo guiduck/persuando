@@ -1,19 +1,20 @@
 "use client";
 
-import type { SessionHistoryResponse } from "@persuando/contracts";
+import type { AssistantMode, SessionHistoryResponse } from "@persuando/contracts";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SessionRealtimeClient } from "./session-realtime-client";
 
 interface SessionHistoryLoaderProps {
   initialHistory?: SessionHistoryResponse;
+  assistantMode: AssistantMode;
   realtimeEndpoint: string;
   sessionId: string;
 }
 
 type LoadState = "loading" | "ready" | "unavailable";
 
-export function SessionHistoryLoader({ initialHistory, realtimeEndpoint, sessionId }: Readonly<SessionHistoryLoaderProps>) {
+export function SessionHistoryLoader({ assistantMode, initialHistory, realtimeEndpoint, sessionId }: Readonly<SessionHistoryLoaderProps>) {
   const [history, setHistory] = useState<SessionHistoryResponse | undefined>(initialHistory);
   const [state, setState] = useState<LoadState>(initialHistory ? "ready" : "loading");
 
@@ -41,7 +42,7 @@ export function SessionHistoryLoader({ initialHistory, realtimeEndpoint, session
     };
   }, [initialHistory, sessionId]);
 
-  if (history) return <SessionRealtimeClient history={history} realtimeEndpoint={realtimeEndpoint} />;
+  if (history) return <SessionRealtimeClient assistantMode={assistantMode} history={history} realtimeEndpoint={realtimeEndpoint} />;
 
   return (
     <main className="page">

@@ -15,7 +15,7 @@ export interface ProviderGenerationInput {
   analysisModel: string;
   responseLanguage: string;
   sessionId: string;
-  task?: "session_assistance" | "summary" | "insights" | "followups" | "code_practice";
+  task?: "session_assistance" | "summary" | "insights" | "followups" | "code_practice" | "exam_study";
   transcriptText: string;
   imageReferences?: string[];
   previousCodePracticeGuidance?: string[];

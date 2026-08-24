@@ -376,7 +376,7 @@ Code Practice groups the latest 30 screenshots by visible exercise title, URL, f
 
 ### Exclusive assistant modes and hot screen context
 
-Each user selects one active mode in Capture: Conversation, Code Practice, or Exam Study. Conversation is the only mode that opens the microphone and runs transcription/meeting assistance. Code Practice and Exam Study use screen context without audio transcription, reducing provider traffic and latency.
+Each user selects one active mode in Capture: Conversation, Code Practice, or Exam Study. Conversation is the only mode that opens the microphone, creates an audio meter/recorder, and runs transcription/meeting assistance. Code Practice and Exam Study use screen context without requesting a microphone or creating an `AudioContext` media source, reducing provider traffic and latency.
 
 Validated screenshot events are published to Response listeners immediately and retained in the API hot event state. The Response generation request includes its current newest 30 contexts, while the API also merges hot and persisted session context. Consequently, a screenshot can be displayed and used by the model before PostgreSQL persistence completes.
 

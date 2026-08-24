@@ -57,6 +57,12 @@ test("Capture app exposes visible error and permission failure paths", () => {
   assert.match(combined, /Capture failed/);
 });
 
+test("visual assistant modes do not create an audio source from an empty stream", () => {
+  assert.match(captureSession, /const audioMeter = audioEnabled\s*\? createAudioMeter/);
+  assert.match(captureSession, /: createInactiveAudioMeter\(callbacks\.onAudioLevel\)/);
+  assert.match(captureSession, /stream\.getAudioTracks\(\)\.length === 0/);
+});
+
 test("Capture app supports tray commands and robust capture statuses", () => {
   const combined = `${renderer}\n${captureSession}\n${electronMain}`;
   for (const expected of [

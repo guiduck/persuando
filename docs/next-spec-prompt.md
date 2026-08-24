@@ -218,3 +218,7 @@ The current in-process queue cannot survive a hard crash or coordinate multiple 
 Expected output:
 Produce measurable acceptance criteria, event/state diagrams, migration and rollback notes, failure taxonomy, observability fields, fixture matrix, and packaged Electron-to-VPS smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
 ```
+
+## Additional Source Context - 2026-08-23 Visual Mode Audio Isolation
+
+Code Practice and Exam Study now start as screenshot-only Capture sessions without creating an audio meter or recorder. Future mode-hardening work must preserve this isolation and include packaged Electron tests with no microphone device, a disabled microphone, and a valid Conversation microphone stream.

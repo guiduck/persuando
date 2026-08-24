@@ -170,3 +170,9 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Latest validation: `npm.cmd run build` passed; `npm.cmd run test` passed 125/125 after migration, mode-routing, hot-state, and asynchronous-persistence test updates.
 - Remaining work: run packaged Electron-to-VPS smoke for all three modes; measure screenshot transport latency and provider latency; add operation-specific provider-error UI attribution and a transcription 429 cooldown.
 - Deployment: apply migration `0003_user_settings_assistant_mode.sql` through the normal API migration runner, then restart API, worker, and Response with their existing environment.
+
+## Implementation Update - 2026-08-23 Visual Mode Audio Isolation
+
+- Fixed Capture startup in Code Practice and Exam Study: visual-only sessions no longer pass an empty `MediaStream` to `AudioContext.createMediaStreamSource`.
+- The audio meter now starts only when Conversation mode actually enables microphone capture, with an additional missing-audio-track guard.
+- Validation: Capture tests passed 10/10, the Capture production build passed, `npm.cmd run build` passed, the full suite passed 126/126, and lint passed. No API contract, database migration, secret, or deployment environment changed. Rebuild the Windows Capture artifact before testing this fix.

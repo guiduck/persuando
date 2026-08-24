@@ -48,7 +48,9 @@ export async function startMicrophoneCapture(
   }
   const socket = await connectCaptureSocket();
   console.info(`[Persuando Capture] Capture WebSocket connected: sessionId=${session.id}.`);
-  const audioMeter = createAudioMeter(stream, callbacks.onAudioLevel);
+  const audioMeter = audioEnabled
+    ? createAudioMeter(stream, callbacks.onAudioLevel)
+    : createInactiveAudioMeter(callbacks.onAudioLevel);
   let chunkSequence = 0;
   let chunkTimer: number | undefined;
   let recorder: MediaRecorder | undefined;
@@ -256,6 +258,10 @@ function redactUserIdFromUrl(value: string): string {
 
 function createAudioMeter(stream: MediaStream, onAudioLevel: CaptureSessionCallbacks["onAudioLevel"]): { stop(): void } {
   if (!onAudioLevel) return { stop() {} };
+  if (stream.getAudioTracks().length === 0) {
+    console.warn("[Persuando Capture] Audio meter skipped: microphone stream has no audio track.");
+    return createInactiveAudioMeter(onAudioLevel);
+  }
   const AudioContextCtor = window.AudioContext;
   if (!AudioContextCtor) return { stop() {} };
 
@@ -276,6 +282,15 @@ function createAudioMeter(stream: MediaStream, onAudioLevel: CaptureSessionCallb
       window.clearInterval(interval);
       onAudioLevel(0);
       void audioContext.close();
+    }
+  };
+}
+
+function createInactiveAudioMeter(onAudioLevel: CaptureSessionCallbacks["onAudioLevel"]): { stop(): void } {
+  onAudioLevel?.(0);
+  return {
+    stop() {
+      onAudioLevel?.(0);
     }
   };
 }

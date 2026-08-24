@@ -142,3 +142,7 @@ Phase 3 Code Practice now segments screenshot history by exercise and grounds ea
 Phase 3 now has one persisted active mode per user. Conversation exclusively owns microphone transcription and conversation artifacts; Code Practice exclusively owns coding visual tutoring; Exam Study exclusively owns didactic public-exam question solving. The backend enforces the selection instead of relying on UI state.
 
 Screenshot fan-out and hot context now precede durability: Response can render and submit a new image to the model immediately, while image rows flush to PostgreSQL in two-second background batches with retry and shutdown flush. This also centralizes visual generation in Response and removes duplicate Ctrl+E/Auto provider calls. Remaining gates are packaged VPS smoke, multi-instance/shared-hot-state design, operation-specific provider-error attribution, transcription cooldown, and measured latency/cost budgets. Deferred: external question-bank search and web research; Exam Study currently solves questions visible in captured context.
+
+## Implementation Update - 2026-08-23 Visual Mode Audio Isolation
+
+Code Practice and Exam Study can start screenshot-only sessions without a microphone track or `AudioContext` source. Conversation retains the existing microphone meter, recorder, and transcription path.

@@ -1,4 +1,4 @@
-import type { Insight, SafeError, Suggestion, Summary, TranscriptSegment } from "@persuando/contracts";
+import type { CodePracticeWorkflow, Insight, SafeError, Suggestion, Summary, TranscriptSegment } from "@persuando/contracts";
 
 export interface ProviderTranscriptionInput {
   apiKey?: string;
@@ -19,6 +19,8 @@ export interface ProviderGenerationInput {
   transcriptText: string;
   imageReferences?: string[];
   previousCodePracticeGuidance?: string[];
+  codePracticeIncrementalHistory?: string[];
+  codePracticeWorkflow?: CodePracticeWorkflow;
   programmingLanguage?: string;
   generationId?: string;
 }

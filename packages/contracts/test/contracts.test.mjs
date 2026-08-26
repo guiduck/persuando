@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -49,4 +50,15 @@ test("all planned WebSocket event names are registered", () => {
   assert.ok(websocketEventTypes.includes("retention.deleted"));
   assert.ok(websocketEventTypes.includes("copilot.context"));
   assert.ok(websocketEventTypes.includes("copilot.explanation"));
+});
+
+test("Code Practice workflow is an additive optional WebSocket contract", async () => {
+  const [typesSource, websocketSource] = await Promise.all([
+    readFile("packages/contracts/src/types.ts", "utf8"),
+    readFile("packages/contracts/src/websocket.ts", "utf8")
+  ]);
+
+  assert.match(typesSource, /export type CodePracticeWorkflow = "exercise" \| "repository"/);
+  assert.match(websocketSource, /codePracticeWorkflow\?: CodePracticeWorkflow/);
+  assert.match(websocketSource, /mode: "summary" \| "insights" \| "followups" \| "code_practice" \| "exam_study"/);
 });

@@ -385,3 +385,29 @@ Image contexts are queued in memory and persisted in background batches every 2 
 - `Screen context queued for background persistence`
 - `copilot.context background persisted`
 - `Screen context persistence flush completed`
+
+### Code Practice Exercise And Repository Workflows
+
+Code Practice now has two Response-mode workflows:
+
+- `Exercise`: the default public-practice workflow for LeetCode/HackerRank-style single exercises. It keeps the existing two-phase visual grounding, requires the selected-language solution block when appropriate, and treats timers or test/exam wording as simulated practice context.
+- `Repository`: a repository/debugging workflow for visible editor, terminal, test output, diffs, comments, and instructions. It treats screenshots as partial observable evidence, carries bounded incremental history from recent screen text and prior guidance, and must avoid claiming file searches, commands, or repository facts that were not visible.
+
+The selected workflow is stored by Response Mode per session in browser local storage and is sent on every manual or automatic Code Practice generation request. The API also persists the workflow and incremental-history summary in the generated visual guidance metadata for later debugging. Repository mode does not enforce the single-exercise fenced-solution repair rule, because repository help may need patches, edits, commands, or diagnosis rather than one final solution block.
+
+Manual generation is single-flight per `sessionId + mode + workflow` in both Response and the API. Duplicate clicks or Auto refreshes while a matching request is already running are skipped instead of sending repeated provider calls. Response Auto waits briefly after fresh screen context before requesting generation, allowing the latest screenshot batch to be included.
+
+Response Mode renders Copilot Markdown through a safe Markdown renderer with HTML disabled and `highlight.js` syntax highlighting for fenced code blocks. Session detail panels can be expanded/focused from their header control and collapsed again with the same control or `Escape`.
+
+Useful logs:
+
+```text
+[Persuando Response] Manual generation requested: ... mode=code_practice workflow=repository screenContexts=...
+[Persuando Response] Manual generation skipped because one is already running: ... mode=code_practice workflow=repository
+[RealtimeService] Manual generation requested: ... mode=code_practice workflow=repository ... incrementalHistory=... repositorySearch=false
+[RealtimeService] Manual generation skipped because a matching request is already in flight: ... mode=code_practice workflow=repository
+[OpenAiCompatibleProviderAdapter] Generation provider request: ... task=code_practice phase=visual_analysis ... workflow=repository ... incrementalHistory=...
+[OpenAiCompatibleProviderAdapter] Generation provider request: ... task=code_practice phase=answer ... workflow=repository ... incrementalHistory=...
+```
+
+Repository-mode smoke should use a new session, select Code Practice, switch the panel to `Repository`, capture the visible editor plus terminal/test output, request guidance, then verify the answer labels observable evidence, distinguishes current versus stale context, proposes concrete changes, and does not invent unseen files, command output, or repository-wide searches.

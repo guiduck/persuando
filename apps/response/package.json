@@ -15,8 +15,11 @@
   "dependencies": {
     "@persuando/config": "0.1.0",
     "@persuando/contracts": "0.1.0",
+    "highlight.js": "^11.11.2",
     "next": "^16.2.7",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2"
   }
 }

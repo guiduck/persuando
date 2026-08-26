@@ -222,3 +222,34 @@ Produce measurable acceptance criteria, event/state diagrams, migration and roll
 ## Additional Source Context - 2026-08-23 Visual Mode Audio Isolation
 
 Code Practice and Exam Study now start as screenshot-only Capture sessions without creating an audio meter or recorder. Future mode-hardening work must preserve this isolation and include packaged Electron tests with no microphone device, a disabled microphone, and a valid Conversation microphone stream.
+
+## Next Spec Prompt - 2026-08-25 Repository Code Practice Evaluation
+
+```text
+/speckit-specify Specify production evaluation and hardening for Persuando Code Practice repository workflow.
+
+Objective:
+Make repository-mode Code Practice reliably diagnose visible codebase/debugging context without inventing repository searches, command output, files, symbols, or line numbers, while preserving the existing exercise workflow.
+
+Source request/context:
+The implemented baseline adds an additive `codePracticeWorkflow` contract with `exercise` as the default and `repository` as a Response-selectable workflow. Repository mode passes bounded incremental history from visible screen text and previous guidance, logs `workflow` and `incrementalHistory`, persists workflow metadata with generated guidance, and renders safe syntax-highlighted Markdown in Response Mode. Manual generation is single-flight per session/mode/workflow.
+
+Requirements:
+- Preserve backward compatibility for existing Code Practice clients that omit `codePracticeWorkflow`.
+- Define fixture-based evaluation for visible editor content, terminal/test output, diffs, comments, instructions, stale screenshots, and prior incorrect guidance.
+- Require repository answers to label observable evidence, current/stale context, concrete edit proposals, validation commands, and uncertainties.
+- Forbid claims of unseen repository search, files, exact line numbers, command execution, or test results unless they are visible in provided context.
+- Define when workflow preference should remain browser-local versus server-persisted across devices/reconnects.
+- Define payload, concurrency, cooldown, latency, token/image, and cost budgets for repository mode separately from exercise mode.
+- Preserve safe logs: generationId, workflow, phase, model, language, image count, incremental-history count, latency, and safe error code only.
+- Include packaged Electron-to-VPS smoke scenarios for switching Exercise/Repository, duplicate-click prevention, Auto generation after fresh screenshots, highlighted code rendering, and panel focus/collapse behavior.
+
+Artifact considerations:
+Prefer additive contracts and existing provider abstractions. Avoid database migrations unless server-side workflow persistence is approved. Preserve generated guidance compatibility with existing CodeCopilotContext rows.
+
+Risks/assumptions:
+Screenshots are partial evidence and OCR may be uncertain. Repository mode cannot inspect local files unless a future approved connector or upload path provides them. Real-provider evaluation requires external credentials that must not be committed.
+
+Expected output:
+Produce a concise feature specification with acceptance criteria, fixture matrix, failure taxonomy, observability requirements, deployment/rollback notes, and manual smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
+```

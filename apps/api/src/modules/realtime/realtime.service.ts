@@ -14,6 +14,7 @@ import {
 import {
   type CaptureAudioChunkEvent,
   type CaptureStatusEvent,
+  type CodePracticeWorkflow,
   type CodeCopilotContext,
   type CopilotContextEvent,
   type Insight,
@@ -75,6 +76,7 @@ export class RealtimeService implements OnModuleDestroy {
   private readonly eventsBySessionId = new Map<string, PersuandoWebSocketEvent[]>();
   private readonly eventListeners = new Set<(event: PersuandoWebSocketEvent) => void>();
   private readonly pendingScreenContextPersistence = new Map<string, CopilotContextEvent>();
+  private readonly manualGenerationInFlight = new Set<string>();
   private screenContextFlushInProgress = false;
   private screenContextPersistenceTimer?: NodeJS.Timeout;
   private nextSequence = 1;
@@ -440,7 +442,8 @@ export class RealtimeService implements OnModuleDestroy {
         payload: {
           contextId: context.id,
           content: explanation,
-          kind: copilotExplanationKind(event.payload.explanationMode)
+          kind: copilotExplanationKind(event.payload.explanationMode),
+          codePracticeWorkflow: "exercise"
         }
       });
     } catch (error) {
@@ -470,7 +473,7 @@ export class RealtimeService implements OnModuleDestroy {
 
   private async transcribeAcceptedAudioChunk(client: RealtimeClient, event: CaptureAudioChunkEvent): Promise<TranscriptSegment | undefined> {
     const settings = await this.settingsService.getSettings(client.user.id);
-    const apiKey = settings.providerCredentialId
+      const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
     const audio = decodeAudioPayload(event);
@@ -518,11 +521,11 @@ export class RealtimeService implements OnModuleDestroy {
   ): Promise<void> {
     const settings = await this.settingsService.getSettings(client.user.id);
     if (settings.assistantMode !== "conversation") return;
-    const apiKey = settings.providerCredentialId
+      const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
     const contextSegments = await this.getGenerationContextSegments(sessionId, sourceSegment);
-    const sourceSegmentIds = contextSegments.map((segment) => segment.id);
+      const sourceSegmentIds = contextSegments.map((segment) => segment.id);
     const output = await this.providersService.generate({
       apiKey,
       analysisModel: settings.analysisModel,
@@ -560,130 +563,151 @@ export class RealtimeService implements OnModuleDestroy {
       ? requestedMode === "summary" || requestedMode === "insights" || requestedMode === "followups"
       : requestedMode === activeMode;
     if (!allowed) throw new ForbiddenException(`Generation mode ${requestedMode} is disabled while ${activeMode} is active.`);
+
     const isVisualMode = requestedMode === "code_practice" || requestedMode === "exam_study";
-
-    const apiKey = settings.providerCredentialId
-      ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
-      : undefined;
-    const contextSegments = await this.getRecentTranscriptSegments(event.sessionId);
-    const sourceSegmentIds = contextSegments.map((segment) => segment.id);
-    const requestedScreenContexts = isVisualMode
-      ? event.payload.screenContexts?.slice(-MAX_SCREEN_CONTEXTS) ?? []
-      : [];
-    const persistedScreenContexts = isVisualMode
-      ? await this.sessionsService.getRecentScreenContexts(event.sessionId, MAX_SCREEN_CONTEXTS)
-      : [];
-    const cachedScreenContexts = isVisualMode
-      ? this.getCachedScreenContexts(event.sessionId)
-      : [];
-    const screenContexts = mergeScreenContexts([
-      ...requestedScreenContexts,
-      ...persistedScreenContexts,
-      ...cachedScreenContexts
-    ]).slice(-MAX_SCREEN_CONTEXTS);
-    const screenContextSource = requestedScreenContexts.length > 0
-      ? "response_payload+session_history"
-      : "session_history";
-    const previousCodePracticeGuidance = isVisualMode
-      ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
-      : [];
-    const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
-    const generationId = randomUUID();
-    const programmingLanguage = settings.preferredProgrammingLanguage?.trim() || "javascript";
-    const imageReferences = isVisualMode
-      ? screenContexts
-          .map((context) => context.imageReference)
-          .filter((value): value is string => Boolean(value))
-      : undefined;
-
-    if (isVisualMode && imageReferences?.length === 0) {
-      throw new BadRequestException("Visual assistance generation requires at least one screenshot context.");
-    }
-
-    this.logger.log(
-      `Manual generation requested: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} hasCredential=${Boolean(apiKey)}`
-    );
-
-    let output: ProviderGenerationOutput;
-    try {
-      output = await this.providersService.generate({
-        apiKey,
-        analysisModel: settings.analysisModel,
-        generationId,
-        programmingLanguage,
-        responseLanguage: settings.responseLanguage,
-        sessionId: event.sessionId,
-        task: event.payload.mode,
-        transcriptText,
-        imageReferences,
-        previousCodePracticeGuidance
-      });
-    } catch (error) {
-      const safeError = toSafeProviderError(error);
+    const codePracticeWorkflow = requestedMode === "code_practice" ? normalizeCodePracticeWorkflow(event.payload.codePracticeWorkflow) : undefined;
+    const inFlightKey = manualGenerationKey(event.sessionId, requestedMode, codePracticeWorkflow);
+    if (this.manualGenerationInFlight.has(inFlightKey)) {
       this.logger.warn(
-        `Manual generation failed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} screenContextSource=${screenContextSource} imageReferences=${imageReferences?.length ?? 0} code=${safeError.code} retryable=${safeError.retryable} message=${safeError.message}`
+        `Manual generation skipped because a matching request is already in flight: sessionId=${event.sessionId} mode=${requestedMode} workflow=${codePracticeWorkflow ?? "none"}.`
       );
-      throw error;
-    }
-
-    this.logger.log(
-      `Manual generation completed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} imageReferences=${imageReferences?.length ?? 0} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`
-    );
-
-    if (event.payload.mode === "summary") {
-      await this.publishSummary(event.sessionId, output.summary.content, sourceSegmentIds);
       return { action: "accepted" };
     }
+    this.manualGenerationInFlight.add(inFlightKey);
 
-    if (event.payload.mode === "insights") {
-      await this.publishInsights(event.sessionId, output.insights, sourceSegmentIds);
-      return { action: "accepted" };
-    }
+    try {
+      const apiKey = settings.providerCredentialId
+        ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
+        : undefined;
+      const contextSegments = await this.getRecentTranscriptSegments(event.sessionId);
+      const sourceSegmentIds = contextSegments.map((segment) => segment.id);
+      const requestedScreenContexts = isVisualMode
+        ? event.payload.screenContexts?.slice(-MAX_SCREEN_CONTEXTS) ?? []
+        : [];
+      const persistedScreenContexts = isVisualMode
+        ? await this.sessionsService.getRecentScreenContexts(event.sessionId, MAX_SCREEN_CONTEXTS)
+        : [];
+      const cachedScreenContexts = isVisualMode
+        ? this.getCachedScreenContexts(event.sessionId)
+        : [];
+      const screenContexts = mergeScreenContexts([
+        ...requestedScreenContexts,
+        ...persistedScreenContexts,
+        ...cachedScreenContexts
+      ]).slice(-MAX_SCREEN_CONTEXTS);
+      const screenContextSource = requestedScreenContexts.length > 0
+        ? "response_payload+session_history"
+        : "session_history";
+      const previousCodePracticeGuidance = isVisualMode
+        ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
+        : [];
+      const incrementalHistory = codePracticeWorkflow === "repository"
+        ? buildIncrementalRepositoryHistory(previousCodePracticeGuidance, screenContexts, requestedScreenContexts.length)
+        : [];
+      const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
+      const generationId = randomUUID();
+      const programmingLanguage = settings.preferredProgrammingLanguage?.trim() || "javascript";
+      const imageReferences = isVisualMode
+        ? screenContexts
+            .map((context) => context.imageReference)
+            .filter((value): value is string => Boolean(value))
+        : undefined;
 
-    if (event.payload.mode === "followups") {
-      await this.publishSuggestions(event.sessionId, output.suggestions, sourceSegmentIds);
-      return { action: "accepted" };
-    }
+      if (isVisualMode && imageReferences?.length === 0) {
+        throw new BadRequestException("Visual assistance generation requires at least one screenshot context.");
+      }
 
-    const contextId = randomUUID();
-    const guidance = output.suggestions[0]?.content ?? output.summary.content;
-    await this.database.codeCopilotContext.create({
-      data: {
-        id: contextId,
-        sessionId: event.sessionId,
-        programmingLanguage,
-        explanationMode: "explain",
-        problemContext: JSON.stringify({
-          version: 1,
-          kind: "manual_generation",
+      this.logger.log(
+        `Manual generation requested: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} incrementalHistory=${incrementalHistory.length} hasCredential=${Boolean(apiKey)} repositorySearch=false`
+      );
+
+      let output: ProviderGenerationOutput;
+      try {
+        output = await this.providersService.generate({
+          apiKey,
+          analysisModel: settings.analysisModel,
+          codePracticeIncrementalHistory: incrementalHistory,
+          codePracticeWorkflow,
           generationId,
           programmingLanguage,
-          screenContextSource,
-          screenContextCount: screenContexts.length,
-          imageReferenceCount: imageReferences?.length ?? 0
-        }),
-        generatedGuidance: guidance,
-        status: "completed"
+          responseLanguage: settings.responseLanguage,
+          sessionId: event.sessionId,
+          task: event.payload.mode,
+          transcriptText,
+          imageReferences,
+          previousCodePracticeGuidance
+        });
+      } catch (error) {
+        const safeError = toSafeProviderError(error);
+        this.logger.warn(
+          `Manual generation failed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} screenContextSource=${screenContextSource} imageReferences=${imageReferences?.length ?? 0} code=${safeError.code} retryable=${safeError.retryable} message=${safeError.message}`
+        );
+        throw error;
       }
-    });
-    this.logger.log(
-      `Manual visual guidance persisted: sessionId=${event.sessionId} mode=${event.payload.mode} contextId=${contextId} guidanceLength=${guidance.length} previousGuidance=${previousCodePracticeGuidance.length}`
-    );
-    this.publishServerEvent({
-      version: 1,
-      type: "copilot.explanation",
-      sessionId: event.sessionId,
-      sentAt: new Date().toISOString(),
-      payload: {
-        contextId,
-        content: guidance,
-        kind: "explanation",
-        assistantMode: event.payload.mode,
-      }
-    });
-    return { action: "accepted" };
-  }
 
+      this.logger.log(
+        `Manual generation completed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} imageReferences=${imageReferences?.length ?? 0} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`
+      );
+
+      if (event.payload.mode === "summary") {
+        await this.publishSummary(event.sessionId, output.summary.content, sourceSegmentIds);
+        return { action: "accepted" };
+      }
+
+      if (event.payload.mode === "insights") {
+        await this.publishInsights(event.sessionId, output.insights, sourceSegmentIds);
+        return { action: "accepted" };
+      }
+
+      if (event.payload.mode === "followups") {
+        await this.publishSuggestions(event.sessionId, output.suggestions, sourceSegmentIds);
+        return { action: "accepted" };
+      }
+
+      const contextId = randomUUID();
+      const guidance = output.suggestions[0]?.content ?? output.summary.content;
+      await this.database.codeCopilotContext.create({
+        data: {
+          id: contextId,
+          sessionId: event.sessionId,
+          programmingLanguage,
+          explanationMode: "explain",
+          problemContext: JSON.stringify({
+            version: 1,
+            kind: "manual_generation",
+            generationId,
+            programmingLanguage,
+            screenContextSource,
+            screenContextCount: screenContexts.length,
+            imageReferenceCount: imageReferences?.length ?? 0,
+            codePracticeWorkflow,
+            incrementalHistory
+          }),
+          generatedGuidance: guidance,
+          status: "completed"
+        }
+      });
+      this.logger.log(
+        `Manual visual guidance persisted: sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} contextId=${contextId} guidanceLength=${guidance.length} previousGuidance=${previousCodePracticeGuidance.length}`
+      );
+      this.publishServerEvent({
+        version: 1,
+        type: "copilot.explanation",
+        sessionId: event.sessionId,
+        sentAt: new Date().toISOString(),
+        payload: {
+          contextId,
+          content: guidance,
+          kind: "explanation",
+          assistantMode: event.payload.mode,
+          codePracticeWorkflow
+        }
+      });
+      return { action: "accepted" };
+    } finally {
+      this.manualGenerationInFlight.delete(inFlightKey);
+    }
+  }
   private async publishSummary(sessionId: SessionId, content: string, sourceSegmentIds: TranscriptSegmentId[]): Promise<void> {
     const generatedAt = new Date();
     const summary = await this.database.summary.create({
@@ -817,7 +841,7 @@ export class RealtimeService implements OnModuleDestroy {
     context: CodeCopilotContext
   ): Promise<string> {
     const settings = await this.settingsService.getSettings(client.user.id);
-    const apiKey = settings.providerCredentialId
+      const apiKey = settings.providerCredentialId
       ? await this.credentialsService.decryptForProviderCall(client.user.id, settings.providerCredentialId)
       : undefined;
     const previousCodePracticeGuidance = await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId);
@@ -1201,6 +1225,31 @@ function mergeScreenContexts(
   return [...byImageReference.values()];
 }
 
+function normalizeCodePracticeWorkflow(value: unknown): CodePracticeWorkflow {
+  return value === "repository" ? "repository" : "exercise";
+}
+
+function manualGenerationKey(sessionId: string, mode: ResponseGenerateEvent["payload"]["mode"], workflow?: CodePracticeWorkflow): string {
+  return `${sessionId}:${mode}:${workflow ?? "none"}`;
+}
+
+function buildIncrementalRepositoryHistory(
+  previousGuidance: string[],
+  screenContexts: { imageReference?: string; textContext?: string }[],
+  hotContextCount: number
+): string[] {
+  const latestScreens = screenContexts.slice(-6).map((context, index) => {
+    const note = context.textContext?.trim() || "screenshot image attached";
+    return `Recent screen ${index + 1}/${Math.min(6, screenContexts.length)}: ${note.slice(0, 600)}`;
+  });
+  const boundedGuidance = previousGuidance.slice(-4).map((guidance, index) => `Relevant prior guidance ${index + 1}: ${guidance.slice(0, 1600)}`);
+  return [
+    `Repository tracking snapshot: hotOrRequestedScreens=${hotContextCount} mergedScreens=${screenContexts.length}. Persisted screenshots and hot state were merged before provider generation.`,
+    "Track current problem/repository, observed files and symbols, suggested changes, latest tests, open errors, and useful prior guidance. Do not claim repository search from image-only evidence.",
+    ...latestScreens,
+    ...boundedGuidance
+  ].slice(-12);
+}
 function validateRequestedScreenContexts(event: ResponseGenerateEvent): void {
   const { screenContexts } = event.payload;
   if (screenContexts === undefined) return;
@@ -1275,6 +1324,9 @@ function parseRealtimeEvent(event: unknown): PersuandoWebSocketEvent {
     const generate = candidate as ResponseGenerateEvent;
     if (!["summary", "insights", "followups", "code_practice", "exam_study"].includes(generate.payload.mode)) {
       throw new BadRequestException("Realtime generate mode is invalid");
+    }
+    if (generate.payload.codePracticeWorkflow !== undefined && generate.payload.codePracticeWorkflow !== "exercise" && generate.payload.codePracticeWorkflow !== "repository") {
+      throw new BadRequestException("Realtime generate codePracticeWorkflow is invalid");
     }
     validateRequestedScreenContexts(generate);
   }

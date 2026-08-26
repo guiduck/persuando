@@ -450,6 +450,53 @@ test("OpenAiCompatibleProviderAdapter maps rejected generation requests separate
       /generation request/i.test(error.message)
   );
 });
+
+test("OpenAiCompatibleProviderAdapter selects repository workflow prompts and incremental history", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{
+        message: {
+          content: requests.length === 1
+            ? JSON.stringify({ activeProblemTitle: "Repository kata", filesAndSymbols: ["src/app.ts handleRequest"] })
+            : JSON.stringify({
+                summary: { content: "Continue the repository fix." },
+                insights: [],
+                suggestions: [{
+                  category: "response",
+                  content: "## Diagnóstico objetivo\nO teste falha em `handleRequest`.\n\n## Mudanças propostas\n```typescript\nexport function handleRequest() { return true; }\n```",
+                  urgency: "high"
+                }]
+              })
+        }
+      }]
+    });
+  });
+
+  await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    codePracticeIncrementalHistory: ["Latest test result: expected true, received false."],
+    codePracticeWorkflow: "repository",
+    imageReferences: ["data:image/png;base64,repo-screen"],
+    previousCodePracticeGuidance: ["Earlier suggestion changed the wrong symbol."],
+    programmingLanguage: "typescript",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Repository editor and terminal are visible."
+  });
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].messages[0].content, /simulated repository debugging session/i);
+  assert.match(requests[0].messages[1].content[0].text, /Code Practice workflow: repository/);
+  assert.match(requests[1].messages[0].content, /Repository Practice/);
+  assert.match(requests[1].messages[0].content, /Do not claim deep repository search/i);
+  assert.match(requests[1].messages[1].content, /Bounded incremental repository history/);
+  assert.match(requests[1].messages[1].content, /Latest test result/);
+  assert.match(requests[1].messages[1].content, /Mudanças propostas/);
+});
 function jsonResponse(status, payload) {
   return {
     ok: status >= 200 && status < 300,

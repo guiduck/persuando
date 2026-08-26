@@ -62,3 +62,35 @@ test("Response app copy avoids forbidden responsible-use claims", () => {
     assert.doesNotMatch(combined, new RegExp(forbidden));
   }
 });
+
+test("Response Code Practice renders safe highlighted Markdown", () => {
+  assert.match(sessionPage, /react-markdown/);
+  assert.match(sessionPage, /rehype-highlight/);
+  assert.match(sessionPage, /skipHtml/);
+  assert.match(sessionPage, /MarkdownPre/);
+  assert.match(sessionPage, /code-block/);
+  assert.match(sessionPage, /figcaption/);
+  assert.doesNotMatch(sessionPage, /dangerouslySetInnerHTML/);
+});
+
+test("Response session can highlight and restore panels accessibly", () => {
+  assert.match(sessionPage, /HighlightPanelButton/);
+  assert.match(sessionPage, /highlightedPanel/);
+  assert.match(sessionPage, /Escape/);
+  assert.match(sessionPage, /aria-label=\{label\}/);
+  assert.match(sessionPage, /title=\{label\}/);
+  for (const expected of ["Transcript", "Summary", "What to say", "Topics", "Insights", "Follow-ups", "Screen context", "State"]) {
+    assert.match(sessionPage, new RegExp(expected.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("Response Code Practice exposes Exercise and Repository workflow", () => {
+  assert.match(sessionPage, /CodePracticeWorkflow/);
+  assert.match(sessionPage, /Exercise/);
+  assert.match(sessionPage, /Repository/);
+  assert.match(sessionPage, /codePracticeWorkflow/);
+  assert.match(sessionPage, /loadCodePracticeWorkflow/);
+  assert.match(sessionPage, /persuando:\$\{sessionId\}:code-practice-workflow/);
+  assert.match(sessionPage, /Generation skipped because a request is already in flight/);
+  assert.match(sessionPage, /waiting for screenshots|updated context|analyzing/);
+});

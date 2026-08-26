@@ -598,6 +598,82 @@ test("Session history keeps the latest 30 persisted screenshots in FIFO order", 
   assert.equal(history?.screenContexts.at(-1).debugId, "periodic-debug-31");
 });
 
+
+test("RealtimeService defaults Code Practice workflow to exercise and propagates repository", async () => {
+  const generationInputs = [];
+  const providersService = {
+    getActiveAdapterName: () => "mock",
+    transcribe: async () => {
+      throw new Error("should not transcribe");
+    },
+    generate: async (input) => {
+      generationInputs.push(input);
+      return {
+        summary: { content: "Repository guidance." },
+        insights: [],
+        suggestions: [{ category: "response", content: "Repository guidance.", urgency: "high" }]
+      };
+    }
+  };
+  const { consentService, realtimeService, session, settingsService } = await buildHarness({ providersService });
+  await grantCopilotConsent(consentService, session.id);
+  const currentSettings = await settingsService.getSettings("google:user-1");
+  const { userId: _userId, ...settingsInput } = currentSettings;
+  await settingsService.updateSettings("google:user-1", { ...settingsInput, assistantMode: "code_practice" });
+  realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
+  await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id, { lastSeenSequence: 0 }));
+  const screenContexts = [{ imageReference: "data:image/png;base64,current", textContext: "src/app.ts failing test" }];
+
+  await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", screenContexts }));
+  await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "repository", screenContexts }));
+  const replay = await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id, { lastSeenSequence: 0 }));
+  const explanations = replay.replayedEvents.filter((storedEvent) => storedEvent.type === "copilot.explanation");
+
+  assert.equal(generationInputs[0].codePracticeWorkflow, "exercise");
+  assert.equal(generationInputs[1].codePracticeWorkflow, "repository");
+  assert.equal(generationInputs[1].codePracticeIncrementalHistory.length > 0, true);
+  assert.equal(explanations.at(-1)?.payload.codePracticeWorkflow, "repository");
+});
+
+test("RealtimeService keeps manual visual generation single-flight per workflow", async () => {
+  const deferred = createDeferred();
+  let generateCount = 0;
+  const providersService = {
+    getActiveAdapterName: () => "mock",
+    transcribe: async () => {
+      throw new Error("should not transcribe");
+    },
+    generate: async () => {
+      generateCount += 1;
+      await deferred.promise;
+      return {
+        summary: { content: "Delayed guidance." },
+        insights: [],
+        suggestions: [{ category: "response", content: "Delayed guidance.", urgency: "high" }]
+      };
+    }
+  };
+  const { consentService, realtimeService, session, settingsService } = await buildHarness({ providersService });
+  await grantCopilotConsent(consentService, session.id);
+  const currentSettings = await settingsService.getSettings("google:user-1");
+  const { userId: _userId, ...settingsInput } = currentSettings;
+  await settingsService.updateSettings("google:user-1", { ...settingsInput, assistantMode: "code_practice" });
+  realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
+  await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id, { lastSeenSequence: 0 }));
+  const request = event("response.generate", session.id, {
+    mode: "code_practice",
+    codePracticeWorkflow: "repository",
+    screenContexts: [{ imageReference: "data:image/png;base64,current" }]
+  });
+
+  const first = realtimeService.handleClientEvent("response-1", request);
+  const second = await realtimeService.handleClientEvent("response-1", request);
+  deferred.resolve();
+  await first;
+
+  assert.equal(second.action, "accepted");
+  assert.equal(generateCount, 1);
+});
 function createDeferred() {
   let resolve;
   const promise = new Promise((innerResolve) => {

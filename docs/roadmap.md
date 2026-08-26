@@ -146,3 +146,7 @@ Screenshot fan-out and hot context now precede durability: Response can render a
 ## Implementation Update - 2026-08-23 Visual Mode Audio Isolation
 
 Code Practice and Exam Study can start screenshot-only sessions without a microphone track or `AudioContext` source. Conversation retains the existing microphone meter, recorder, and transcription path.
+
+## Update - 2026-08-25 Code Practice Exercise And Repository Workflows
+
+Phase 3 now separates Code Practice into an `exercise` workflow for simulated public-practice problems and a `repository` workflow for visible repository/debugging work. The workflow travels from Response generation requests through the WebSocket contract, realtime service, provider adapter, and Copilot explanation events. Repository mode adds incremental visible-context history, asks for evidence-based diagnosis and concrete edits, and explicitly avoids invented repository search or unseen command output. Response Mode now persists the per-session workflow choice locally, deduplicates matching in-flight generations, renders safe highlighted Markdown/code blocks, and supports focused/expanded detail panels. Remaining gate: packaged Electron-to-VPS real-provider smoke for both workflows, plus a decision on durable server-side workflow preference and repository-mode evaluation fixtures.

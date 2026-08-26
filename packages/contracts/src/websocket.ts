@@ -1,4 +1,15 @@
-import type { AssistantMode, Insight, ProviderOperation, SafeError, SessionId, SessionStatus, Suggestion, Summary, TranscriptSegment } from "./types.js";
+import type {
+  AssistantMode,
+  CodePracticeWorkflow,
+  Insight,
+  ProviderOperation,
+  SafeError,
+  SessionId,
+  SessionStatus,
+  Suggestion,
+  Summary,
+  TranscriptSegment
+} from "./types.js";
 
 export const websocketEventTypes = [
   "capture.audio_chunk",
@@ -57,6 +68,7 @@ export type ResponseGenerateEvent = BaseWebSocketEvent<
   "response.generate",
   {
     mode: "summary" | "insights" | "followups" | "code_practice" | "exam_study";
+    codePracticeWorkflow?: CodePracticeWorkflow;
     screenContexts?: {
       imageReference?: string;
       textContext?: string;
@@ -88,6 +100,7 @@ export type CopilotExplanationEvent = BaseWebSocketEvent<
     content: string;
     kind: "hint" | "explanation" | "tradeoff" | "review";
     assistantMode?: Extract<AssistantMode, "code_practice" | "exam_study">;
+    codePracticeWorkflow?: CodePracticeWorkflow;
   }
 >;
 

@@ -1,3 +1,5 @@
+@import "highlight.js/styles/github-dark.css";
+
 :root {
   color-scheme: dark;
   --background: #070809;
@@ -399,4 +401,124 @@ button:disabled,
   font-size: 13px;
   line-height: 1.55;
   white-space: pre;
+}
+
+button:focus-visible,
+.button:focus-visible,
+.segmented-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--blue) 80%, white);
+  outline-offset: 2px;
+}
+
+.icon-button {
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+.icon-button.small {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
+.detail-grid > .panel {
+  min-width: 0;
+}
+
+.detail-grid.has-highlight {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.highlighted-panel {
+  grid-column: 1 / -1;
+  min-height: calc(100vh - 170px);
+  order: -1;
+}
+
+.highlighted-panel .panel-scroll,
+.highlighted-panel .transcript-scroll {
+  max-height: calc(100vh - 280px);
+}
+
+.compact-panel {
+  min-height: 0;
+  order: 2;
+}
+
+.compact-panel .artifact-list {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.workflow-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.workflow-segmented {
+  grid-template-columns: repeat(2, minmax(96px, 1fr));
+}
+
+.markdown-content {
+  gap: 14px;
+  color: #d5dde5;
+}
+
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin: 18px 0 2px;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.markdown-content h2 {
+  border-bottom: 1px solid var(--border);
+  font-size: 19px;
+  padding-bottom: 8px;
+}
+
+.markdown-content h3 {
+  font-size: 17px;
+}
+
+.markdown-content h4 {
+  color: #c9d6e2;
+  font-size: 15px;
+}
+
+.markdown-content p {
+  margin: 0;
+}
+
+.markdown-content li + li {
+  margin-top: 6px;
+}
+
+.markdown-content .code-block {
+  margin: 4px 0 2px;
+}
+
+.code-block .hljs {
+  background: transparent;
+  color: #d8e7ff;
+  padding: 0;
+}
+
+@media (max-width: 800px) {
+  .detail-grid.has-highlight {
+    grid-template-columns: 1fr;
+  }
+
+  .highlighted-panel {
+    min-height: calc(100vh - 150px);
+  }
 }

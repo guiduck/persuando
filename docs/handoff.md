@@ -176,3 +176,13 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Fixed Capture startup in Code Practice and Exam Study: visual-only sessions no longer pass an empty `MediaStream` to `AudioContext.createMediaStreamSource`.
 - The audio meter now starts only when Conversation mode actually enables microphone capture, with an additional missing-audio-track guard.
 - Validation: Capture tests passed 10/10, the Capture production build passed, `npm.cmd run build` passed, the full suite passed 126/126, and lint passed. No API contract, database migration, secret, or deployment environment changed. Rebuild the Windows Capture artifact before testing this fix.
+
+## Implementation Update - 2026-08-25 Code Practice Exercise And Repository Workflows
+
+- Current status: Code Practice now supports explicit `exercise` and `repository` workflows from Response Mode through WebSocket contracts, realtime orchestration, provider prompts, persisted guidance metadata, and Copilot explanation events.
+- Decision: keep `exercise` as the backward-compatible default. Repository mode is additive, prompt-level behavior for visible repository/debugging context; it uses bounded incremental history and does not claim repository search beyond screenshots or visible text. No database migration or secret change was required.
+- UI/behavior: Response Mode stores the workflow selection per session in browser local storage, sends it with manual/Auto Code Practice generation, prevents duplicate in-flight requests, renders safe Markdown with `highlight.js` syntax highlighting, and lets users focus/collapse session panels with accessible header controls and `Escape`.
+- Observability: API/provider logs include `workflow`, `incrementalHistory`, `generationId`, image counts, phase, model, language, and `repositorySearch=false` without logging images, prompts, provider keys, or secrets.
+- Validation: `npm.cmd run build` passed; `node --test packages/contracts/test/contracts.test.mjs apps/api/test/providers.test.mjs apps/api/test/realtime.test.mjs apps/response/test/response-ui.test.mjs` passed; `npm.cmd run test` passed 133/133; `npm.cmd run --workspace @persuando/response build` passed.
+- Remaining work: run packaged Electron-to-VPS real-provider smoke in both workflows, measure repository-mode latency/cost, and decide whether workflow preference should become server-persisted rather than browser-local per session.
+- Recommended next Spec Kit step: specify repository-mode evaluation and production hardening with fixtures for visible editor/test/diff evidence, stale-context rejection, no invented files/commands, workflow persistence, payload budgets, and real-provider smoke.

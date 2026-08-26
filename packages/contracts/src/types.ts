@@ -48,6 +48,7 @@ export type CaptureStatus = "idle" | "active" | "paused" | "revoked" | "error" |
 export type ProviderCredentialStatus = "unverified" | "valid" | "invalid" | "revoked" | "deleted";
 export type RetentionMode = "seven_day_workspace" | "manual_deleted";
 export type AssistantMode = "conversation" | "code_practice" | "exam_study";
+export type CodePracticeWorkflow = "exercise" | "repository";
 export type ProviderOperation = "transcription" | "conversation" | "code_practice" | "exam_study";
 
 export interface User {

@@ -195,3 +195,13 @@ Run `/speckit-specify` for the next focused feature. Recommended prompt: use `do
 - Latest validation: `npm.cmd run build` passed; focused `node --test packages/contracts/test/contracts.test.mjs apps/api/test/providers.test.mjs apps/api/test/realtime.test.mjs apps/response/test/response-ui.test.mjs` passed 56/56 after rebuild.
 - Remaining work: run full test suite and Response production build after this closeout; perform real-provider Electron-to-VPS smoke for Code Problem, Repository, and Design System; decide whether workflow preference should be server-persisted across devices.
 - Recommended next Spec Kit step: specify evaluation fixtures for interview-style Code Practice answers, including complete final code, step-by-step commentary, corrected pitfalls, design-system accessibility/token checks, stale-context rejection, and no invented repository/design evidence.
+
+## Implementation Update - 2026-08-31 Code Practice Conversational Interview Script
+
+- Current status: Code Practice code-problem output now emphasizes a speakable simulated-interview script. The answer starts with what the student understood and the goal, shows the complete solved code near the beginning, then walks through the solution conversationally instead of as disconnected topic notes.
+- Decision: `Fala para entrevista` blockquotes are the most visually prominent reading path. Each construction step should include the current doubt, the next coding move, and the reason for that move. Google guidance is limited to short search terms suitable for interview preparation or allowed clarification.
+- UI/quality: Response Markdown now styles blockquotes so the spoken lines stand out while keeping fenced code blocks and existing safe Markdown rendering. The provider repair prompt also requires the new conversational anchors when a selected-language solution is missing.
+- Validation: `npm.cmd run build` passed; focused `node --test apps/api/test/providers.test.mjs apps/response/test/response-ui.test.mjs` passed 25/25; `npm.cmd run test` passed 134/134; `npm.cmd run --workspace @persuando/response build` passed.
+- Remaining work: run real-provider Electron-to-VPS smoke for Code Problem, Repository, and Design System, checking whether the generated Portuguese script is easy to read aloud while coding and whether the Google search terms remain concise.
+- Recommended next Spec Kit step: specify evaluation fixtures for conversational Code Practice answers, including visible `Fala para entrevista` prominence, current-doubt progression, final-code placement, corrected false starts, and concise interview-appropriate search terms.
+

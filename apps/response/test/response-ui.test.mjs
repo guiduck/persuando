@@ -8,6 +8,7 @@ const sessionRoute = await readFile("apps/response/src/app/sessions/[sessionId]/
 const sessionLoader = await readFile("apps/response/src/app/sessions/[sessionId]/session-history-loader.tsx", "utf8");
 const loadingPage = await readFile("apps/response/src/app/sessions/[sessionId]/loading.tsx", "utf8");
 const errorPage = await readFile("apps/response/src/app/sessions/[sessionId]/error.tsx", "utf8");
+const globalCss = await readFile("apps/response/src/app/globals.css", "utf8");
 
 test("Response session UI covers required live and retained states", () => {
   const combined = `${homePage}\n${sessionPage}\n${loadingPage}\n${errorPage}`.toLowerCase();
@@ -70,6 +71,8 @@ test("Response Code Practice renders safe highlighted Markdown", () => {
   assert.match(sessionPage, /MarkdownPre/);
   assert.match(sessionPage, /code-block/);
   assert.match(sessionPage, /figcaption/);
+  assert.match(globalCss, /\.markdown-content blockquote/);
+  assert.match(globalCss, /font-weight: 700/);
   assert.doesNotMatch(sessionPage, /dangerouslySetInnerHTML/);
 });
 

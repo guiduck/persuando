@@ -271,12 +271,16 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   assert.match(answerBody.messages[1].content, /Selected programming language: javascript/);
   assert.match(answerBody.messages[1].content, /do not output language-neutral pseudocode/);
   assert.match(answerBody.messages[1].content, /campo value e precisa ser revisada/);
-  assert.match(answerBody.messages[1].content, /Diagnóstico da tentativa atual/);
-  assert.match(answerBody.messages[1].content, /print-versus-return/);
+  assert.match(answerBody.messages[1].content, /Como eu chegaria nessa solução/);
+  assert.match(answerBody.messages[1].content, /Ajustes que eu corrigiria no caminho/);
   assert.match(answerBody.messages[1].content, /Never recreate Node, Tree, main, stdin parsing/);
-  assert.match(answerBody.messages[1].content, /Roteiro de entrevista/);
-  assert.match(answerBody.messages[1].content, /Construção passo a passo/);
-  assert.match(answerBody.messages[1].content, /Always include the complete final solution/);
+  assert.match(answerBody.messages[1].content, /O que eu entendi do problema/);
+  assert.match(answerBody.messages[1].content, /Solução resolvida/);
+  assert.match(answerBody.messages[1].content, /Termos para pesquisar no Google/);
+  assert.match(answerBody.messages[1].content, /Dúvida atual/);
+  assert.match(answerBody.messages[1].content, /Fala para entrevista/);
+  assert.match(answerBody.messages[1].content, /blockquoted/);
+  assert.match(answerBody.messages[1].content, /conversational step-by-step interview walkthrough/);
 });
 
 test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accepts fenced JSON", async () => {
@@ -352,6 +356,8 @@ test("OpenAiCompatibleProviderAdapter retries a Code Practice answer that omits 
   assert.match(requests[1].messages[1].content, /"language":"javascript"/);
   assert.match(requests[1].messages[1].content, /"selectedProgrammingLanguageIsAuthoritative":true/);
   assert.match(requests[2].messages[1].content, /REPAIR REQUIRED/);
+  assert.match(requests[2].messages[1].content, /Solução resolvida/);
+  assert.match(requests[2].messages[1].content, /Termos para pesquisar no Google/);
   assert.match(output.suggestions[0].content, /```javascript/);
 });
 test("OpenAiCompatibleProviderAdapter preserves genuine short Code Practice output without hardcoded replacement", async () => {
@@ -558,3 +564,4 @@ function jsonResponse(status, payload) {
     }
   };
 }
+

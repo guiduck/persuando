@@ -499,6 +499,21 @@ button:focus-visible,
   margin: 0;
 }
 
+.markdown-content blockquote {
+  margin: 10px 0 14px;
+  border-left: 4px solid #38bdf8;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.11);
+  color: #e6f6ff;
+  padding: 10px 12px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.markdown-content blockquote p {
+  margin: 0;
+}
+
 .markdown-content li + li {
   margin-top: 6px;
 }

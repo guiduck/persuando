@@ -288,3 +288,25 @@ Screenshots are partial evidence and OCR may be uncertain. Repository/design-sys
 Expected output:
 Produce a concise feature specification with acceptance criteria, fixture matrix, failure taxonomy, observability fields, deployment/rollback checks, and manual smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
 ```
+
+## Next Spec Prompt - 2026-08-31 Conversational Code Practice Evaluation
+
+```text
+/speckit-specify Specify evaluation and hardening for Persuando conversational Code Practice answers.
+
+Objective:
+Make code-problem practice outputs consistently useful as simulated interview rehearsal: complete final code first, then a readable spoken walkthrough that feels like the candidate thinking and explaining while coding.
+
+Source request/context:
+The implemented baseline now asks Code Practice to start with what the student understood, place the complete solved code near the beginning, emphasize `Fala para entrevista` blockquotes, include current doubts per step, explain why decisions are made during the walkthrough, include small corrected false starts, and provide only concise Google search terms suitable for preparation or allowed interview clarification.
+
+Requirements:
+- Preserve explicit Code Practice study framing and the existing `exercise`, `repository`, and `design_system` workflows.
+- Define quality fixtures for code-problem answers that verify: problem understanding, objective, complete selected-language final solution, conversational step progression, current doubt per step, spoken-script prominence, explanation of decisions when relevant, corrected false starts, implementation-specific Big-O, and final checklist.
+- Require Google help to be only short search queries such as algorithm names, data structures, API concepts, platform error messages, or visible error text; do not add links or long explanations.
+- Validate Response rendering so `Fala para entrevista` blockquotes are visually scannable without breaking safe Markdown/code highlighting.
+- Preserve no fabricated provider fallback content, no hidden repository/design access, and no live-assessment/proctoring evasion behavior.
+
+Expected output:
+Produce a concise feature specification with measurable acceptance criteria, fixture matrix, UI readability checks, provider prompt constraints, deployment smoke scenarios, and rollback notes. Do not create tasks until /speckit-tasks is invoked.
+```

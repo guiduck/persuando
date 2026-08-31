@@ -374,12 +374,16 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"], workflow 
       "Never invent scaffolding, classes, field names, input parsing, or output behavior that the platform already supplies. Preserve visible identifiers such as root, data, left, right, and the exact required function signature.",
       "For output-format problems, verify spaces, line breaks, trailing separators, and print-versus-return semantics explicitly.",
       "Responsible-use boundary: this is a simulated technical-assessment preparation exercise for study. For a clearly proctored exam, hiring assessment, live interview, or active contest, provide conceptual debugging and pseudocode rather than copy-paste final code. For a public self-study or practice page without visible proctoring signals, always provide a complete taught solution in the selected language.",
-      "Teach the solution like a simulated interview: build it in deliberate steps, say what is worth explaining aloud, justify the chosen approach, and include small false-start pitfalls as corrected notes without leaving wrong final code.",
+      "Teach the solution like a simulated interview conversation, not like disconnected bullet notes: start with what the student understood, the objective, why the chosen approach works, and a complete solved-code view, then narrate how to arrive there step by step.",
+      "Make the speakable interview script visually prominent with Markdown blockquotes under headings named Fala para entrevista. These are the lines the student should be able to glance at and say aloud while coding.",
+      "Include a short Google search terms section with only interview-appropriate search queries, not explanations, links, or instructions to search during a prohibited setting.",
+      "For each step, express the current doubt before resolving it. Use headings or bold labels for Dúvida atual, O que eu faria, and Fala para entrevista so the reading path feels conversational.",
+      "When useful, include small false-start pitfalls as corrected notes without leaving wrong final code.",
       "If the public exercise title, URL, and behavior are clear but the editor signature is not visible, state the signature assumption briefly and still provide the standard platform function solution. Do not withhold the solution merely to request another screenshot.",
       "Explain Big-O for the actual proposed solution: define the problem variables, connect each traversal, loop, recursion, queue, heap, or sort to its cost, and explain why the final bound follows. Do not give a generic definition of Big-O.",
       "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the main answer in suggestions[0].content with category='response' and urgency='high'.",
       "Write explanations in the requested response language, but write every code block in the explicitly selected programming language. Never substitute pseudocode or another language when a programming language is provided.",
-      "A Code Practice response is invalid unless Solução atualizada contains a non-empty fenced code block labeled with the selected programming language, preceded or followed by an interview-style step-by-step walkthrough. Use concise Markdown headings, Big-O, and a final contract checklist. Prefer 700 to 1400 useful words over repetitive boilerplate.",
+      "A Code Practice response is invalid unless Solução resolvida contains a non-empty fenced code block labeled with the selected programming language and the answer includes Fala para entrevista, Termos para pesquisar no Google, Dúvida atual, and Construção passo a passo. Prefer 800 to 1500 useful words over repetitive boilerplate.",
       "Do not include secrets."
     ].join(" ");
   }
@@ -477,23 +481,23 @@ ${previousGuidance}
 Recent transcript and screen timeline notes:
 ${input.transcriptText}
 
-Produce the next tutoring turn, not a fresh generic solution. Follow this order:
-1. "Diagnóstico da tentativa atual": identify the student's latest code/result and the concrete reason it fails. If no attempt is visible, say that clearly.
-2. "Contrato exato da plataforma": state the exact function signature, provided fields/types, print-versus-return behavior, and output formatting. Do not add scaffolding the editor already provides.
-3. "Correção do histórico": identify any incorrect or stale prior guidance and correct it explicitly. If prior guidance was sound, say what remains applicable.
-4. "Correção mínima": show the smallest change that addresses the newest visible failure.
-5. "Roteiro de entrevista": explain the chosen approach as something the student could say while developing the solution, including why this approach beats simpler tempting alternatives.
-6. "Construção passo a passo": build the code in parts. For each part, explain what to comment aloud during an interview and include one small corrected pitfall when useful.
-7. "Solução atualizada": for a public self-study or practice page, provide the complete method/function in the selected programming language and exact platform format. Match identifiers and output format exactly.
-8. "Por que funciona": walk through the visible sample or newest test evidence.
-9. "Complexidade Big-O" and "Checklist antes de enviar".
+Produce the next tutoring turn as a conversational simulated-interview script, not a disconnected topic outline. Follow this order:
+1. "O que eu entendi do problema": open with the student's speakable understanding of the problem and objective. Immediately include a prominent blockquote headed "Fala para entrevista".
+2. "Solução resolvida": show the complete final method/function in the selected programming language and exact platform format, then briefly explain why this approach works before the detailed walkthrough.
+3. "Termos para pesquisar no Google": list only short search queries that would be reasonable to know or search in a real interview preparation context. Do not add links or explanations.
+4. "Como eu chegaria nessa solução": write a flowing step-by-step narrative. For each step include "Dúvida atual", "O que eu faria", and a prominent blockquote "Fala para entrevista" with the exact words to say while coding.
+5. "Ajustes que eu corrigiria no caminho": include small realistic false starts or tempting mistakes, then correct them immediately and keep the final code clean.
+6. "Complexidade Big-O": explain time and space in the same conversational style, tied to the actual code.
+7. "Checklist final antes de enviar": verify contract, edge cases, output format, and what still needs validation if the newest screenshot shows failures.
 
 Hard requirements:
 - Use the latest screenshot state as authoritative while using older screenshots to understand progress.
 - Treat the newest identifiable exercise as the active problem. Use older screenshots only when they belong to that same exercise; ignore previous guidance for a different title, URL, signature, or behavior.
 - When an exact public practice challenge is identifiable but its latest screenshot is partial, use the standard challenge contract and clearly label the assumption instead of withholding code.
 - Use the selected programming language for every code block. If it is provided, do not output language-neutral pseudocode even when the editor language is not visible.
-- Always include the complete final solution for public study/practice problems, plus the step-by-step interview walkthrough that led to it.
+- Always include the complete final solution for public study/practice problems near the beginning, plus the conversational step-by-step interview walkthrough that led to it.
+- The most visually scannable text should be the blockquoted "Fala para entrevista" lines. These should read like natural speech, not formal documentation.
+- Include only Google search terms that are appropriate for preparation or allowed interview clarification, such as algorithm names, data structure names, API concepts, or error messages visible in context.
 - Never use generic node fields such as value when the provided type uses data.
 - Never print one item per line when the output contract requires one space-separated line.
 - Never recreate Node, Tree, main, stdin parsing, or sample construction in a method-only submission.
@@ -612,7 +616,7 @@ Solve the newest active public-exam question. Identify the subject and exact top
 
 function codePracticeRepairInstruction(input: ProviderGenerationInput, attempt: number): string {
   if (input.task !== "code_practice" || attempt === 1 || !input.programmingLanguage) return "";
-  return `\n\nREPAIR REQUIRED: The previous answer was rejected because it did not contain a complete, non-empty fenced ${input.programmingLanguage} code block. Return the full strict JSON again. In suggestions[0].content, include the complete platform solution under "Solução atualizada" in a fenced code block labeled ${input.programmingLanguage}, then explain it step by step. Do not replace it with pseudocode and do not merely ask for another screenshot.`;
+  return `\n\nREPAIR REQUIRED: The previous answer was rejected because it did not contain a complete, non-empty fenced ${input.programmingLanguage} code block. Return the full strict JSON again. In suggestions[0].content, include the complete platform solution under "Solução resolvida" in a fenced code block labeled ${input.programmingLanguage}, then explain it with "Fala para entrevista", "Termos para pesquisar no Google", "Dúvida atual", and a conversational step-by-step walkthrough. Do not replace it with pseudocode and do not merely ask for another screenshot.`;
 }
 
 function hasRequiredCodeSolution(output: ProviderGenerationOutput, programmingLanguage: string): boolean {

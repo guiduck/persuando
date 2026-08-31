@@ -13,6 +13,11 @@ The MVP uses two visible modes:
 The backend is a NestJS API with PostgreSQL, Prisma, native WebSocket realtime, Redis/BullMQ worker
 boundaries, encrypted provider credentials, consent enforcement, and 7-day session retention with
 manual delete.
+## Code Practice Interview Script
+
+Code Practice is a study simulation for technical assessments, not a stealth or proctoring feature. The `exercise` workflow focuses on public code problems, `repository` on visible repository/debugging work, and `design_system` on component or design-system practice.
+
+For code-problem practice, the generated answer should read like a conversational interview walkthrough. It should put the complete solved code near the beginning, then make the spoken script visually prominent with `Fala para entrevista` blockquotes, starting from what the student understood about the problem and the objective. Each step should expose the current doubt, what to try next, why that choice moves the solution forward, and small realistic false starts corrected along the way. Google help should appear only as short search terms a candidate could reasonably use for preparation or allowed clarification.
 
 ## Local Setup
 
@@ -423,3 +428,4 @@ Code Practice now exposes three study workflows in Response Mode:
 All three workflows remain explicitly study/preparation simulations. False starts are teaching notes only: the final code should be clean, complete, and not intentionally wrong. Repository and Design System modes must not claim unseen repository search, design-file access, command output, files, exact line numbers, hidden tests, or tokens unless that evidence is visible or provided by a real tool.
 
 Useful logs now include `workflow=exercise`, `workflow=repository`, or `workflow=design_system` across Response, realtime, and provider phases.
+

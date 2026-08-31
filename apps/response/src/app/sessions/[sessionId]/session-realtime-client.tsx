@@ -538,10 +538,13 @@ function CopilotPanel({ className, codePracticeWorkflow, error, explanations, fo
         <div className="workflow-row">
           <div className="segmented workflow-segmented" role="group" aria-label="Code Practice workflow">
             <button className={codePracticeWorkflow === "exercise" ? "segmented-option active" : "segmented-option"} onClick={() => onWorkflowChange("exercise")} type="button">
-              Exercise
+              Code Problem
             </button>
             <button className={codePracticeWorkflow === "repository" ? "segmented-option active" : "segmented-option"} onClick={() => onWorkflowChange("repository")} type="button">
               Repository
+            </button>
+            <button className={codePracticeWorkflow === "design_system" ? "segmented-option active" : "segmented-option"} onClick={() => onWorkflowChange("design_system")} type="button">
+              Design System
             </button>
           </div>
           {status ? <span className={isGenerating ? "pill active" : "pill"}>{status}</span> : null}
@@ -889,7 +892,8 @@ function codePracticeStatus(screenContextCount: number, isGenerating: boolean, m
 
 function loadCodePracticeWorkflow(sessionId: string): CodePracticeWorkflow {
   if (typeof window === "undefined") return "exercise";
-  return window.localStorage.getItem(codePracticeWorkflowStorageKey(sessionId)) === "repository" ? "repository" : "exercise";
+  const stored = window.localStorage.getItem(codePracticeWorkflowStorageKey(sessionId));
+  return stored === "repository" || stored === "design_system" ? stored : "exercise";
 }
 
 function saveCodePracticeWorkflow(sessionId: string, workflow: CodePracticeWorkflow): void {

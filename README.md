@@ -411,3 +411,15 @@ Useful logs:
 ```
 
 Repository-mode smoke should use a new session, select Code Practice, switch the panel to `Repository`, capture the visible editor plus terminal/test output, request guidance, then verify the answer labels observable evidence, distinguishes current versus stale context, proposes concrete changes, and does not invent unseen files, command output, or repository-wide searches.
+
+### Code Practice Interview-Style Workflows
+
+Code Practice now exposes three study workflows in Response Mode:
+
+- `Code Problem` (`exercise`): algorithm/platform problems. The answer must frame the session as simulated technical-assessment preparation for study, diagnose the current attempt, explain the chosen approach like an interview, build the solution in parts, call out small corrected pitfalls, and still end with the complete final solution in the selected language when the context is public practice/self-study.
+- `Repository` (`repository`): repository/debugging work from visible editor, terminal, tests, diffs, comments, and instructions. The answer must use only observable evidence, continue incrementally from prior guidance, explain the chosen fix like an interview, propose step-by-step edits, and include the complete relevant final function/component/patch section when evidence is sufficient.
+- `Design System` (`design_system`): component-library and UI-system work from visible components, props, variants, tokens, styles, stories, tests, accessibility notes, and visual diffs. The answer must explain component API, token/styling, accessibility, states, trade-offs, corrected pitfalls, validation checks, and final code or patch shape.
+
+All three workflows remain explicitly study/preparation simulations. False starts are teaching notes only: the final code should be clean, complete, and not intentionally wrong. Repository and Design System modes must not claim unseen repository search, design-file access, command output, files, exact line numbers, hidden tests, or tokens unless that evidence is visible or provided by a real tool.
+
+Useful logs now include `workflow=exercise`, `workflow=repository`, or `workflow=design_system` across Response, realtime, and provider phases.

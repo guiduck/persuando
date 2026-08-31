@@ -84,9 +84,11 @@ test("Response session can highlight and restore panels accessibly", () => {
   }
 });
 
-test("Response Code Practice exposes Exercise and Repository workflow", () => {
+test("Response Code Practice exposes Code Problem, Repository, and Design System workflows", () => {
   assert.match(sessionPage, /CodePracticeWorkflow/);
-  assert.match(sessionPage, /Exercise/);
+  assert.match(sessionPage, /Code Problem/);
+  assert.match(sessionPage, /Design System/);
+  assert.match(sessionPage, /design_system/);
   assert.match(sessionPage, /Repository/);
   assert.match(sessionPage, /codePracticeWorkflow/);
   assert.match(sessionPage, /loadCodePracticeWorkflow/);

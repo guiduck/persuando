@@ -599,7 +599,7 @@ test("Session history keeps the latest 30 persisted screenshots in FIFO order", 
 });
 
 
-test("RealtimeService defaults Code Practice workflow to exercise and propagates repository", async () => {
+test("RealtimeService defaults Code Practice workflow and propagates repository/design-system", async () => {
   const generationInputs = [];
   const providersService = {
     getActiveAdapterName: () => "mock",
@@ -626,13 +626,16 @@ test("RealtimeService defaults Code Practice workflow to exercise and propagates
 
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", screenContexts }));
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "repository", screenContexts }));
+  await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "design_system", screenContexts }));
   const replay = await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id, { lastSeenSequence: 0 }));
   const explanations = replay.replayedEvents.filter((storedEvent) => storedEvent.type === "copilot.explanation");
 
   assert.equal(generationInputs[0].codePracticeWorkflow, "exercise");
   assert.equal(generationInputs[1].codePracticeWorkflow, "repository");
   assert.equal(generationInputs[1].codePracticeIncrementalHistory.length > 0, true);
-  assert.equal(explanations.at(-1)?.payload.codePracticeWorkflow, "repository");
+  assert.equal(generationInputs[2].codePracticeWorkflow, "design_system");
+  assert.equal(generationInputs[2].codePracticeIncrementalHistory.length > 0, true);
+  assert.equal(explanations.at(-1)?.payload.codePracticeWorkflow, "design_system");
 });
 
 test("RealtimeService keeps manual visual generation single-flight per workflow", async () => {

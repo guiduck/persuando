@@ -58,7 +58,7 @@ test("Code Practice workflow is an additive optional WebSocket contract", async 
     readFile("packages/contracts/src/websocket.ts", "utf8")
   ]);
 
-  assert.match(typesSource, /export type CodePracticeWorkflow = "exercise" \| "repository"/);
+  assert.match(typesSource, /export type CodePracticeWorkflow = "exercise" \| "repository" \| "design_system"/);
   assert.match(websocketSource, /codePracticeWorkflow\?: CodePracticeWorkflow/);
   assert.match(websocketSource, /mode: "summary" \| "insights" \| "followups" \| "code_practice" \| "exam_study"/);
 });

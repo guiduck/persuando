@@ -274,6 +274,9 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   assert.match(answerBody.messages[1].content, /Diagnóstico da tentativa atual/);
   assert.match(answerBody.messages[1].content, /print-versus-return/);
   assert.match(answerBody.messages[1].content, /Never recreate Node, Tree, main, stdin parsing/);
+  assert.match(answerBody.messages[1].content, /Roteiro de entrevista/);
+  assert.match(answerBody.messages[1].content, /Construção passo a passo/);
+  assert.match(answerBody.messages[1].content, /Always include the complete final solution/);
 });
 
 test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accepts fenced JSON", async () => {
@@ -496,6 +499,55 @@ test("OpenAiCompatibleProviderAdapter selects repository workflow prompts and in
   assert.match(requests[1].messages[1].content, /Bounded incremental repository history/);
   assert.match(requests[1].messages[1].content, /Latest test result/);
   assert.match(requests[1].messages[1].content, /Mudanças propostas/);
+});
+
+test("OpenAiCompatibleProviderAdapter selects design-system workflow prompts", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{
+        message: {
+          content: requests.length === 1
+            ? JSON.stringify({ activeProblemTitle: "Button variants", components: ["Button"], tokens: ["spacing.2"] })
+            : JSON.stringify({
+                summary: { content: "Refine the Button component." },
+                insights: [],
+                suggestions: [{
+                  category: "response",
+                  content: "## Roteiro de entrevista\nExplique a API do componente.\n\n## Código final\n```tsx\nexport function Button() { return <button />; }\n```",
+                  urgency: "high"
+                }]
+              })
+        }
+      }]
+    });
+  });
+
+  await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    codePracticeIncrementalHistory: ["Latest visual diff shows cramped spacing."],
+    codePracticeWorkflow: "design_system",
+    imageReferences: ["data:image/png;base64,design-system-screen"],
+    previousCodePracticeGuidance: ["Earlier suggestion skipped accessibility states."],
+    programmingLanguage: "tsx",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Button component and Storybook are visible."
+  });
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].messages[0].content, /design-system\/component-library exercise/i);
+  assert.match(requests[0].messages[1].content[0].text, /Code Practice workflow: design_system/);
+  assert.match(requests[1].messages[0].content, /Design System Practice/);
+  assert.match(requests[1].messages[0].content, /simulated technical-assessment preparation exercise for study/i);
+  assert.match(requests[1].messages[1].content, /Bounded incremental design-system history/);
+  assert.match(requests[1].messages[1].content, /Roteiro de entrevista/);
+  assert.match(requests[1].messages[1].content, /Construção passo a passo/);
+  assert.match(requests[1].messages[1].content, /Código final/);
+  assert.match(requests[1].messages[1].content, /false starts only as corrected teaching notes/);
 });
 function jsonResponse(status, payload) {
   return {

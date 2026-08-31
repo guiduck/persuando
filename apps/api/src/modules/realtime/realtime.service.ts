@@ -601,7 +601,7 @@ export class RealtimeService implements OnModuleDestroy {
       const previousCodePracticeGuidance = isVisualMode
         ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
         : [];
-      const incrementalHistory = codePracticeWorkflow === "repository"
+      const incrementalHistory = codePracticeWorkflow === "repository" || codePracticeWorkflow === "design_system"
         ? buildIncrementalRepositoryHistory(previousCodePracticeGuidance, screenContexts, requestedScreenContexts.length)
         : [];
       const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
@@ -1226,7 +1226,8 @@ function mergeScreenContexts(
 }
 
 function normalizeCodePracticeWorkflow(value: unknown): CodePracticeWorkflow {
-  return value === "repository" ? "repository" : "exercise";
+  if (value === "repository" || value === "design_system") return value;
+  return "exercise";
 }
 
 function manualGenerationKey(sessionId: string, mode: ResponseGenerateEvent["payload"]["mode"], workflow?: CodePracticeWorkflow): string {
@@ -1245,7 +1246,7 @@ function buildIncrementalRepositoryHistory(
   const boundedGuidance = previousGuidance.slice(-4).map((guidance, index) => `Relevant prior guidance ${index + 1}: ${guidance.slice(0, 1600)}`);
   return [
     `Repository tracking snapshot: hotOrRequestedScreens=${hotContextCount} mergedScreens=${screenContexts.length}. Persisted screenshots and hot state were merged before provider generation.`,
-    "Track current problem/repository, observed files and symbols, suggested changes, latest tests, open errors, and useful prior guidance. Do not claim repository search from image-only evidence.",
+    "Track current problem/repository/design system, observed files, components, tokens, symbols, suggested changes, latest tests, visual regressions, open errors, and useful prior guidance. Do not claim repository search from image-only evidence.",
     ...latestScreens,
     ...boundedGuidance
   ].slice(-12);
@@ -1325,7 +1326,7 @@ function parseRealtimeEvent(event: unknown): PersuandoWebSocketEvent {
     if (!["summary", "insights", "followups", "code_practice", "exam_study"].includes(generate.payload.mode)) {
       throw new BadRequestException("Realtime generate mode is invalid");
     }
-    if (generate.payload.codePracticeWorkflow !== undefined && generate.payload.codePracticeWorkflow !== "exercise" && generate.payload.codePracticeWorkflow !== "repository") {
+    if (generate.payload.codePracticeWorkflow !== undefined && generate.payload.codePracticeWorkflow !== "exercise" && generate.payload.codePracticeWorkflow !== "repository" && generate.payload.codePracticeWorkflow !== "design_system") {
       throw new BadRequestException("Realtime generate codePracticeWorkflow is invalid");
     }
     validateRequestedScreenContexts(generate);

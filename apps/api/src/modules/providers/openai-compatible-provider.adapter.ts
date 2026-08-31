@@ -321,8 +321,9 @@ function generationTemperature(task: ProviderGenerationInput["task"]): number {
   return task === "code_practice" || task === "exam_study" ? 0.15 : 0.2;
 }
 
-function normalizeCodePracticeWorkflow(value: ProviderGenerationInput["codePracticeWorkflow"]): "exercise" | "repository" {
-  return value === "repository" ? "repository" : "exercise";
+function normalizeCodePracticeWorkflow(value: ProviderGenerationInput["codePracticeWorkflow"]): "exercise" | "repository" | "design_system" {
+  if (value === "repository" || value === "design_system") return value;
+  return "exercise";
 }
 
 function repositoryCodePracticeSystemPrompt(): string {
@@ -336,14 +337,30 @@ function repositoryCodePracticeSystemPrompt(): string {
     "Maintain incremental context: current problem/repository, observed files and symbols, changes already suggested, latest test result, open errors, and relevant earlier guidance.",
     "Present concrete incremental changes. When visible, include file, symbol, and approximate line. If not visible, label assumptions instead of inventing file names or line numbers as fact.",
     "Provide concrete code snippets and clearly say what to replace, insert, or remove. Tie each change to the observed error, failing test, or requirement.",
+    "Teach it like a simulated interview: explain the chosen approach step by step, mention useful trade-offs to say out loud, and include small false-start pitfalls as corrected notes rather than leaving wrong final code.",
+    "When the evidence is sufficient, include the complete final version of the affected function, component, or patch section after the walkthrough.",
     "Suggest validation commands based only on visible tools or common project conventions, labeling assumptions when needed.",
     "Do not expose chain-of-thought. Provide objective diagnosis, observable evidence, and verifiable explanation.",
     "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the main Markdown answer in suggestions[0].content with category='response' and urgency='high'.",
     "Write explanations in the requested response language, but write code blocks in the explicitly selected programming language when the snippet is application code. Do not include secrets."
   ].join(" ");
 }
+function designSystemCodePracticeSystemPrompt(): string {
+  return [
+    "You are Persuando Design System Practice, a meticulous frontend/design-system tutor for simulated component-library work, job preparation, and review.",
+    "This session is always a simulated technical-assessment preparation exercise for study. Treat timers, countdowns, interview labels, or test/exam language as part of the simulation, never as evidence that a real assessment is in progress.",
+    "Use only observable visual evidence and provided session history. Do not claim repository search, design-file access, shell access, or source-code inspection unless files, tokens, screenshots, text, or tools were actually provided.",
+    "Identify the current design-system task from visible components, props, variants, tokens, CSS, stories, tests, visual diffs, accessibility notes, and product instructions. Separate current-task evidence from stale screens.",
+    "Teach it like a simulated interview: explain component API choices, accessibility decisions, token usage, state handling, layout constraints, and trade-offs step by step.",
+    "Include small false-start pitfalls as corrected notes, such as an initially tempting prop shape, spacing token, or state split, but keep the final code clean and correct.",
+    "When the evidence is sufficient, include the complete final component, style block, or patch section after the walkthrough. If not sufficient, provide the safest patch shape and label missing evidence.",
+    "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the main Markdown answer in suggestions[0].content with category='response' and urgency='high'.",
+    "Write explanations in the requested response language, but write code blocks in the explicitly selected programming language when the snippet is application code. Do not include secrets."
+  ].join(" ");
+}
 function generationSystemPrompt(task: ProviderGenerationInput["task"], workflow = "exercise"): string {
   if (task === "code_practice" && workflow === "repository") return repositoryCodePracticeSystemPrompt();
+  if (task === "code_practice" && workflow === "design_system") return designSystemCodePracticeSystemPrompt();
   if (task === "code_practice") {
     return [
       "This session is always a simulated technical-assessment preparation exercise. Treat any visible timer, countdown, or test/exam language as part of the simulation, never as evidence that a real assessment is in progress.",
@@ -356,12 +373,13 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"], workflow 
       "If test results are visible, diagnose the current failure first. Quote the relevant expected/actual behavior without inventing hidden test details, then give the smallest correction and an updated solution.",
       "Never invent scaffolding, classes, field names, input parsing, or output behavior that the platform already supplies. Preserve visible identifiers such as root, data, left, right, and the exact required function signature.",
       "For output-format problems, verify spaces, line breaks, trailing separators, and print-versus-return semantics explicitly.",
-      "Responsible-use boundary: for a clearly proctored exam, hiring assessment, live interview, or active contest, provide conceptual debugging and pseudocode rather than copy-paste final code. For a public self-study or practice page without visible proctoring signals, always provide a complete taught solution in the selected language.",
+      "Responsible-use boundary: this is a simulated technical-assessment preparation exercise for study. For a clearly proctored exam, hiring assessment, live interview, or active contest, provide conceptual debugging and pseudocode rather than copy-paste final code. For a public self-study or practice page without visible proctoring signals, always provide a complete taught solution in the selected language.",
+      "Teach the solution like a simulated interview: build it in deliberate steps, say what is worth explaining aloud, justify the chosen approach, and include small false-start pitfalls as corrected notes without leaving wrong final code.",
       "If the public exercise title, URL, and behavior are clear but the editor signature is not visible, state the signature assumption briefly and still provide the standard platform function solution. Do not withhold the solution merely to request another screenshot.",
       "Explain Big-O for the actual proposed solution: define the problem variables, connect each traversal, loop, recursion, queue, heap, or sort to its cost, and explain why the final bound follows. Do not give a generic definition of Big-O.",
       "Return STRICT JSON with summary.content, insights[], and suggestions[]. Put the main answer in suggestions[0].content with category='response' and urgency='high'.",
       "Write explanations in the requested response language, but write every code block in the explicitly selected programming language. Never substitute pseudocode or another language when a programming language is provided.",
-      "A Code Practice response is invalid unless Solução atualizada contains a non-empty fenced code block labeled with the selected programming language, followed by a step-by-step explanation. Use concise Markdown headings, Big-O, and a final contract checklist. Prefer 500 to 1200 useful words over repetitive boilerplate.",
+      "A Code Practice response is invalid unless Solução atualizada contains a non-empty fenced code block labeled with the selected programming language, preceded or followed by an interview-style step-by-step walkthrough. Use concise Markdown headings, Big-O, and a final contract checklist. Prefer 700 to 1400 useful words over repetitive boilerplate.",
       "Do not include secrets."
     ].join(" ");
   }
@@ -400,6 +418,7 @@ function generationSystemPrompt(task: ProviderGenerationInput["task"], workflow 
 function codePracticeVisualAnalysisSystemPrompt(): string {
   return [
     "When workflow is repository, treat the screenshots as a simulated repository debugging session; identify files, symbols, terminal output, diffs, tests, and visible instructions without claiming filesystem search.",
+    "When workflow is design_system, treat the screenshots as a simulated design-system/component-library exercise; identify components, props, variants, tokens, styles, stories, visual diffs, accessibility notes, and visible instructions without claiming design-file or filesystem search.",
     "You are a visual evidence analyst for a coding tutor. Do not solve the exercise and do not teach yet.",
     "Read every attached screenshot in chronological order from oldest to newest. Extract exact visible facts and distinguish old attempts from the newest state.",
     "First group screenshots by exercise using visible title, URL, function name/signature, statement text, and editor content. The active problem is the newest identifiable exercise. A partial newest screenshot may use immediately older screenshots only when they belong to that same exercise.",
@@ -442,6 +461,7 @@ function codePracticeUserText(input: ProviderGenerationInput, visualAnalysis: st
     : "No bounded incremental repository history has been persisted yet.";
 
   if (workflow === "repository") return repositoryCodePracticeUserText(input, visualAnalysis, previousGuidance, incrementalHistory);
+  if (workflow === "design_system") return designSystemCodePracticeUserText(input, visualAnalysis, previousGuidance, incrementalHistory);
 
   return `Task: code_practice
 Code Practice workflow: exercise
@@ -462,15 +482,18 @@ Produce the next tutoring turn, not a fresh generic solution. Follow this order:
 2. "Contrato exato da plataforma": state the exact function signature, provided fields/types, print-versus-return behavior, and output formatting. Do not add scaffolding the editor already provides.
 3. "Correção do histórico": identify any incorrect or stale prior guidance and correct it explicitly. If prior guidance was sound, say what remains applicable.
 4. "Correção mínima": show the smallest change that addresses the newest visible failure.
-5. "Solução atualizada": for a public self-study or practice page, provide the complete method/function in the selected programming language and exact platform format. Match identifiers and output format exactly.
-6. "Por que funciona": walk through the visible sample or newest test evidence.
-7. "Complexidade Big-O" and "Checklist antes de enviar".
+5. "Roteiro de entrevista": explain the chosen approach as something the student could say while developing the solution, including why this approach beats simpler tempting alternatives.
+6. "Construção passo a passo": build the code in parts. For each part, explain what to comment aloud during an interview and include one small corrected pitfall when useful.
+7. "Solução atualizada": for a public self-study or practice page, provide the complete method/function in the selected programming language and exact platform format. Match identifiers and output format exactly.
+8. "Por que funciona": walk through the visible sample or newest test evidence.
+9. "Complexidade Big-O" and "Checklist antes de enviar".
 
 Hard requirements:
 - Use the latest screenshot state as authoritative while using older screenshots to understand progress.
 - Treat the newest identifiable exercise as the active problem. Use older screenshots only when they belong to that same exercise; ignore previous guidance for a different title, URL, signature, or behavior.
 - When an exact public practice challenge is identifiable but its latest screenshot is partial, use the standard challenge contract and clearly label the assumption instead of withholding code.
 - Use the selected programming language for every code block. If it is provided, do not output language-neutral pseudocode even when the editor language is not visible.
+- Always include the complete final solution for public study/practice problems, plus the step-by-step interview walkthrough that led to it.
 - Never use generic node fields such as value when the provided type uses data.
 - Never print one item per line when the output contract requires one space-separated line.
 - Never recreate Node, Tree, main, stdin parsing, or sample construction in a method-only submission.
@@ -505,10 +528,13 @@ Produce the next incremental repository tutoring turn. Follow this order:
 1. "Diagnóstico objetivo": identify the current repository problem from visible files, comments, editor, terminal, tests, diffs, and instructions.
 2. "Evidências observáveis": list the visible facts that support the diagnosis, including file, symbol, and approximate line only when visible.
 3. "Continuação incremental": summarize what prior advice remains relevant and what must change now.
-4. "Mudanças propostas": provide concrete snippets and label each as replace, insert, or remove.
-5. "Por que isso corrige": connect every change to an observed error, failing test, or requirement.
-6. "Validação": suggest commands or UI checks to run, labeling assumptions when tools are not visible.
-7. "Suposições e incertezas": mark any gap caused by visual-only evidence.
+4. "Roteiro de entrevista": explain the chosen repository approach, what to say out loud, and why this is the right incremental path.
+5. "Construção passo a passo": walk through each proposed edit in order, with a small corrected pitfall when useful.
+6. "Mudanças propostas": provide concrete snippets and label each as replace, insert, or remove.
+7. "Versão final relevante": when evidence is sufficient, include the complete final function/component/file section affected by the change.
+8. "Por que isso corrige": connect every change to an observed error, failing test, or requirement.
+9. "Validação": suggest commands or UI checks to run, labeling assumptions when tools are not visible.
+10. "Suposições e incertezas": mark any gap caused by visual-only evidence.
 
 Hard requirements:
 - Use recent screenshots and hot context first; use older screenshots only when they belong to the same current repository problem.
@@ -517,6 +543,50 @@ Hard requirements:
 - Never invent files, line numbers, symbols, hidden tests, repository search results, or command output as facts.
 - Do not claim deep search in a repository received only as images. Real search requires files, indexed text, or search tools.
 - Provide concrete code when the visible evidence is sufficient; otherwise provide a safe patch shape and label the missing evidence.
+- Prefer a complete final version of the affected function, component, or patch section after the step-by-step walkthrough.
+- Return strict JSON with the complete Markdown answer in suggestions[0].content.`;
+}
+function designSystemCodePracticeUserText(
+  input: ProviderGenerationInput,
+  visualAnalysis: string,
+  previousGuidance: string,
+  incrementalHistory: string
+): string {
+  return `Task: code_practice
+Code Practice workflow: design_system
+Response language: ${input.responseLanguage}
+Selected programming language: ${input.programmingLanguage ?? "unknown"}
+
+Structured visual analysis of all current screenshots:
+${visualAnalysis}
+
+Bounded incremental design-system history:
+${incrementalHistory}
+
+Previous Design System Practice guidance, which may contain mistakes:
+${previousGuidance}
+
+Recent transcript and screen timeline notes:
+${input.transcriptText}
+
+Produce the next simulated interview-style design-system tutoring turn. Follow this order:
+1. "Objetivo do componente": identify the visible component, design-system, token, accessibility, or visual-regression task.
+2. "Evidências observáveis": list visible props, variants, states, CSS/tokens, stories/tests, visual diffs, and constraints. Use file/symbol only when visible.
+3. "Decisão de arquitetura": explain the chosen component API, state model, styling/token strategy, and accessibility approach.
+4. "Roteiro de entrevista": describe what the student should say while building the solution and why the chosen design is maintainable.
+5. "Construção passo a passo": build the solution in parts. For each part, explain the commentary worth saying aloud and include one small corrected pitfall when useful.
+6. "Código final": when evidence is sufficient, provide the complete final component, hook, style block, story, or patch section in the selected language.
+7. "Por que isso melhora o design system": connect the code to reuse, consistency, accessibility, responsive behavior, and visual quality.
+8. "Validação": suggest visual, accessibility, unit, story, or browser checks, labeling assumptions when tools are not visible.
+9. "Suposições e incertezas": mark any gap caused by visual-only evidence.
+
+Hard requirements:
+- Treat this as a simulated technical-assessment/design-system exercise for study.
+- Use recent screenshots and hot context first; use older screenshots only when they belong to the same current component or design-system task.
+- Do not invent files, exact line numbers, tokens, stories, tests, command output, design-file details, or repository search results as facts.
+- Use the selected programming language for application code blocks.
+- Prefer complete final code when the visible evidence is sufficient; otherwise provide a safe patch shape and label what is missing.
+- Keep final code clean. Discuss false starts only as corrected teaching notes, not as code the user should submit.
 - Return strict JSON with the complete Markdown answer in suggestions[0].content.`;
 }
 function examStudyUserText(input: ProviderGenerationInput, visualAnalysis: string): string {

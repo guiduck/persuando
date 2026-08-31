@@ -253,3 +253,38 @@ Screenshots are partial evidence and OCR may be uncertain. Repository mode canno
 Expected output:
 Produce a concise feature specification with acceptance criteria, fixture matrix, failure taxonomy, observability requirements, deployment/rollback notes, and manual smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
 ```
+
+## Next Spec Prompt - 2026-08-30 Interview-Style Code Practice Evaluation
+
+```text
+/speckit-specify Specify evaluation and hardening for Persuando interview-style Code Practice workflows.
+
+Objective:
+Make Code Practice consistently produce study-safe simulated interview answers across code problems, repository debugging, and design-system/component work, with complete final code when evidence is sufficient and a clear step-by-step development narrative.
+
+Source request/context:
+The implemented baseline now has three additive workflows: `exercise`, `repository`, and `design_system`. Response Mode labels them as Code Problem, Repository, and Design System. The workflow travels through WebSocket, realtime, provider prompts, guidance metadata, and Copilot explanation events. Prompts frame the session as simulated technical-assessment preparation for study and require interview-style commentary, step-by-step construction, corrected false-start pitfalls, and clean final code or patch sections.
+
+Project context:
+Use README.md, docs/architecture.md, docs/domain-model.md, docs/handoff.md, docs/roadmap.md, specs/001-persuando-mvp/, and the existing Capture -> realtime API -> OpenAI-compatible provider -> Response architecture.
+
+Requirements:
+- Preserve backward compatibility: omitted `codePracticeWorkflow` defaults to `exercise`.
+- Define answer-quality fixtures for Code Problem, Repository, and Design System workflows.
+- Require public study/practice code-problem answers to include complete final selected-language code plus interview-style walkthrough sections.
+- Require repository answers to use only visible/provided evidence, propose incremental edits, explain what to say aloud, and include complete relevant final function/component/patch sections when evidence is sufficient.
+- Require design-system answers to cover component API, variants, tokens, states, accessibility, responsive behavior, visual quality, validation checks, and final code/patch shape.
+- Define how corrected false-start pitfalls should appear as teaching notes without leaving wrong final code.
+- Forbid claims of live/proctored assistance, unseen repository search, design-file access, command output, exact lines, hidden tests, or tokens unless actually visible or tool-provided.
+- Define per-workflow latency, payload, token/image, cost, duplicate-click, Auto-generation, and logging expectations.
+- Include packaged Electron-to-VPS real-provider smoke scenarios for all three workflow labels and Markdown/syntax-highlight rendering.
+
+Artifact considerations:
+Prefer additive contracts and existing provider abstractions. Avoid database migrations unless durable server-side workflow preference is approved. Preserve existing CodeCopilotContext compatibility.
+
+Risks/assumptions:
+Screenshots are partial evidence and OCR may be uncertain. Repository/design-system workflows cannot inspect files or design tools unless a future approved connector or upload path provides them. Real-provider tests require external credentials that must not be committed.
+
+Expected output:
+Produce a concise feature specification with acceptance criteria, fixture matrix, failure taxonomy, observability fields, deployment/rollback checks, and manual smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
+```

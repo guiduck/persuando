@@ -15,6 +15,31 @@ const transcriptionInput = {
   sessionId: "session-1"
 };
 
+const practiceStepsFixture = [{
+  title: "Implement the complete function",
+  objective: "Produce a coherent working stage.",
+  completeCode: "function solve(input) { return input; }",
+  testCode: "console.assert(solve('ok') === 'ok');",
+  expectedResult: "The assertion passes.",
+  explanation: "This test validates the complete stage.",
+  interviewerSpeech: "I will validate the smallest complete behavior before optimizing."
+}];
+
+function validSystemDesignGuidance() {
+  const stages = [
+    "Passo 1 — Requisitos funcionais e não funcionais",
+    "Passo 2 — Padrões de acesso",
+    "Passo 3 — Escala horizontal e vertical",
+    "Passo 4 — Dados",
+    "Passo 5 — Design de alto nível",
+    "Passo 6 — Gargalos",
+    "Passo 7 — Consistência",
+    "Passo 8 — Falhas",
+    "Passo 9 — Trade-offs"
+  ].map((title, index) => `## ${title}\n\n### Problema\nPressão arquitetônica ${index + 1}.\n\n### Solução\nDecisão justificada ${index + 1}.\n\n### Trade-off\nBenefício e custo ${index + 1}.\n\n> **Fala para entrevista:** Vou explicar a decisão ${index + 1} e seu custo.`).join("\n\n");
+  return `## O que eu entendi\nUm serviço recebe URLs e devolve endereços curtos.\n\n## Perguntas de clarificação do escopo\n> **Fala para entrevista:** Quais requisitos e padrões de acesso são prioritários?\n> **Fala para entrevista:** Qual escala horizontal ou vertical esperamos?\n> **Fala para entrevista:** Quais dados e integrações definem o design de alto nível?\n> **Fala para entrevista:** Quais gargalos e garantias de consistência importam?\n> **Fala para entrevista:** Quais falhas e trade-offs são aceitáveis?\n\n## Diagrama inicial\n\n\`\`\`mermaid\nflowchart LR\n  Client["Client"] --> API["API"]\n\`\`\`\n\n## Legenda do diagrama\n- **Client → API:** envia as solicitações para o serviço mínimo.\n\n${stages}\n\n## Diagrama final\n\n\`\`\`mermaid\nflowchart LR\n  Client["Client"] --> API["API"]\n  API --> Cache["Cache"]\n  API --> DB["Database"]\n\`\`\`\n\n## Legenda do diagrama\n- **Client → API:** envia criação e redirecionamento.\n- **API → Cache:** consulta mapeamentos frequentes.\n- **API → Database:** persiste a fonte de verdade.`;
+}
+
 test("ProvidersService selects mock adapter by configuration", async () => {
   const service = new ProvidersService({
     env: {
@@ -226,7 +251,8 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
                   ].join("\n"),
                   urgency: "high"
                 }
-              ]
+              ],
+              practiceSteps: practiceStepsFixture
             })
           }
         }
@@ -275,12 +301,14 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   assert.match(answerBody.messages[1].content, /Ajustes que eu corrigiria no caminho/);
   assert.match(answerBody.messages[1].content, /Never recreate Node, Tree, main, stdin parsing/);
   assert.match(answerBody.messages[1].content, /O que eu entendi do problema/);
-  assert.match(answerBody.messages[1].content, /Solução resolvida/);
+  assert.match(answerBody.messages[1].content, /Solução ótima de referência/);
+  assert.match(answerBody.messages[1].content, /Perguntas de clarificação/);
+  assert.match(answerBody.messages[1].content, /practiceSteps/);
   assert.match(answerBody.messages[1].content, /Termos para pesquisar no Google/);
   assert.match(answerBody.messages[1].content, /Dúvida atual/);
   assert.match(answerBody.messages[1].content, /Fala para entrevista/);
   assert.match(answerBody.messages[1].content, /blockquoted/);
-  assert.match(answerBody.messages[1].content, /conversational step-by-step interview walkthrough/);
+  assert.match(answerBody.messages[1].content, /conversational simulated-interview script/);
 });
 
 test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accepts fenced JSON", async () => {
@@ -290,7 +318,8 @@ test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accep
     JSON.stringify({
       summary: { content: "Use BFS em JavaScript." },
       insights: [],
-      suggestions: [{ category: "response", content: "## Solução atualizada\n```javascript\nfunction levelOrder(root) { const queue = [root]; }\n```\nPasso a passo.", urgency: "high" }]
+      suggestions: [{ category: "response", content: "## Solução ótima de referência\n```javascript\nfunction levelOrder(root) { const queue = [root]; }\n```\nPasso a passo.", urgency: "high" }],
+      practiceSteps: practiceStepsFixture
     })
   ];
   let requestCount = 0;
@@ -328,9 +357,10 @@ test("OpenAiCompatibleProviderAdapter retries a Code Practice answer that omits 
       insights: [],
       suggestions: [{
         category: "response",
-        content: "## Solução atualizada\n```javascript\nfunction swapNodes(indexes, queries) { return []; }\n```\n## Passo a passo\nA função segue o contrato selecionado.",
+        content: "## Solução ótima de referência\n```javascript\nfunction swapNodes(indexes, queries) { return []; }\n```\n## Passo a passo\nA função segue o contrato selecionado.",
         urgency: "high"
-      }]
+      }],
+      practiceSteps: practiceStepsFixture
     })
   ];
   let requestCount = 0;
@@ -356,7 +386,8 @@ test("OpenAiCompatibleProviderAdapter retries a Code Practice answer that omits 
   assert.match(requests[1].messages[1].content, /"language":"javascript"/);
   assert.match(requests[1].messages[1].content, /"selectedProgrammingLanguageIsAuthoritative":true/);
   assert.match(requests[2].messages[1].content, /REPAIR REQUIRED/);
-  assert.match(requests[2].messages[1].content, /Solução resolvida/);
+  assert.match(requests[2].messages[1].content, /Solução ótima de referência/);
+  assert.match(requests[2].messages[1].content, /practiceSteps/);
   assert.match(requests[2].messages[1].content, /Termos para pesquisar no Google/);
   assert.match(output.suggestions[0].content, /```javascript/);
 });
@@ -555,6 +586,297 @@ test("OpenAiCompatibleProviderAdapter selects design-system workflow prompts", a
   assert.match(requests[1].messages[1].content, /Código final/);
   assert.match(requests[1].messages[1].content, /false starts only as corrected teaching notes/);
 });
+
+test("OpenAiCompatibleProviderAdapter generates independent System Design guidance with Mermaid and interview speech", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{
+        message: {
+          content: requests.length === 1
+            ? JSON.stringify({
+                activeProblemTitle: "Design a URL shortener",
+                problemFingerprint: "url-shortener",
+                prompt: "Design a URL shortener",
+                functionalRequirements: ["create short URL", "redirect"],
+                currentArchitecture: null
+              })
+            : JSON.stringify({
+                summary: { content: "Design a URL shortener." },
+                insights: [],
+                suggestions: [{
+                  category: "response",
+                  content: validSystemDesignGuidance(),
+                  urgency: "high"
+                }],
+                practiceSteps: []
+              })
+        }
+      }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,url-shortener"],
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "system_design",
+    transcriptText: "A realistic company-branded system design simulation."
+  });
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].messages[0].content, /System Design interview tutor/);
+  assert.match(requests[0].messages[0].content, /logos/i);
+  assert.match(requests[1].messages[0].content, /simulation-only practice session/i);
+  assert.match(requests[1].messages[0].content, /valid fenced mermaid flowcharts/i);
+  assert.match(requests[1].messages[0].content, /Legenda do diagrama/);
+  assert.match(requests[1].messages[0].content, /every important diagram component and connection/i);
+  assert.match(requests[1].messages[0].content, /Microsoft, Amazon/i);
+  assert.match(requests[1].messages[0].content, /functional and non-functional requirements; 2 access patterns; 3 horizontal and vertical scale/i);
+  assert.match(requests[1].messages[1].content, /Perguntas de clarificação/);
+  assert.match(requests[1].messages[1].content, /Fala para entrevista/);
+  assert.match(requests[1].messages[1].content, /Passo 1 — Requisitos funcionais e não funcionais/);
+  assert.match(requests[1].messages[1].content, /Passo 9 — Trade-offs/);
+  assert.match(requests[1].messages[1].content, /Problem -> Solution -> Trade-off/);
+  assert.equal(output.suggestions[0].content.match(/```mermaid/g)?.length, 2);
+  assert.match(output.suggestions[0].content, /## Diagrama inicial/);
+  assert.match(output.suggestions[0].content, /## Diagrama final/);
+  assert.match(output.suggestions[0].content, /## Legenda do diagrama/);
+});
+
+test("OpenAiCompatibleProviderAdapter repairs System Design guidance with a displaced diagram legend", async () => {
+  const requests = [];
+  const responses = [
+    JSON.stringify({
+      activeProblemTitle: "Design a notification service",
+      problemFingerprint: "notification-service",
+      functionalRequirements: ["send notifications"]
+    }),
+    JSON.stringify({
+      summary: { content: "Notification service." },
+      insights: [],
+      suggestions: [{
+        category: "response",
+        content: validSystemDesignGuidance().replace(
+          "```\n\n## Legenda do diagrama",
+          "```\n\n## Decisões prematuras\nA legenda ficou separada.\n\n## Legenda do diagrama"
+        ),
+        urgency: "high"
+      }],
+      practiceSteps: []
+    }),
+    JSON.stringify({
+      summary: { content: "Notification service with legend." },
+      insights: [],
+      suggestions: [{
+        category: "response",
+        content: validSystemDesignGuidance(),
+        urgency: "high"
+      }],
+      practiceSteps: []
+    })
+  ];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{ finish_reason: "stop", message: { content: responses[requests.length - 1] } }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,notification-service"],
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "system_design",
+    transcriptText: "Design a notification service"
+  });
+
+  assert.equal(requests.length, 3);
+  assert.match(requests[2].messages[1].content, /REPAIR REQUIRED/);
+  assert.match(requests[2].messages[1].content, /immediately followed/i);
+  assert.match(requests[2].messages[1].content, /exactly nine numbered level-two stages/i);
+  assert.match(requests[2].messages[1].content, /Problem, Solution, Trade-off headings/i);
+  assert.match(output.suggestions[0].content, /## Legenda do diagrama/);
+});
+
+test("OpenAiCompatibleProviderAdapter repairs a System Design stage with an incomplete decision cycle", async () => {
+  const requests = [];
+  const invalidGuidance = validSystemDesignGuidance().replace(
+    "### Trade-off\nBenefício e custo 5.\n\n> **Fala para entrevista:** Vou explicar a decisão 5 e seu custo.",
+    "> **Fala para entrevista:** Vou explicar a decisão 5 sem declarar o trade-off."
+  );
+  const responses = [
+    JSON.stringify({
+      activeProblemTitle: "Design a URL shortener",
+      problemFingerprint: "url-shortener"
+    }),
+    JSON.stringify({
+      summary: { content: "Incomplete decision cycle." },
+      insights: [],
+      suggestions: [{ category: "response", content: invalidGuidance, urgency: "high" }],
+      practiceSteps: []
+    }),
+    JSON.stringify({
+      summary: { content: "Complete decision cycle." },
+      insights: [],
+      suggestions: [{ category: "response", content: validSystemDesignGuidance(), urgency: "high" }],
+      practiceSteps: []
+    })
+  ];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{ finish_reason: "stop", message: { content: responses[requests.length - 1] } }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,url-shortener-cycle"],
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "system_design",
+    transcriptText: "Design a URL shortener"
+  });
+
+  assert.equal(requests.length, 3);
+  assert.match(requests[2].messages[1].content, /Problem, Solution, Trade-off headings/i);
+  assert.match(output.suggestions[0].content, /### Trade-off\nBenefício e custo 5/);
+});
+
+test("OpenAiCompatibleProviderAdapter suppresses a repeated answer when extracted visual facts did not change", async () => {
+  const currentAnalysis = {
+    activeProblemTitle: "Two Sum",
+    problemFingerprint: "two-sum",
+    functionSignature: "twoSum(nums, target)",
+    currentAttempt: "nested loops",
+    observedTestResults: ["sample passes"],
+    currentStage: "simple_correct",
+    chronologicalProgress: ["cursor moved"]
+  };
+  let requestCount = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+    requestCount += 1;
+    return jsonResponse(200, {
+      choices: [{ message: { content: JSON.stringify(currentAnalysis) } }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,two-sum"],
+    previousVisualAnalysis: JSON.stringify({ ...currentAnalysis, chronologicalProgress: ["earlier capture"] }),
+    programmingLanguage: "javascript",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Two Sum"
+  });
+
+  assert.equal(requestCount, 1);
+  assert.equal(output.skippedReason, "unchanged_visual_context");
+  assert.equal(output.suggestions.length, 0);
+});
+
+test("OpenAiCompatibleProviderAdapter gives only the next complete tested step for an incremental attempt", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
+      choices: [{ message: { content: requests.length === 1
+        ? JSON.stringify({
+            activeProblemTitle: "Two Sum",
+            problemFingerprint: "two-sum",
+            currentStage: "simple_correct",
+            currentAttempt: "nested loops pass samples"
+          })
+        : JSON.stringify({
+            summary: { content: "Agora troque a busca interna por um mapa." },
+            insights: [],
+            suggestions: [{
+              category: "response",
+              content: "## Dúvida atual\nComo evitar o segundo loop?\n\n## O que eu faria\nUsaria um mapa.\n\n> **Fala para entrevista:** Vou guardar cada valor já visto.",
+              urgency: "high"
+            }],
+            practiceSteps: [{
+              title: "Trocar busca por mapa",
+              objective: "Reduzir o tempo para O(n)",
+              completeCode: "function twoSum(nums, target) { const seen = new Map(); for (let i = 0; i < nums.length; i++) { const need = target - nums[i]; if (seen.has(need)) return [seen.get(need), i]; seen.set(nums[i], i); } return []; }",
+              testCode: "console.log(twoSum([2, 7, 11, 15], 9));",
+              expectedResult: "[0, 1]",
+              explanation: "Cada elemento é visitado uma vez.",
+              interviewerSpeech: "Vou trocar a busca linear interna por acesso médio O(1) em um mapa."
+            }]
+          }) } }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,two-sum-progress"],
+    previousCodePracticeGuidance: ["A solução simples com dois loops já passou os exemplos."],
+    programmingLanguage: "javascript",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Two Sum progress"
+  });
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[1].messages[1].content, /Do not repeat the child-simple introduction/);
+  assert.doesNotMatch(output.suggestions[0].content, /Solução ótima de referência/);
+  assert.equal(output.practiceSteps.length, 1);
+});
+
+test("OpenAiCompatibleProviderAdapter closes an already optimal exercise without another code step", async () => {
+  let requestCount = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+    requestCount += 1;
+    return jsonResponse(200, {
+      choices: [{ message: { content: requestCount === 1
+        ? JSON.stringify({
+            activeProblemTitle: "Two Sum",
+            problemFingerprint: "two-sum",
+            currentStage: "optimal_correct",
+            observedTestResults: ["all tests passed"]
+          })
+        : JSON.stringify({
+            summary: { content: "Exercício concluído." },
+            insights: [],
+            suggestions: [{
+              category: "response",
+              content: "Todos os testes visíveis passaram com a solução O(n).\n\n> **Fala para entrevista:** A solução está completa e mantém tempo linear com espaço linear.",
+              urgency: "high"
+            }],
+            practiceSteps: []
+          }) } }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,two-sum-complete"],
+    programmingLanguage: "javascript",
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "code_practice",
+    transcriptText: "Two Sum complete"
+  });
+
+  assert.equal(requestCount, 2);
+  assert.match(output.suggestions[0].content, /Exercício|solução está completa/i);
+  assert.deepEqual(output.practiceSteps, []);
+});
+
 function jsonResponse(status, payload) {
   return {
     ok: status >= 200 && status < 300,

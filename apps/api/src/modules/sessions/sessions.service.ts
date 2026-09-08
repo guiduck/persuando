@@ -6,6 +6,7 @@ import type {
   InsightId,
   Session,
   SessionHistoryResponse,
+  SessionGeneratedGuidance,
   SessionId,
   SessionScreenContext,
   Suggestion,
@@ -73,12 +74,13 @@ export class SessionsService {
   async getSessionHistory(sessionId: string): Promise<Omit<SessionHistoryResponse, "consentGrants"> | undefined> {
     const session = await this.getSession(sessionId);
     if (!session) return undefined;
-    const [transcriptSegments, summaries, insights, suggestions, screenContexts] = await Promise.all([
+    const [transcriptSegments, summaries, insights, suggestions, screenContexts, generatedGuidance] = await Promise.all([
       this.database.transcriptSegment.findMany({ where: { sessionId }, orderBy: { startMs: "asc" } }),
       this.database.summary.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } }),
       this.database.insight.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } }),
       this.database.suggestion.findMany({ where: { sessionId }, orderBy: { generatedAt: "asc" } }),
-      this.getRecentScreenContexts(sessionId)
+      this.getRecentScreenContexts(sessionId),
+      this.getGeneratedGuidance(sessionId)
     ]);
     return {
       session,
@@ -86,7 +88,8 @@ export class SessionsService {
       summaries: summaries.map(toSummary),
       insights: insights.map(toInsight),
       suggestions: suggestions.map(toSuggestion),
-      screenContexts
+      screenContexts,
+      generatedGuidance
     };
   }
 
@@ -103,17 +106,51 @@ export class SessionsService {
   }
 
   async getRecentCodePracticeGuidance(sessionId: string, limit = 4): Promise<string[]> {
+    return this.getRecentVisualGuidance(sessionId, "code_practice", limit);
+  }
+
+  async getRecentVisualGuidance(
+    sessionId: string,
+    assistantMode: SessionGeneratedGuidance["assistantMode"],
+    limit = 4
+  ): Promise<string[]> {
     const records = await this.database.codeCopilotContext.findMany({
       where: { sessionId, status: "completed" },
       orderBy: { createdAt: "desc" },
-      take: limit
+      take: Math.max(limit * 8, 32)
     });
     return records
-      .map((record) => record.generatedGuidance?.trim())
-      .filter((guidance): guidance is string => Boolean(guidance))
+      .map(toStoredVisualGuidance)
+      .filter((guidance): guidance is StoredVisualGuidance => guidance?.assistantMode === assistantMode)
       .slice(0, limit)
       .reverse()
-      .map((guidance) => guidance.slice(0, 6_000));
+      .map((guidance) => guidance.content.slice(0, 6_000));
+  }
+
+  async getLatestVisualAnalysis(
+    sessionId: string,
+    assistantMode: SessionGeneratedGuidance["assistantMode"]
+  ): Promise<string | undefined> {
+    const records = await this.database.codeCopilotContext.findMany({
+      where: { sessionId, status: "completed" },
+      orderBy: { createdAt: "desc" },
+      take: 32
+    });
+    return records
+      .map(toStoredVisualGuidance)
+      .find((guidance) => guidance?.assistantMode === assistantMode && guidance.visualAnalysis)?.visualAnalysis;
+  }
+
+  private async getGeneratedGuidance(sessionId: string): Promise<SessionGeneratedGuidance[]> {
+    const records = await this.database.codeCopilotContext.findMany({
+      where: { sessionId, status: "completed" },
+      orderBy: { createdAt: "asc" },
+      take: 100
+    });
+    return records
+      .map(toStoredVisualGuidance)
+      .filter((guidance): guidance is StoredVisualGuidance => Boolean(guidance))
+      .map(({ visualAnalysis: _visualAnalysis, ...guidance }) => guidance);
   }
 
   async listVisibleSessionsForUser(userId: string, now = new Date()): Promise<Session[]> {
@@ -269,6 +306,45 @@ interface ScreenContextRecord {
   id: string;
   problemContext: string;
   createdAt: Date | string;
+  generatedGuidance?: string | null;
+}
+
+interface StoredVisualGuidance extends SessionGeneratedGuidance {
+  visualAnalysis?: string;
+}
+
+function toStoredVisualGuidance(record: ScreenContextRecord): StoredVisualGuidance | undefined {
+  const content = record.generatedGuidance?.trim();
+  if (!content) return undefined;
+  let metadata: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(record.problemContext) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) metadata = parsed as Record<string, unknown>;
+  } catch {
+    // Older generated rows may contain legacy plain context.
+  }
+  return {
+    id: record.id,
+    content,
+    generatedAt: toIso(record.createdAt)!,
+    assistantMode: isVisualAssistantMode(metadata.assistantMode) ? metadata.assistantMode : "code_practice",
+    responseLanguage: metadata.responseLanguage === "pt-BR" || metadata.responseLanguage === "en-US"
+      ? metadata.responseLanguage
+      : undefined,
+    codePracticeWorkflow: metadata.codePracticeWorkflow === "exercise"
+      || metadata.codePracticeWorkflow === "repository"
+      || metadata.codePracticeWorkflow === "design_system"
+      ? metadata.codePracticeWorkflow
+      : undefined,
+    practiceSteps: Array.isArray(metadata.practiceSteps)
+      ? metadata.practiceSteps as SessionGeneratedGuidance["practiceSteps"]
+      : undefined,
+    visualAnalysis: typeof metadata.visualAnalysis === "string" ? metadata.visualAnalysis : undefined
+  };
+}
+
+function isVisualAssistantMode(value: unknown): value is SessionGeneratedGuidance["assistantMode"] {
+  return value === "code_practice" || value === "system_design" || value === "exam_study";
 }
 
 function toSessionScreenContext(record: ScreenContextRecord): SessionScreenContext | undefined {

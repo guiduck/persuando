@@ -1,4 +1,4 @@
-import type { CodePracticeWorkflow, Insight, SafeError, Suggestion, Summary, TranscriptSegment } from "@persuando/contracts";
+import type { CodePracticeWorkflow, Insight, PracticeStep, SafeError, Suggestion, Summary, TranscriptSegment } from "@persuando/contracts";
 
 export interface ProviderTranscriptionInput {
   apiKey?: string;
@@ -15,10 +15,11 @@ export interface ProviderGenerationInput {
   analysisModel: string;
   responseLanguage: string;
   sessionId: string;
-  task?: "session_assistance" | "summary" | "insights" | "followups" | "code_practice" | "exam_study";
+  task?: "session_assistance" | "summary" | "insights" | "followups" | "code_practice" | "system_design" | "exam_study";
   transcriptText: string;
   imageReferences?: string[];
   previousCodePracticeGuidance?: string[];
+  previousVisualAnalysis?: string;
   codePracticeIncrementalHistory?: string[];
   codePracticeWorkflow?: CodePracticeWorkflow;
   programmingLanguage?: string;
@@ -33,6 +34,9 @@ export interface ProviderGenerationOutput {
   summary: Pick<Summary, "content">;
   insights: Pick<Insight, "type" | "content" | "confidence">[];
   suggestions: Pick<Suggestion, "category" | "content" | "urgency">[];
+  practiceSteps?: PracticeStep[];
+  visualAnalysis?: string;
+  skippedReason?: "unchanged_visual_context";
 }
 
 export interface ProviderAdapter {

@@ -31,7 +31,8 @@ const requiredContextConsents = [
   ["code_copilot", "Code practice context"],
   ["screen_coding_context_capture", "Periodic screen context"],
   ["backend_transmission", "Backend transmission"],
-  ["external_ai_provider_usage", "External AI provider usage"]
+  ["external_ai_provider_usage", "External AI provider usage"],
+  ["simulation_only_use", "Simulation-only use agreement"]
 ] as const satisfies readonly [ConsentType, string][];
 
 interface CaptureRuntimeState {
@@ -434,6 +435,12 @@ function Dashboard({
           <ConsentToggle consentGrants={consentGrants} consentType="external_ai_provider_usage" label="External AI provider usage" setConsentGrants={setConsentGrants} />
           <ConsentToggle consentGrants={consentGrants} consentType="screen_coding_context_capture" label="Periodic screen context" setConsentGrants={setConsentGrants} />
           <ConsentToggle consentGrants={consentGrants} consentType="code_copilot" label="Code practice context" setConsentGrants={setConsentGrants} />
+          <ConsentToggle
+            consentGrants={consentGrants}
+            consentType="simulation_only_use"
+            label="I agree to use Code Practice and System Design only in simulations, study, preparation, and review."
+            setConsentGrants={setConsentGrants}
+          />
           <ConsentToggle consentGrants={consentGrants} consentType="session_retention" label="7-day session retention" setConsentGrants={setConsentGrants} />
         </section>
 

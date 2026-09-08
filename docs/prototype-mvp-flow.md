@@ -19,7 +19,7 @@ Response apps.
 5. User chooses transcription model, analysis model, primary language, response language, preferred
    programming language, session timer, and capture defaults.
 6. User grants explicit consent for microphone capture, transcription, backend transmission,
-   external provider usage, retention, screen/code context, and code practice.
+   external provider usage, retention, screen/code context, code practice, and simulation-only use.
 
 Production status:
 
@@ -57,17 +57,18 @@ Production status:
 
 - Implemented in Next.js App Router session pages and client WebSocket component.
 
-## Flow D: Context And Code Practice
+## Flow D: Visual Interview Practice
 
 1. User starts listening with the toolbar visible.
 2. User types a context prompt or clicks Capture screen.
 3. Capture sends visible, user-requested `copilot.context`.
-4. Backend checks code copilot, screen/code context, backend transmission, and provider consent.
-5. Response receives `copilot.explanation` and shows it in Code practice.
+4. Backend checks code copilot, screen/code context, backend transmission, provider, and simulation-only-use consent.
+5. Response can request Code Practice and System Design independently or simultaneously, in Portuguese or English.
+6. Response receives `copilot.explanation`, persists it with its visual mode, and shows/restores it in the matching panel.
 
 Production status:
 
-- Implemented for visible text context and user-requested screen context capture.
+- Implemented for visible text context, user-requested screen context capture, independent visual-practice panels, and retained generated guidance.
 - Future specs may improve image storage/redaction; hidden automatic capture remains forbidden.
 
 ## Flow E: Retention And Delete
@@ -99,3 +100,29 @@ Production status:
   hardening should add storage/redaction limits before broad usage.
 - Robust system-audio capture, automatic app/site detection, and hidden capture are still outside
   MVP scope.
+
+### Response layout editing
+
+During any live Response session, the user can select `Edit layout` and reorder all visible cards by
+dragging their handles. The same mode exposes earlier/later buttons as a precise keyboard and touch
+alternative, displays each card's current position, announces moves accessibly, and provides
+`Reset layout`. Selecting `Done arranging` saves the resulting left-to-right grid order for that
+assistant mode in the current browser; future sessions of another assistant mode retain their own
+layout.
+
+### System Design concept reference
+
+The System Design card places a `Guia rápido de conceitos` action before generated explanations.
+Opening it displays a responsive native dialog backed by a static Markdown file and the same safe
+Markdown renderer used by Code Practice. The modal covers common architecture components, their
+use, positive properties, negative trade-offs, and short interview-speech examples. The long
+reference stays outside the normal card flow so it does not push the generated solution down the
+page.
+
+The generated solution starts with an assumption-based Mermaid sketch, follows nine explicitly numbered
+stages in the fixed Requirements-to-Trade-offs order, and ends with the evolved Mermaid architecture.
+Every stage exposes Problem, Solution, Trade-off, and an interview-speech example. Each diagram is
+followed immediately by a synchronized Markdown legend. Response recursively presents both rendered
+architectures beside their explanations so the user can connect every visible component and arrow to
+its responsibility and request/data flow. Each pair stacks on smaller viewports, and older retained
+answers without the structured format remain readable through the existing Markdown presentation.

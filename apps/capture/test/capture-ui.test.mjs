@@ -21,6 +21,7 @@ test("Capture app includes settings, consent, toolbar, and microphone upload sur
     "Microphone capture",
     "External AI provider usage",
     "Code practice context",
+    "I agree to use Code Practice and System Design only in simulations, study, preparation, and review.",
     "Start listening",
     "Pause",
     "End",

@@ -13,9 +13,13 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@persuando/config": "0.1.0",
     "@persuando/contracts": "0.1.0",
     "highlight.js": "^11.11.2",
+    "mermaid": "^11.12.0",
     "next": "^16.2.7",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

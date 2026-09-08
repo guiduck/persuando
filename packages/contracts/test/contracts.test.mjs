@@ -52,13 +52,17 @@ test("all planned WebSocket event names are registered", () => {
   assert.ok(websocketEventTypes.includes("copilot.explanation"));
 });
 
-test("Code Practice workflow is an additive optional WebSocket contract", async () => {
+test("visual practice contracts keep legacy workflows and add independent System Design", async () => {
   const [typesSource, websocketSource] = await Promise.all([
     readFile("packages/contracts/src/types.ts", "utf8"),
     readFile("packages/contracts/src/websocket.ts", "utf8")
   ]);
 
   assert.match(typesSource, /export type CodePracticeWorkflow = "exercise" \| "repository" \| "design_system"/);
+  assert.match(typesSource, /export type VisualGenerationMode = "code_practice" \| "system_design" \| "exam_study"/);
   assert.match(websocketSource, /codePracticeWorkflow\?: CodePracticeWorkflow/);
-  assert.match(websocketSource, /mode: "summary" \| "insights" \| "followups" \| "code_practice" \| "exam_study"/);
+  assert.match(websocketSource, /mode: "summary" \| "insights" \| "followups" \| VisualGenerationMode/);
+  assert.match(websocketSource, /responseLanguage\?: InterviewResponseLanguage/);
+  assert.match(websocketSource, /practiceSteps\?: PracticeStep/);
+  assert.match(websocketSource, /generation\.completed/);
 });

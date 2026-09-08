@@ -561,10 +561,12 @@ export class RealtimeService implements OnModuleDestroy {
     const requestedMode = event.payload.mode;
     const allowed = activeMode === "conversation"
       ? requestedMode === "summary" || requestedMode === "insights" || requestedMode === "followups"
-      : requestedMode === activeMode;
+      : activeMode === "code_practice"
+        ? requestedMode === "code_practice" || requestedMode === "system_design"
+        : requestedMode === activeMode;
     if (!allowed) throw new ForbiddenException(`Generation mode ${requestedMode} is disabled while ${activeMode} is active.`);
 
-    const isVisualMode = requestedMode === "code_practice" || requestedMode === "exam_study";
+    const isVisualMode = requestedMode === "code_practice" || requestedMode === "system_design" || requestedMode === "exam_study";
     const codePracticeWorkflow = requestedMode === "code_practice" ? normalizeCodePracticeWorkflow(event.payload.codePracticeWorkflow) : undefined;
     const inFlightKey = manualGenerationKey(event.sessionId, requestedMode, codePracticeWorkflow);
     if (this.manualGenerationInFlight.has(inFlightKey)) {
@@ -598,15 +600,19 @@ export class RealtimeService implements OnModuleDestroy {
       const screenContextSource = requestedScreenContexts.length > 0
         ? "response_payload+session_history"
         : "session_history";
-      const previousCodePracticeGuidance = isVisualMode
-        ? await this.sessionsService.getRecentCodePracticeGuidance(event.sessionId)
-        : [];
+      const [previousCodePracticeGuidance, previousVisualAnalysis] = isVisualMode
+        ? await Promise.all([
+            this.sessionsService.getRecentVisualGuidance(event.sessionId, requestedMode),
+            this.sessionsService.getLatestVisualAnalysis(event.sessionId, requestedMode)
+          ])
+        : [[], undefined];
       const incrementalHistory = codePracticeWorkflow === "repository" || codePracticeWorkflow === "design_system"
         ? buildIncrementalRepositoryHistory(previousCodePracticeGuidance, screenContexts, requestedScreenContexts.length)
         : [];
       const transcriptText = this.buildManualGenerationContext(event.payload.mode, contextSegments, screenContexts);
       const generationId = randomUUID();
       const programmingLanguage = settings.preferredProgrammingLanguage?.trim() || "javascript";
+      const responseLanguage = normalizeInterviewResponseLanguage(event.payload.responseLanguage) ?? settings.responseLanguage;
       const imageReferences = isVisualMode
         ? screenContexts
             .map((context) => context.imageReference)
@@ -618,7 +624,7 @@ export class RealtimeService implements OnModuleDestroy {
       }
 
       this.logger.log(
-        `Manual generation requested: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} incrementalHistory=${incrementalHistory.length} hasCredential=${Boolean(apiKey)} repositorySearch=false`
+        `Manual generation requested: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} responseLanguage=${responseLanguage} transcriptSegments=${contextSegments.length} screenContextSource=${screenContextSource} screenContexts=${screenContexts.length} imageReferences=${imageReferences?.length ?? 0} previousGuidance=${previousCodePracticeGuidance.length} incrementalHistory=${incrementalHistory.length} hasCredential=${Boolean(apiKey)} repositorySearch=false`
       );
 
       let output: ProviderGenerationOutput;
@@ -630,12 +636,13 @@ export class RealtimeService implements OnModuleDestroy {
           codePracticeWorkflow,
           generationId,
           programmingLanguage,
-          responseLanguage: settings.responseLanguage,
+          responseLanguage,
           sessionId: event.sessionId,
           task: event.payload.mode,
           transcriptText,
           imageReferences,
-          previousCodePracticeGuidance
+          previousCodePracticeGuidance,
+          previousVisualAnalysis
         });
       } catch (error) {
         const safeError = toSafeProviderError(error);
@@ -648,6 +655,20 @@ export class RealtimeService implements OnModuleDestroy {
       this.logger.log(
         `Manual generation completed: generationId=${generationId} sessionId=${event.sessionId} mode=${event.payload.mode} workflow=${codePracticeWorkflow ?? "none"} model=${settings.analysisModel} programmingLanguage=${programmingLanguage} imageReferences=${imageReferences?.length ?? 0} summaryLength=${output.summary.content.length} insights=${output.insights.length} suggestions=${output.suggestions.length}`
       );
+
+      if (output.skippedReason === "unchanged_visual_context") {
+        this.publishServerEvent({
+          version: 1,
+          type: "generation.completed",
+          sessionId: event.sessionId,
+          sentAt: new Date().toISOString(),
+          payload: {
+            mode: requestedMode as "code_practice" | "system_design" | "exam_study",
+            outcome: "unchanged"
+          }
+        });
+        return { action: "accepted" };
+      }
 
       if (event.payload.mode === "summary") {
         await this.publishSummary(event.sessionId, output.summary.content, sourceSegmentIds);
@@ -676,12 +697,16 @@ export class RealtimeService implements OnModuleDestroy {
             version: 1,
             kind: "manual_generation",
             generationId,
+            assistantMode: event.payload.mode,
             programmingLanguage,
+            responseLanguage,
             screenContextSource,
             screenContextCount: screenContexts.length,
             imageReferenceCount: imageReferences?.length ?? 0,
             codePracticeWorkflow,
-            incrementalHistory
+            incrementalHistory,
+            practiceSteps: output.practiceSteps,
+            visualAnalysis: output.visualAnalysis
           }),
           generatedGuidance: guidance,
           status: "completed"
@@ -700,7 +725,8 @@ export class RealtimeService implements OnModuleDestroy {
           content: guidance,
           kind: "explanation",
           assistantMode: event.payload.mode,
-          codePracticeWorkflow
+          codePracticeWorkflow,
+          practiceSteps: output.practiceSteps
         }
       });
       return { action: "accepted" };
@@ -1234,6 +1260,11 @@ function manualGenerationKey(sessionId: string, mode: ResponseGenerateEvent["pay
   return `${sessionId}:${mode}:${workflow ?? "none"}`;
 }
 
+function normalizeInterviewResponseLanguage(value: unknown): "en-US" | "pt-BR" | undefined {
+  if (value === "en-US" || value === "pt-BR") return value;
+  return undefined;
+}
+
 function buildIncrementalRepositoryHistory(
   previousGuidance: string[],
   screenContexts: { imageReference?: string; textContext?: string }[],
@@ -1323,11 +1354,14 @@ function parseRealtimeEvent(event: unknown): PersuandoWebSocketEvent {
 
   if (candidate.type === "response.generate") {
     const generate = candidate as ResponseGenerateEvent;
-    if (!["summary", "insights", "followups", "code_practice", "exam_study"].includes(generate.payload.mode)) {
+    if (!["summary", "insights", "followups", "code_practice", "system_design", "exam_study"].includes(generate.payload.mode)) {
       throw new BadRequestException("Realtime generate mode is invalid");
     }
     if (generate.payload.codePracticeWorkflow !== undefined && generate.payload.codePracticeWorkflow !== "exercise" && generate.payload.codePracticeWorkflow !== "repository" && generate.payload.codePracticeWorkflow !== "design_system") {
       throw new BadRequestException("Realtime generate codePracticeWorkflow is invalid");
+    }
+    if (generate.payload.responseLanguage !== undefined && normalizeInterviewResponseLanguage(generate.payload.responseLanguage) === undefined) {
+      throw new BadRequestException("Realtime generate responseLanguage is invalid");
     }
     validateRequestedScreenContexts(generate);
   }

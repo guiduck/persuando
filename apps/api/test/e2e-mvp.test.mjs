@@ -113,7 +113,8 @@ async function grantMvpConsent(consentService, sessionId) {
     "external_ai_provider_usage",
     "session_retention",
     "code_copilot",
-    "screen_coding_context_capture"
+    "screen_coding_context_capture",
+    "simulation_only_use"
   ]) {
     await consentService.createGrant({
       userId: user.id,

@@ -15,7 +15,7 @@ This file tracks prototype and UI reference decisions for Persuando.
 - Capture dashboard/main window: simple session launcher, recent sessions, current assistant/profile, settings entry, and resume controls. This should be simpler than the observed competitor dashboard.
 - Capture settings: OpenAI API key entry, transcription model selection, analysis model selection, microphone/screen permissions, audio/screen controls, feature toggles, session timer, auto-scroll, and shortcuts.
 - Capture tray/status: background running state, show/hide toolbar, open dashboard/settings, active capture indicators, pause/resume controls, end session, and quit action.
-- Response session: live transcript, running summary, topic/keyword explanations, direct suggested responses, follow-up questions, and code/practice guidance.
+- Response session: live transcript, running summary, topic/keyword explanations, direct suggested responses, follow-up questions, an independent Code Practice panel, an independent System Design panel, and a Portuguese/English generation-language selector.
 - Same-machine response mode: the Capture App may open Response Mode locally, but the architecture must still support Response Mode on a second device signed in to the same account.
 
 ## Design Decisions
@@ -45,3 +45,28 @@ Current implementation validation:
 - Response session now implements retained history plus live transcript, summary, direct suggested
   answers, topics, insights, follow-ups, code-practice explanations, provider errors, reconnecting
   state, and manual delete state.
+- Code Practice and System Design have separate Manual/Auto controls and loading state so they can
+  generate simultaneously. Retained answers rehydrate into their original panel.
+- Code Practice structured steps render complete code and the matching runnable example test side by
+  side, with expected output, rationale, and prominent interview speech. The layout stacks on narrow
+  screens.
+- System Design renders provider-supplied fenced Mermaid diagrams through strict lazy-loaded Mermaid;
+  invalid diagrams fall back to visible source instead of executing arbitrary page content.
+- System Design makes progress explicit through nine numbered headings in the fixed order Requirements,
+  Access patterns, Scale, Data, High-level design, Bottlenecks, Consistency, Failures, and Trade-offs.
+  Each section visibly contains Problem, Solution, Trade-off, and interview speech in that order.
+- Both the initial assumption-based Mermaid sketch and final evolved diagram, together with each
+  immediately following `Legenda do diagrama` or `Diagram legend`, render as semantic artifacts. Every
+  diagram and explanatory legend sit side by side when space permits and stack automatically on narrow
+  screens. Retained answers without the structured pairs continue through the safe Markdown renderer.
+- Before those generated explanations, System Design shows a compact `Guia rápido de conceitos`
+  callout. Its modal reference is loaded from Markdown on demand, closes with `Escape`, restores
+  normal page interaction when dismissed, and handles loading, failure, and retry states. Concept
+  headings use blue; benefits use green plus a check label; risks/trade-offs use red plus a warning
+  label, so meaning is not communicated by color alone.
+- Response sessions expose `Edit layout`, `Done arranging`, and `Reset layout`. In edit mode, every
+  card has a dedicated drag handle, current position, and earlier/later controls; sorting supports
+  pointer, touch, and keyboard input and announces movement to assistive technology.
+- The grid applies the logical order from left to right and stores a normalized, versioned preference
+  per assistant mode in the current browser. Cross-device sync, card hiding, and custom sizing are
+  deferred.

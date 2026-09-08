@@ -86,10 +86,11 @@ runner.
 
 ### `CodeCopilotContext`
 
-- `id`: unique code-practice context record.
-- key fields: programming language, explanation mode, problem context, generated guidance, status.
-- relationships: belongs to a session and may produce `copilot.explanation` realtime output.
-- lifecycle/status: inactive, active, paused, completed, discarded.
+- `id`: unique visual-practice context or generated-result record.
+- key fields: programming language, explanation mode, problem context metadata, generated guidance, status.
+- generated-result metadata: `assistantMode` (`code_practice` or `system_design`), response language, optional legacy Code Practice workflow, optional paired practice steps, and internal visual analysis used for change detection.
+- relationships: belongs to a session, is returned as safe `generatedGuidance` history when completed, and may produce `copilot.explanation` realtime output.
+- lifecycle/status: inactive, active, paused, completed, discarded; session retention and deletion own its final lifecycle.
 
 ### `ProviderCredential`
 
@@ -119,6 +120,8 @@ runner.
 - Code copilot mode is off by default and only runs when explicitly enabled.
 - Screenshot capture and visual analysis are separate permissions.
 - Code copilot and screen/coding context capture require explicit active consent and visible active state.
+- Visual practice also requires active `simulation_only_use` acceptance; the selected application mode, not screenshot appearance, defines the simulation context.
+- Code Practice and System Design generations may run concurrently, but matching requests within one mode remain single-flight.
 - Provider credentials must be encrypted on the backend, decrypted only for authorized provider calls, and never stored in source files or logs.
 - A session may have one or more Capture Mode clients and one or more Response Mode clients, but MVP assumes one active capture client.
 - Response Mode access uses the same signed-in user account and workspace for MVP.

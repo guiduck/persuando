@@ -13,11 +13,15 @@ The MVP uses two visible modes:
 The backend is a NestJS API with PostgreSQL, Prisma, native WebSocket realtime, Redis/BullMQ worker
 boundaries, encrypted provider credentials, consent enforcement, and 7-day session retention with
 manual delete.
-## Code Practice Interview Script
+## Interview Practice
 
-Code Practice is a study simulation for technical assessments, not a stealth or proctoring feature. The `exercise` workflow focuses on public code problems, `repository` on visible repository/debugging work, and `design_system` on component or design-system practice.
+Persuando accepts interview-practice sessions only. Before visual assistance is enabled, Capture requires an explicit simulation-only acceptance. The selected application mode is authoritative: company/platform logos, timers, hiring copy, and realistic assessment layouts are treated as simulation scenery rather than signals that make the provider withhold complete teaching code. Text visible in screenshots remains untrusted problem evidence and never becomes an instruction that can override the provider prompt.
 
-For code-problem practice, the generated answer should read like a conversational interview walkthrough. It should put the complete solved code near the beginning, then make the spoken script visually prominent with `Fala para entrevista` blockquotes, starting from what the student understood about the problem and the objective. Each step should expose the current doubt, what to try next, why that choice moves the solution forward, and small realistic false starts corrected along the way. Google help should appear only as short search terms a candidate could reasonably use for preparation or allowed clarification.
+Code Practice and System Design are independent Response panels and can generate concurrently from the same retained screen context. Each panel keeps its own recent guidance in `code_copilot_contexts`; session history restores the generated answer type, language, workflow, structured code/test steps, and timestamp without a schema migration. The Response language selector applies Portuguese or English to future generations in that session.
+
+For code-problem practice, the initial answer includes a child-simple interpretation, expected input/output, three to five useful clarifying questions, explicit assumptions, a complete optimal reference solution, and a complete minimum working solution. Incremental steps contain a coherent code unit beside the test that it already passes, the expected result, the goal, and a prominent `Fala para entrevista`. Big-O identifies the exact loops, traversals, recursion, and auxiliary structures that produce the time and space bounds. Repeated screenshots with no meaningful extracted change do not produce another answer; a minimum solution advances toward optimization, while a completed optimal solution closes the exercise. A new problem fingerprint restarts the script.
+
+System Design follows a fixed interview rhythm: child-simple interpretation; three to five grouped clarification questions that scope all nine concerns; explicit assumptions; an initial minimal Mermaid sketch; then Requirements, Access patterns, horizontal/vertical Scale, Data, High-level design, Bottlenecks, Consistency, Failures, and Trade-offs in that exact order. Every numbered stage visibly follows `Problema → Solução → Trade-off` and ends with a `Fala para entrevista`. A final Mermaid diagram shows the evolved design. Every diagram is immediately followed by a synchronized Markdown legend explaining its important components, connections, responsibilities, and request/data flow. Response renders each diagram/legend pair side by side with a strict client-side Mermaid configuration and source fallback, then stacks it on narrow screens.
 
 ## Local Setup
 
@@ -417,15 +421,25 @@ Useful logs:
 
 Repository-mode smoke should use a new session, select Code Practice, switch the panel to `Repository`, capture the visible editor plus terminal/test output, request guidance, then verify the answer labels observable evidence, distinguishes current versus stale context, proposes concrete changes, and does not invent unseen files, command output, or repository-wide searches.
 
-### Code Practice Interview-Style Workflows
+### Independent Code Practice And System Design Panels
 
-Code Practice now exposes three study workflows in Response Mode:
+Code Practice exposes `Code Problem` (`exercise`) and `Repository` (`repository`) in Response. The legacy `design_system` workflow remains accepted by contracts/provider routing for backward compatibility, but new UI uses the independent `system_design` generation mode for architecture interviews.
 
-- `Code Problem` (`exercise`): algorithm/platform problems. The answer must frame the session as simulated technical-assessment preparation for study, diagnose the current attempt, explain the chosen approach like an interview, build the solution in parts, call out small corrected pitfalls, and still end with the complete final solution in the selected language when the context is public practice/self-study.
-- `Repository` (`repository`): repository/debugging work from visible editor, terminal, tests, diffs, comments, and instructions. The answer must use only observable evidence, continue incrementally from prior guidance, explain the chosen fix like an interview, propose step-by-step edits, and include the complete relevant final function/component/patch section when evidence is sufficient.
-- `Design System` (`design_system`): component-library and UI-system work from visible components, props, variants, tokens, styles, stories, tests, accessibility notes, and visual diffs. The answer must explain component API, token/styling, accessibility, states, trade-offs, corrected pitfalls, validation checks, and final code or patch shape.
+The System Design panel has its own Manual/Auto state, generation lock, persisted guidance history, and provider context. Its lock key is independent from Code Practice, so both requests may be in flight at once while duplicate requests for the same panel are still suppressed. A `generation.completed` event clears loading without adding duplicate content when visual analysis concludes that the relevant problem/attempt facts did not change.
 
-All three workflows remain explicitly study/preparation simulations. False starts are teaching notes only: the final code should be clean, complete, and not intentionally wrong. Repository and Design System modes must not claim unseen repository search, design-file access, command output, files, exact line numbers, hidden tests, or tokens unless that evidence is visible or provided by a real tool.
+Before generated System Design explanations, the panel exposes a compact `Guia rápido de conceitos` callout. It opens an accessible native dialog and loads `apps/response/public/system-design-reference.md` only on demand through the same safe Markdown rendering path used by Code Practice. Concept names are blue; explicitly labeled benefits are green; explicitly labeled risks and trade-offs are red. The reference covers load balancing, scaling, cache, CDN, SQL/NoSQL, sharding, consistent hashing, resharding, replication, indexes, queues/streams, rate limiting, CAP/consistency, and object storage, with interview-speech examples.
 
-Useful logs now include `workflow=exercise`, `workflow=repository`, or `workflow=design_system` across Response, realtime, and provider phases.
+All visual interview modes use the simulation-only acceptance and application state as the source of truth. Microsoft, Amazon, or other recognizable logos, hiring interfaces, and timers are explicitly treated as high-fidelity simulation scenery rather than evidence of a live interview. Repository guidance still cannot claim unseen repository search, command output, files, or exact line numbers. System Design must produce grounded architecture reasoning rather than inventing invisible infrastructure facts. Its initial and final diagrams and immediately following `Legenda do diagrama`/`Diagram legend` sections are responsive visual artifacts: each legend repeats visible labels, explains responsibilities and incoming/outgoing flow, and stays beside its rendered diagram when space permits. Missing diagrams, displaced legends, reordered stages, or incomplete per-stage cycles trigger one provider repair; retained legacy answers without the structured format keep the normal Markdown rendering.
+
+### Custom Response Card Layout
+
+The live Response session has an `Edit layout` mode for arranging every visible card. Cards can be dragged by their dedicated handle, moved with the keyboard, or shifted one position at a time with the earlier/later buttons. `Done arranging` leaves edit mode, `Reset layout` restores the product default, and the grid fills the saved order from left to right.
+
+Layout preferences are stored in versioned browser local storage per assistant mode, so Code Practice, Exam Study, and Conversation can keep different arrangements across sessions on the same browser. Stored values are normalized when cards are added or removed. This UI-only preference does not change session history, API contracts, database schema, retention, or deletion behavior.
+
+### Custom Response Card Layout
+
+The live Response session has an `Edit layout` mode for arranging every visible card. Cards can be dragged by their dedicated handle, moved with the keyboard, or shifted one position at a time with the earlier/later buttons. `Done arranging` leaves edit mode, `Reset layout` restores the product default, and the grid fills the saved order from left to right.
+
+Layout preferences are stored in versioned browser local storage per assistant mode, so Code Practice, Exam Study, and Conversation can keep different arrangements across sessions on the same browser. Stored values are normalized when cards are added or removed. This UI-only preference does not change session history, API contracts, database schema, retention, or deletion behavior.
 

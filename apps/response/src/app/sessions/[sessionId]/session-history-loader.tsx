@@ -1,12 +1,13 @@
 "use client";
 
-import type { AssistantMode, SessionHistoryResponse } from "@persuando/contracts";
+import type { AssistantMode, InterviewResponseLanguage, SessionHistoryResponse } from "@persuando/contracts";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SessionRealtimeClient } from "./session-realtime-client";
 
 interface SessionHistoryLoaderProps {
   initialHistory?: SessionHistoryResponse;
+  initialResponseLanguage: InterviewResponseLanguage;
   assistantMode: AssistantMode;
   realtimeEndpoint: string;
   sessionId: string;
@@ -14,7 +15,7 @@ interface SessionHistoryLoaderProps {
 
 type LoadState = "loading" | "ready" | "unavailable";
 
-export function SessionHistoryLoader({ assistantMode, initialHistory, realtimeEndpoint, sessionId }: Readonly<SessionHistoryLoaderProps>) {
+export function SessionHistoryLoader({ assistantMode, initialHistory, initialResponseLanguage, realtimeEndpoint, sessionId }: Readonly<SessionHistoryLoaderProps>) {
   const [history, setHistory] = useState<SessionHistoryResponse | undefined>(initialHistory);
   const [state, setState] = useState<LoadState>(initialHistory ? "ready" : "loading");
 
@@ -42,7 +43,16 @@ export function SessionHistoryLoader({ assistantMode, initialHistory, realtimeEn
     };
   }, [initialHistory, sessionId]);
 
-  if (history) return <SessionRealtimeClient assistantMode={assistantMode} history={history} realtimeEndpoint={realtimeEndpoint} />;
+  if (history) {
+    return (
+      <SessionRealtimeClient
+        assistantMode={assistantMode}
+        history={history}
+        initialResponseLanguage={initialResponseLanguage}
+        realtimeEndpoint={realtimeEndpoint}
+      />
+    );
+  }
 
   return (
     <main className="page">

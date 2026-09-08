@@ -135,7 +135,13 @@ async function grantCopilotConsent(consentService, sessionId) {
     consentType: "backend_transmission",
     consentTextVersion: "2026-05-20"
   });
-  return { backend, codeCopilot, screenContext };
+  const simulationOnlyUse = await consentService.createGrant({
+    userId: "google:user-1",
+    sessionId,
+    consentType: "simulation_only_use",
+    consentTextVersion: "simulation-only-v1"
+  });
+  return { backend, codeCopilot, screenContext, simulationOnlyUse };
 }
 
 test("RealtimeService requires an authenticated client", async () => {
@@ -599,7 +605,7 @@ test("Session history keeps the latest 30 persisted screenshots in FIFO order", 
 });
 
 
-test("RealtimeService defaults Code Practice workflow and propagates repository/design-system", async () => {
+test("RealtimeService keeps legacy workflows and generates independent System Design in the selected language", async () => {
   const generationInputs = [];
   const providersService = {
     getActiveAdapterName: () => "mock",
@@ -627,6 +633,11 @@ test("RealtimeService defaults Code Practice workflow and propagates repository/
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", screenContexts }));
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "repository", screenContexts }));
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "design_system", screenContexts }));
+  await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, {
+    mode: "system_design",
+    responseLanguage: "en-US",
+    screenContexts
+  }));
   const replay = await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id, { lastSeenSequence: 0 }));
   const explanations = replay.replayedEvents.filter((storedEvent) => storedEvent.type === "copilot.explanation");
 
@@ -635,10 +646,13 @@ test("RealtimeService defaults Code Practice workflow and propagates repository/
   assert.equal(generationInputs[1].codePracticeIncrementalHistory.length > 0, true);
   assert.equal(generationInputs[2].codePracticeWorkflow, "design_system");
   assert.equal(generationInputs[2].codePracticeIncrementalHistory.length > 0, true);
-  assert.equal(explanations.at(-1)?.payload.codePracticeWorkflow, "design_system");
+  assert.equal(generationInputs[3].task, "system_design");
+  assert.equal(generationInputs[3].responseLanguage, "en-US");
+  assert.equal(generationInputs[3].previousCodePracticeGuidance.length, 0);
+  assert.equal(explanations.at(-1)?.payload.assistantMode, "system_design");
 });
 
-test("RealtimeService keeps manual visual generation single-flight per workflow", async () => {
+test("RealtimeService deduplicates a matching request while allowing Code Practice and System Design in parallel", async () => {
   const deferred = createDeferred();
   let generateCount = 0;
   const providersService = {
@@ -671,11 +685,15 @@ test("RealtimeService keeps manual visual generation single-flight per workflow"
 
   const first = realtimeService.handleClientEvent("response-1", request);
   const second = await realtimeService.handleClientEvent("response-1", request);
+  const systemDesign = realtimeService.handleClientEvent("response-1", event("response.generate", session.id, {
+    mode: "system_design",
+    screenContexts: [{ imageReference: "data:image/png;base64,current" }]
+  }));
   deferred.resolve();
-  await first;
+  await Promise.all([first, systemDesign]);
 
   assert.equal(second.action, "accepted");
-  assert.equal(generateCount, 1);
+  assert.equal(generateCount, 2);
 });
 function createDeferred() {
   let resolve;

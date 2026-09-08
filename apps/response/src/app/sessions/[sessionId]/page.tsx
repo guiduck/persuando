@@ -21,7 +21,13 @@ export default async function SessionDetailPage({
           Back to workspace
         </Link>
       </nav>
-      <SessionHistoryLoader assistantMode={settingsResponse.settings.assistantMode} initialHistory={history} realtimeEndpoint={realtimeEndpoint} sessionId={sessionId} />
+      <SessionHistoryLoader
+        assistantMode={settingsResponse.settings.assistantMode}
+        initialHistory={history}
+        initialResponseLanguage={settingsResponse.settings.responseLanguage === "pt-BR" ? "pt-BR" : "en-US"}
+        realtimeEndpoint={realtimeEndpoint}
+        sessionId={sessionId}
+      />
     </main>
   );
 }

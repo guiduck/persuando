@@ -107,12 +107,13 @@ test("ConsentService blocks code copilot without explicit copilot and screen con
   });
 });
 
-test("ConsentService allows code copilot only with visible copilot, screen context, and backend transmission consent", () => {
+test("ConsentService allows code copilot only with visible context and simulation-only acceptance", () => {
   const service = new ConsentService();
   const decision = service.requireCodeCopilotConsent([
     grant("code_copilot"),
     grant("screen_coding_context_capture"),
-    grant("backend_transmission")
+    grant("backend_transmission"),
+    grant("simulation_only_use")
   ], now);
 
   assert.deepEqual(decision, { ok: true });

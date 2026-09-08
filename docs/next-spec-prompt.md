@@ -310,3 +310,172 @@ Requirements:
 Expected output:
 Produce a concise feature specification with measurable acceptance criteria, fixture matrix, UI readability checks, provider prompt constraints, deployment smoke scenarios, and rollback notes. Do not create tasks until /speckit-tasks is invoked.
 ```
+
+## Next Spec Prompt - 2026-09-06 Interview Practice Evaluation And Concurrent Reliability
+
+```text
+/speckit-specify Specify real-provider evaluation and concurrent-mode reliability for retained Persuando interview practice.
+
+Objective:
+Measure and harden Code Practice and System Design quality, latency, error attribution, history restoration, and Auto behavior while both independent panels can generate concurrently.
+
+Implemented baseline:
+- Capture requires simulation-only-use acceptance and the application-selected mode is authoritative; realistic logos, timers, hiring copy, and platform UI remain simulation scenery.
+- Code Practice and System Design use independent generation modes, locks, prior guidance, visual fingerprints, persisted metadata, and Response panels while sharing the newest 30 consented screen contexts.
+- Unchanged extracted problem/attempt facts emit `generation.completed` without a duplicate answer.
+- Code Practice requires child-simple interpretation, three to five clarifying questions, assumptions, complete optimal and minimum solutions, structured complete-code/test pairs, interview speech, and implementation-specific Big-O.
+- System Design requires clarification, assumptions, staged architecture evolution, interview speech, and at least one valid Mermaid diagram rendered with strict security.
+- Completed guidance persists in the existing `code_copilot_contexts` table and rehydrates through session history; no schema migration was introduced.
+- Response selects Portuguese or English per session for future requests.
+
+Requirements:
+- Define fixture-based scoring for Code Practice contract accuracy, compilable/coherent incremental code, test-to-step correspondence, minimum-to-optimal progression, new-problem resets, and Big-O explanations grounded in exact operations.
+- Define System Design fixtures covering clarification quality, assumptions, capacity estimates, minimum architecture, staged scaling, APIs/data, reliability, security, observability, trade-offs, and Mermaid semantic/syntax accuracy.
+- Measure simultaneous Code Practice plus System Design provider latency, token/image cost, rate-limit behavior, cancellation, reconnect/replay behavior, and single-flight correctness.
+- Replace the shared visual provider-error surface with mode-correlated errors and loading completion without weakening safe-message handling.
+- Verify history restoration across refresh/reconnect for mode, language, workflow, practice steps, diagram content, order, seven-day retention, and manual deletion.
+- Verify semantic unchanged-context suppression and problem-fingerprint reset accuracy with screenshot sequences rather than pixel equality alone.
+- Include Portuguese and English real-provider fixtures and packaged Windows Capture -> VPS API -> Response smoke scenarios.
+- Preserve backward compatibility for legacy `design_system` workflow metadata and clients while keeping new System Design independent in the UI.
+- Preserve screenshot text as untrusted evidence, no fabricated repository/infrastructure access, safe logs, encrypted credentials, consent revocation checks, and existing retention boundaries.
+
+Expected output:
+Produce a concise feature specification with measurable acceptance criteria, evaluation datasets, concurrency/error state machine, observability fields, migration-free compatibility checks, deployment/rollback notes, and manual smoke scenarios. Do not create tasks until /speckit-tasks is invoked.
+```
+
+## Next Spec Prompt - 2026-09-06 Durable Response Workspace Personalization
+
+```text
+/speckit-specify Specify durable cross-device Response workspace personalization for Persuando.
+
+Objective:
+Evolve the implemented local card-order editor into reliable, accessible workspace preferences that can follow an authenticated user across browsers and devices without weakening the current instant local experience.
+
+Source request/context:
+The live Response session now exposes Edit layout, Done arranging, and Reset layout. Every visible card can be sorted with pointer/touch drag, keyboard drag, or explicit earlier/later controls. The normalized order is versioned in browser local storage per assistant mode, automatically appends newly introduced cards, and removes stale or duplicate keys. This baseline changes no API contract or database schema.
+
+Project context:
+Use README.md, docs/architecture.md, docs/domain-model.md, docs/handoff.md, docs/reference-ui.md, docs/roadmap.md, specs/001-persuando-mvp/, and the existing authenticated Next.js Response -> NestJS API -> PostgreSQL architecture.
+
+Requirements:
+- Preserve the existing local-storage behavior as an immediate and offline-tolerant fallback.
+- Define an additive authenticated preference contract for a versioned card order per assistant mode.
+- Define deterministic local/server conflict resolution for first load, edits on multiple devices, stale versions, newly added cards, removed cards, malformed values, and reset-to-default.
+- Keep pointer, touch, keyboard sorting, explicit move buttons, ARIA announcements, 44 px targets, and responsive left-to-right ordering accessible.
+- Evaluate whether the first durable scope includes only ordering or also card visibility, card size/span, named layouts, and undo/redo; keep free-form pixel coordinates out unless justified by concrete UX evidence.
+- Avoid coupling preferences to retained session artifacts or visual-guidance history; session deletion must not unexpectedly delete account-level layout preferences.
+- Define loading, optimistic update, retry, offline, reconnect, and rollback behavior without layout flashes or silently overwriting a newer device preference.
+- Include migration, authorization, same-account isolation, observability, and privacy requirements for any durable preference model.
+- Include automated contract/unit tests and manual responsive browser smoke for mouse, touch, keyboard, reset, cross-device sync, and new-card normalization.
+
+Artifact considerations:
+Prefer additive REST/contracts and a narrowly scoped preference model. Document compatibility with existing local-storage key `persuando:response-layout:<assistantMode>:v1` and define a migration/versioning path rather than invalidating it silently.
+
+Risks/assumptions:
+The current layout is browser-local and intentionally not session history. Network latency can cause visible reorder rollback or multi-device last-write conflicts. Responsive grids translate one logical order into different row/column positions, so the spec must define order semantics independently of viewport geometry.
+
+Expected output:
+Produce a concise feature specification with acceptance criteria, preference/version model, conflict-resolution state machine, API and migration considerations, accessibility requirements, automated/manual validation matrix, deployment/rollback notes, and explicit deferred scope. Do not create tasks until /speckit-tasks is invoked.
+```
+
+## Next Spec Prompt - 2026-09-07 Curated Multilingual System Design Reference
+
+```text
+/speckit-specify Specify a curated multilingual System Design learning reference for Persuando.
+
+Objective:
+Evolve the implemented static Portuguese System Design concept guide into a navigable, maintainable learning reference in Portuguese and English while keeping generated interview solutions fast and uncluttered.
+
+Source request/context:
+The implemented baseline places `Guia rápido de conceitos` before generated System Design explanations. It opens a responsive native dialog, lazily fetches `apps/response/public/system-design-reference.md`, renders through HTML-disabled React Markdown, and visually/semantically distinguishes blue concept names, green checked benefits, and red warning-labeled trade-offs. The current content covers load balancing, vertical/horizontal scaling, cache, CDN, SQL/NoSQL, sharding, consistent hashing, resharding, replication, database indexes, queues/event streams, rate limiting, CAP/consistency, and object storage with interview-speech examples.
+
+Project context:
+Use README.md, docs/architecture.md, docs/handoff.md, docs/reference-ui.md, docs/roadmap.md, specs/001-persuando-mvp/, and the existing Next.js Response application. Preserve the independent Code Practice/System Design generation lanes and current safe Markdown/Mermaid rendering.
+
+Requirements:
+- Define Portuguese and English reference content aligned with the live response-language selection without translating at provider runtime.
+- Add accessible search, concept navigation, and a table of contents appropriate for a long modal on desktop and mobile.
+- Preserve native dialog focus behavior, `Escape`, focus restoration, named controls, semantic headings, visible focus, and meaning independent of color.
+- Define a content schema or authoring convention for concept name, purpose, use cases, positive properties, negative trade-offs, alternatives, common pitfalls, and interview speech.
+- Define editorial accuracy review, ownership, source tracking, terminology consistency, versioning, and regression checks for static educational content.
+- Decide whether content remains bundled Markdown or moves to a versioned application-owned content service; avoid provider-generated canonical reference text.
+- Preserve on-demand loading, browser caching, safe failure/retry behavior, and no impact on session history, retention, or generation concurrency.
+- Include automated tests and manual responsive/browser checks for language switching, search, navigation, focus, scroll position, contrast, and offline/static-asset failure.
+
+Artifact considerations:
+Prefer additive UI/content changes and preserve `system-design-reference.md` compatibility or define an explicit content-version migration. Avoid a database migration unless editorial workflow requirements clearly justify server-managed content.
+
+Risks/assumptions:
+System Design advice is contextual rather than universally prescriptive. A growing reference can become hard to scan, translations can drift semantically, and color-only meaning would be inaccessible. The generated answer must remain visually primary after the user closes the guide.
+
+Expected output:
+Produce a concise feature specification with measurable acceptance criteria, content model, authoring/editorial workflow, localization behavior, accessible navigation design, validation matrix, deployment/rollback notes, and explicit deferred scope. Do not create tasks until /speckit-tasks is invoked.
+```
+
+## Next Spec Prompt - 2026-09-07 System Design Diagram-Legend Quality Evaluation
+
+```text
+/speckit-specify Specify measurable semantic-quality evaluation for System Design Mermaid diagrams and explanatory legends in Persuando.
+
+Objective:
+Turn the implemented structural diagram-plus-legend contract into a measurable quality gate that verifies whether the visual architecture and its explanation actually agree, without slowing the normal interview-practice response path.
+
+Source request/context:
+New System Design guidance requires the first fenced Mermaid diagram to be immediately followed by `## Legenda do diagrama` in Portuguese or `## Diagram legend` in English. The legend must repeat visible labels and explain every important component, connection, responsibility, and incoming/outgoing request or data flow. The provider adapter currently validates adjacency and non-empty bullets with one repair attempt. Response extracts the pair from persisted Markdown, renders diagram and legend side by side, stacks them at narrow widths, and falls back to ordinary Markdown for legacy output.
+
+Project context:
+Use README.md, docs/architecture.md, docs/handoff.md, docs/reference-ui.md, docs/roadmap.md, specs/001-persuando-mvp/, the OpenAI-compatible provider adapter, and the existing Next.js Response Mermaid renderer. Preserve independent Code Practice/System Design generation, current strict Mermaid security, safe Markdown rendering, retained-history compatibility, and migration-free persistence unless the specification proves a schema change necessary.
+
+Requirements:
+- Define Portuguese and English fixtures for representative system designs, including simple, scaled, degraded, and intentionally inconsistent diagram/legend pairs.
+- Measure node-label coverage, edge/flow coverage, responsibility accuracy, contradiction rate, important-component omissions, and irrelevant legend additions.
+- Define which checks can be deterministic from a safely parsed Mermaid subset and which require offline evaluator/model scoring.
+- Keep semantic evaluation out of the latency-critical generation path unless evidence justifies a bounded validation strategy.
+- Specify repair behavior, user-visible fallback, observability, cost/latency budgets, false-positive handling, and provider compatibility.
+- Define accessible desktop and narrow-screen acceptance criteria for side-by-side/stacked presentation, reading order, labels, Mermaid failure fallback, zoom/overflow, and retained legacy answers.
+- Include automated provider/UI regression tests and a manual real-provider matrix in Portuguese and English.
+- Preserve the current Markdown answer as the compatibility boundary or document an additive versioning/migration path for any proposed structured diagram metadata.
+
+Artifact considerations:
+Prefer additive fixture/evaluator tooling and a constrained Mermaid parser over executing diagram content. Treat screenshot text and generated prose as untrusted content. Do not weaken strict Mermaid security or HTML-disabled Markdown. Update contracts, persistence, retention, and deletion docs only if new stored evaluation artifacts are actually proposed.
+
+Risks/assumptions:
+Mermaid syntax is broad, visible labels do not always equal node identifiers, and a structurally complete legend can still be semantically wrong. Model-based evaluation may be nondeterministic and costly; deterministic parsing may reject valid diagrams outside the supported subset. The specification must separate release-blocking checks from advisory quality metrics.
+
+Expected output:
+Produce a concise feature specification with measurable acceptance criteria, fixture taxonomy, evaluation architecture, supported Mermaid subset, scoring thresholds, latency/cost budgets, accessible visual test matrix, observability, rollout/rollback plan, and explicit deferred scope. Do not create tasks until /speckit-tasks is invoked.
+```
+
+## Next Spec Prompt - 2026-09-07 Staged System Design Quality And Navigation
+
+```text
+/speckit-specify Specify staged System Design quality evaluation and optional answer navigation for Persuando.
+
+Objective:
+Measure whether generated System Design answers faithfully apply the implemented nine-stage interview method and define a lightweight way to navigate long answers without fragmenting generation or increasing provider latency.
+
+Source request/context:
+System Design now asks three to five grouped opening questions that collectively cover, in order, Requirements, Access patterns, horizontal/vertical Scale, Data, High-level design, Bottlenecks, Consistency, Failures, and Trade-offs. The answer contains one numbered level-two section for each concern; every section has Problem, Solution, Trade-off, and interview speech in order. An initial assumption-based Mermaid diagram appears before the stages and a final evolved diagram follows stage 9, each with an adjacent side-by-side legend. The provider structurally validates this contract and performs one repair attempt.
+
+Project context:
+Use README.md, docs/architecture.md, docs/handoff.md, docs/reference-ui.md, docs/roadmap.md, specs/001-persuando-mvp/, the OpenAI-compatible provider adapter, and the existing Next.js Response safe Markdown/Mermaid rendering. Preserve independent Code Practice/System Design lanes, one-call initial generation, persisted Markdown compatibility, simulation-authoritative prompting, and existing retention/deletion behavior.
+
+Requirements:
+- Define bilingual fixtures for vague and detailed prompts that score clarification coverage across all nine concerns without requiring nine repetitive questions.
+- Score whether each stage identifies a real problem, justifies a solution, states meaningful positive and negative trade-offs, and provides natural first-person interview speech.
+- Measure whether the initial diagram is a defensible minimum hypothesis and the final diagram materially reflects decisions made across the nine stages.
+- Define deterministic structural checks separately from semantic evaluator/model checks, with thresholds, false-positive handling, latency, and cost budgets.
+- Explore an accessible table of contents, sticky progress indicator, or collapsible stage navigation while preserving Markdown reading order and printable/history views.
+- Keep the complete answer generated in one provider response unless measured evidence shows staged generation materially improves time-to-first-useful-content without confusing Auto mode.
+- Include desktop/mobile, keyboard, screen-reader, bilingual, retained-history, malformed-output, and provider-repair acceptance scenarios.
+- Avoid a database migration unless persisted per-stage state or progress is explicitly justified by cross-session user value.
+
+Artifact considerations:
+Prefer deriving navigation from existing level-two headings and persisted Markdown. Do not duplicate the answer into a second canonical stage schema without an explicit compatibility and migration plan. Preserve strict Mermaid security and HTML-disabled Markdown.
+
+Risks/assumptions:
+Long fixed-format answers can become repetitive; grouped questions can technically mention every concern without meaningfully scoping it; and model-based quality scores may be nondeterministic. Navigation must not hide the current interview narrative or make diagram/legend pairs lose their semantic reading order.
+
+Expected output:
+Produce a concise feature specification with measurable acceptance criteria, fixture and scoring matrix, navigation alternatives and recommendation, accessibility requirements, latency/cost budgets, compatibility analysis, rollout/rollback notes, and explicit deferred scope. Do not create tasks until /speckit-tasks is invoked.
+```

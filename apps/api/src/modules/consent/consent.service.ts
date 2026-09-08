@@ -111,7 +111,11 @@ export class ConsentService {
   }
 
   requireCodeCopilotConsent(grants: readonly ConsentGrant[], now = new Date()): ConsentDecision {
-    return this.evaluateRequiredConsent(grants, ["code_copilot", "screen_coding_context_capture", "backend_transmission"], now);
+    return this.evaluateRequiredConsent(
+      grants,
+      ["code_copilot", "screen_coding_context_capture", "backend_transmission", "simulation_only_use"],
+      now
+    );
   }
 
   private findLatestGrant(grants: readonly ConsentGrant[], consentType: ConsentType): ConsentGrant | undefined {

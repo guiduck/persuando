@@ -121,6 +121,50 @@ test("SessionsController fetches retained session history artifacts", async () =
       generatedAt: new Date("2026-05-22T12:00:03.000Z")
     }
   });
+  await database.codeCopilotContext.create({
+    data: {
+      id: "code-guidance-1",
+      sessionId: created.session.id,
+      programmingLanguage: "javascript",
+      explanationMode: "explain",
+      problemContext: JSON.stringify({
+        version: 1,
+        kind: "manual_generation",
+        assistantMode: "code_practice",
+        responseLanguage: "pt-BR",
+        codePracticeWorkflow: "exercise",
+        visualAnalysis: JSON.stringify({ problemFingerprint: "two-sum", currentStage: "building_simple" }),
+        practiceSteps: [{
+          title: "Versão mínima",
+          objective: "Validar a regra",
+          completeCode: "function solve() { return true; }",
+          testCode: "console.assert(solve());",
+          expectedResult: "pass",
+          explanation: "Valida o comportamento básico.",
+          interviewerSpeech: "Vou validar primeiro a versão mínima."
+        }]
+      }),
+      generatedGuidance: "## Code Practice salvo",
+      status: "completed"
+    }
+  });
+  await database.codeCopilotContext.create({
+    data: {
+      id: "system-design-guidance-1",
+      sessionId: created.session.id,
+      programmingLanguage: "javascript",
+      explanationMode: "explain",
+      problemContext: JSON.stringify({
+        version: 1,
+        kind: "manual_generation",
+        assistantMode: "system_design",
+        responseLanguage: "en-US",
+        visualAnalysis: JSON.stringify({ problemFingerprint: "url-shortener" })
+      }),
+      generatedGuidance: "## Persisted System Design",
+      status: "completed"
+    }
+  });
 
   const history = await sessionsController.getSession(undefined, "google:user-1", created.session.id);
 
@@ -128,6 +172,11 @@ test("SessionsController fetches retained session history artifacts", async () =
   assert.equal(history.summaries[0]?.content, "Resumo inicial.");
   assert.equal(history.insights[0]?.content, "Qual e o prazo?");
   assert.equal(history.suggestions[0]?.content, "Eu confirmaria o prazo.");
+  assert.equal(history.generatedGuidance.length, 2);
+  assert.equal(history.generatedGuidance[0]?.assistantMode, "code_practice");
+  assert.equal(history.generatedGuidance[0]?.practiceSteps[0]?.testCode, "console.assert(solve());");
+  assert.equal(history.generatedGuidance[1]?.assistantMode, "system_design");
+  assert.equal(history.generatedGuidance[1]?.responseLanguage, "en-US");
 });
 
 test("WorkspacesController lists active and recent visible sessions for current user", async () => {

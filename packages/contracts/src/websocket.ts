@@ -1,14 +1,16 @@
 import type {
-  AssistantMode,
   CodePracticeWorkflow,
+  InterviewResponseLanguage,
   Insight,
+  PracticeStep,
   ProviderOperation,
   SafeError,
   SessionId,
   SessionStatus,
   Suggestion,
   Summary,
-  TranscriptSegment
+  TranscriptSegment,
+  VisualGenerationMode
 } from "./types.js";
 
 export const websocketEventTypes = [
@@ -27,7 +29,8 @@ export const websocketEventTypes = [
   "provider.error",
   "retention.deleted",
   "copilot.context",
-  "copilot.explanation"
+  "copilot.explanation",
+  "generation.completed"
 ] as const;
 
 export type WebSocketEventType = (typeof websocketEventTypes)[number];
@@ -67,8 +70,9 @@ export type ResponseAckEvent = BaseWebSocketEvent<"response.ack", { lastReceived
 export type ResponseGenerateEvent = BaseWebSocketEvent<
   "response.generate",
   {
-    mode: "summary" | "insights" | "followups" | "code_practice" | "exam_study";
+    mode: "summary" | "insights" | "followups" | VisualGenerationMode;
     codePracticeWorkflow?: CodePracticeWorkflow;
+    responseLanguage?: InterviewResponseLanguage;
     screenContexts?: {
       imageReference?: string;
       textContext?: string;
@@ -99,8 +103,16 @@ export type CopilotExplanationEvent = BaseWebSocketEvent<
     contextId: string;
     content: string;
     kind: "hint" | "explanation" | "tradeoff" | "review";
-    assistantMode?: Extract<AssistantMode, "code_practice" | "exam_study">;
+    assistantMode?: VisualGenerationMode;
     codePracticeWorkflow?: CodePracticeWorkflow;
+    practiceSteps?: PracticeStep[];
+  }
+>;
+export type GenerationCompletedEvent = BaseWebSocketEvent<
+  "generation.completed",
+  {
+    mode: VisualGenerationMode;
+    outcome: "unchanged";
   }
 >;
 
@@ -120,7 +132,8 @@ export type PersuandoWebSocketEvent =
   | ProviderErrorEvent
   | RetentionDeletedEvent
   | CopilotContextEvent
-  | CopilotExplanationEvent;
+  | CopilotExplanationEvent
+  | GenerationCompletedEvent;
 
 export function isKnownWebSocketEventType(value: string): value is WebSocketEventType {
   return websocketEventTypes.includes(value as WebSocketEventType);

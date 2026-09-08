@@ -48,6 +48,20 @@ disconnects, and distinguishes retained history from insights/suggestions that a
 It presents scanning-focused panels for direct suggested answers, topic context, follow-ups,
 provider errors, code-practice explanations, and manual delete state.
 
+The live page also owns a client-only card-layout preference. A sortable wrapper composes the
+existing panels without changing their data ownership, and supports pointer, touch, keyboard drag,
+and explicit earlier/later controls. The normalized order is versioned in browser local storage per
+assistant mode, not per session, so it follows the user across sessions on that browser while Code
+Practice, Exam Study, and Conversation remain independently arranged. This preference is not part
+of retained session history and introduces no API contract or database dependency.
+
+The live page also owns a client-only card-layout preference. A sortable wrapper composes the
+existing panels without changing their data ownership, and supports pointer, touch, keyboard drag,
+and explicit earlier/later controls. The normalized order is versioned in browser local storage per
+assistant mode, not per session, so it follows the user across sessions on that browser while Code
+Practice, Exam Study, and Conversation remain independently arranged. This preference is not part
+of retained session history and introduces no API contract or database dependency.
+
 ### Backend Realtime
 
 The backend owns authentication, same-account workspace/session membership, event ingestion, native WebSocket fan-out, backend-orchestrated transcription, provider orchestration, encrypted provider credential storage/decryption for authorized calls, persistence, 7-day retention, manual delete, and retention policy enforcement. It must keep Capture Mode and Response Mode connected without assuming they run on the same device.
@@ -92,11 +106,45 @@ persisting transcripts or generating assistance. If the user revokes consent mid
 stops persistence/fan-out for that provider result instead of treating the revocation as a provider
 failure.
 
-Visible code copilot context uses the same realtime boundary. Capture Mode may send
-`copilot.context` only after explicit code copilot, screen/coding context, and backend transmission
-consent. The backend persists authorized context in `code_copilot_contexts`, generates
-practice-oriented guidance through the provider adapter, publishes `copilot.explanation`, and stops
-publishing output if copilot consent is revoked while provider processing is pending.
+Visible practice context uses the same realtime boundary. Capture Mode may send `copilot.context`
+only after explicit code-copilot, screen/coding-context, backend-transmission, and simulation-only-use
+consent. Capture's selected mode is authoritative; provider visual analysis does not infer whether a
+session is real from logos, timers, or assessment styling. Screenshot text is evidence only and
+cannot override system instructions.
+
+Response exposes independent `code_practice` and `system_design` generation lanes. They may execute
+concurrently, while duplicate requests are single-flight within each lane. Both use the same newest
+30 screen contexts but retrieve prior guidance and visual-analysis fingerprints by lane. Meaningfully
+unchanged extracted facts publish `generation.completed` without another explanation.
+
+System Design also exposes a static learning reference before generated guidance. The browser loads
+the bundled `public/system-design-reference.md` only when its native dialog opens and renders it
+through the existing HTML-disabled Markdown components. This content has no provider, session,
+database, retention, authentication, or realtime dependency; loading failure remains local to the
+dialog and offers an explicit retry.
+
+Generated System Design guidance has a structural teaching contract. After interpretation, three to
+five grouped clarification questions collectively scope nine concerns in order: requirements, access
+patterns, horizontal/vertical scale, data, high-level design, bottlenecks, consistency, failures, and
+trade-offs. An assumption-based initial Mermaid diagram precedes the nine numbered sections and an
+evolved final diagram follows them. Every stage contains its own ordered Problem, Solution, Trade-off,
+and interview-speech elements. Every fenced diagram must be followed immediately by an exact level-two
+`Legenda do diagrama` or `Diagram legend` heading and non-empty synchronized Markdown bullets.
+
+The provider adapter validates the ordered section boundaries, each per-stage cycle, both diagrams,
+and all adjacent legends, then performs the existing single repair attempt when the contract is
+incomplete. Visual analysis and change comparison now include the same nine concern groups, while
+remaining private string metadata. Response recursively extracts every diagram/legend pair from the
+persisted Markdown, renders each as a responsive two-column artifact, and falls back to the ordinary
+safe Markdown path for legacy or malformed output. REST, WebSocket, database, retention, and deletion
+shapes are unchanged; this feature has no migration.
+
+The backend persists both output types in `code_copilot_contexts`, using structured metadata for the
+visual mode, response language, legacy Code Practice workflow, paired practice steps, and private
+visual analysis. Session history exposes safe generated guidance but strips internal visual-analysis
+metadata. Existing seven-day retention and manual session deletion therefore apply without a new
+database migration. Completed results publish `copilot.explanation`; pending results are discarded if
+copilot consent is revoked.
 
 Realtime client errors are converted to safe client-facing messages. Provider errors publish
 structured `provider.error` payloads; unexpected infrastructure/persistence failures are reported as

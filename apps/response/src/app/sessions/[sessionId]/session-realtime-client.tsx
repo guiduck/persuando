@@ -3,7 +3,9 @@
 import type {
   AssistantMode,
   CodePracticeWorkflow,
+  InterviewResponseLanguage,
   Insight,
+  PracticeStep,
   PersuandoWebSocketEvent,
   ProviderErrorEvent,
   RetentionDeletedEvent,
@@ -14,24 +16,41 @@ import type {
   Suggestion,
   Summary,
   TranscriptSegment,
-  CopilotExplanationEvent
+  CopilotExplanationEvent,
+  VisualGenerationMode
 } from "@persuando/contracts";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
-import { useEffect, useMemo, useRef, useState, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { isValidElement, useEffect, useId, useMemo, useRef, useState, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
+
+import { SortableSessionLayout, type SessionLayoutCardKey } from "./sortable-session-layout";
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "offline" | "deleted";
-type GenerateMode = "summary" | "insights" | "followups" | "code_practice" | "exam_study";
+type GenerateMode = "summary" | "insights" | "followups" | VisualGenerationMode;
 type PanelMode = "automatic" | "on_demand";
-type PanelKey = "summary" | "answers" | "insights" | "followups" | "code";
-type FocusPanelKey = "transcript" | "summary" | "answers" | "topics" | "insights" | "followups" | "screen" | "code" | "state";
+type PanelKey = "summary" | "answers" | "insights" | "followups" | "code" | "systemDesign";
+type FocusPanelKey = SessionLayoutCardKey;
 
 const MAX_SCREEN_CONTEXTS = 30;
 const GENERATION_TIMEOUT_MS = 180_000;
+const systemDesignDiagramLegendPattern = /(?:^|\r?\n)(?:#{2,3}[ \t]+(?:Diagrama da solução|Solution diagram|Architecture diagram)[^\r\n]*\r?\n+)?```mermaid[^\S\r\n]*\r?\n([\s\S]+?)```\s*\r?\n+#{2}[ \t]+(Legenda do diagrama|Diagram legend)[^\r\n]*\r?\n([\s\S]*?)(?=\r?\n#{1,2}[ \t]+|$)/i;
+const layoutCardLabels: Record<SessionLayoutCardKey, string> = {
+  answers: "What to say",
+  code: "Code practice",
+  followups: "Follow-ups",
+  insights: "Insights",
+  screen: "Screen context",
+  state: "State",
+  summary: "Summary",
+  systemDesign: "System Design",
+  topics: "Topics",
+  transcript: "Transcript"
+};
 
 interface SessionRealtimeClientProps {
   history: SessionHistoryResponse;
   assistantMode: AssistantMode;
+  initialResponseLanguage: InterviewResponseLanguage;
   realtimeEndpoint: string;
 }
 
@@ -44,14 +63,16 @@ interface RealtimeWireMessage {
   safeMessage?: string;
 }
 
-export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint }: Readonly<SessionRealtimeClientProps>) {
+export function SessionRealtimeClient({ assistantMode, history, initialResponseLanguage, realtimeEndpoint }: Readonly<SessionRealtimeClientProps>) {
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>(history.session.status);
   const [segments, setSegments] = useState<TranscriptSegment[]>(history.transcriptSegments);
   const [summaries, setSummaries] = useState<Summary[]>(history.summaries);
   const [insights, setInsights] = useState<Insight[]>(history.insights);
   const [suggestions, setSuggestions] = useState<Suggestion[]>(history.suggestions);
-  const [copilotExplanations, setCopilotExplanations] = useState<CopilotExplanation[]>([]);
+  const [copilotExplanations, setCopilotExplanations] = useState<CopilotExplanation[]>(
+    () => (history.generatedGuidance ?? []).map(toCopilotExplanationFromHistory)
+  );
   const [screenContexts, setScreenContexts] = useState<ScreenContext[]>((history.screenContexts ?? []).slice(-MAX_SCREEN_CONTEXTS));
   const [newInsightIds, setNewInsightIds] = useState<Set<string>>(new Set());
   const [newSuggestionIds, setNewSuggestionIds] = useState<Set<string>>(new Set());
@@ -60,7 +81,13 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
   const [lastEventAt, setLastEventAt] = useState<string | undefined>();
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting" | "deleted" | "failed">("idle");
   const [highlightedPanel, setHighlightedPanel] = useState<FocusPanelKey | undefined>();
+  const [layoutEditing, setLayoutEditing] = useState(false);
+  const [layoutAnnouncement, setLayoutAnnouncement] = useState("");
+  const [layoutOrder, setLayoutOrder] = useState<SessionLayoutCardKey[]>(() => loadLayoutOrder(assistantMode));
   const [codePracticeWorkflow, setCodePracticeWorkflow] = useState<CodePracticeWorkflow>(() => loadCodePracticeWorkflow(history.session.id));
+  const [responseLanguage, setResponseLanguage] = useState<InterviewResponseLanguage>(
+    () => loadInterviewResponseLanguage(history.session.id, initialResponseLanguage)
+  );
   const lastSequenceRef = useRef(maxInitialSequence(history));
   const joinedAtRef = useRef(new Date().toISOString());
   const reconnectTimerRef = useRef<number | undefined>(undefined);
@@ -68,6 +95,7 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
   const [panelModes, setPanelModes] = useState<Record<PanelKey, PanelMode>>({
     answers: "automatic",
     code: "on_demand",
+    systemDesign: "on_demand",
     followups: "on_demand",
     insights: "automatic",
     summary: "automatic"
@@ -75,7 +103,7 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
   const [generatingModes, setGeneratingModes] = useState<Set<GenerateMode>>(new Set());
   const panelModesRef = useRef(panelModes);
   const pendingManualModesRef = useRef<Set<GenerateMode>>(new Set());
-  const lastAutomaticGenerationRef = useRef<Partial<Record<GenerateMode, { itemCount: number; requestedAt: number }>>>({});
+  const lastAutomaticGenerationRef = useRef<Partial<Record<GenerateMode, { contextId: string; requestedAt: number }>>>({});
   const generatingModesRef = useRef(generatingModes);
 
   useEffect(() => {
@@ -91,8 +119,19 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
   }, [codePracticeWorkflow, history.session.id]);
 
   useEffect(() => {
+    saveInterviewResponseLanguage(history.session.id, responseLanguage);
+  }, [history.session.id, responseLanguage]);
+
+  useEffect(() => {
+    saveLayoutOrder(assistantMode, layoutOrder);
+  }, [assistantMode, layoutOrder]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setHighlightedPanel(undefined);
+      if (event.key === "Escape") {
+        setHighlightedPanel(undefined);
+        setLayoutEditing(false);
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -210,6 +249,7 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
   const directAnswers = suggestions.filter((suggestion) => suggestion.category === "response");
   const visualMode: Extract<GenerateMode, "code_practice" | "exam_study"> = assistantMode === "exam_study" ? "exam_study" : "code_practice";
   const visibleExplanations = copilotExplanations.filter((item) => (item.assistantMode ?? "code_practice") === visualMode);
+  const systemDesignExplanations = copilotExplanations.filter((item) => item.assistantMode === "system_design");
   const topics = deriveTopics(segments, insights);
   const statusCopy = useMemo(() => statusLabel(connectionState, sessionStatus), [connectionState, sessionStatus]);
   const requestGeneration = (mode: GenerateMode, source: "manual" | "automatic" = "manual") => {
@@ -226,19 +266,24 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
     setProviderError(undefined);
     if (source === "manual") pendingManualModesRef.current.add(mode);
     setGeneratingModes((values) => new Set([...values, mode]));
-    const requestScreenContexts = mode === "code_practice" || mode === "exam_study"
+    const requestScreenContexts = mode === "code_practice" || mode === "system_design" || mode === "exam_study"
       ? screenContexts.slice(-MAX_SCREEN_CONTEXTS).map((context) => ({
           imageReference: context.imageReference,
           textContext: context.textContext
         }))
       : undefined;
-    console.info(`[Persuando Response] ${source === "manual" ? "Manual" : "Automatic"} generation requested: sessionId=${history.session.id} mode=${mode} workflow=${mode === "code_practice" ? codePracticeWorkflow : "none"} screenContexts=${requestScreenContexts?.length ?? 0} imageReferences=${requestScreenContexts?.filter((context) => Boolean(context.imageReference)).length ?? 0}.`);
+    console.info(`[Persuando Response] ${source === "manual" ? "Manual" : "Automatic"} generation requested: sessionId=${history.session.id} mode=${mode} workflow=${mode === "code_practice" ? codePracticeWorkflow : "none"} responseLanguage=${responseLanguage} screenContexts=${requestScreenContexts?.length ?? 0} imageReferences=${requestScreenContexts?.filter((context) => Boolean(context.imageReference)).length ?? 0}.`);
     send(socketRef.current, {
       version: 1,
       type: "response.generate",
       sessionId: history.session.id,
       sentAt: new Date().toISOString(),
-      payload: { mode, codePracticeWorkflow: mode === "code_practice" ? codePracticeWorkflow : undefined, screenContexts: requestScreenContexts }
+      payload: {
+        mode,
+        codePracticeWorkflow: mode === "code_practice" ? codePracticeWorkflow : undefined,
+        responseLanguage,
+        screenContexts: requestScreenContexts
+      }
     });
     window.setTimeout(() => {
       const timedOut = source === "manual" && pendingManualModesRef.current.delete(mode);
@@ -262,17 +307,38 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
     if (connectionState !== "live" || sessionStatus !== "active") return;
     if (screenContexts.length === 0 || generatingModes.has(visualMode)) return;
 
+    const newestContextId = screenContexts.at(-1)?.id;
+    if (!newestContextId) return;
     const now = Date.now();
     const previous = lastAutomaticGenerationRef.current[visualMode];
-    if (previous && (previous.itemCount === screenContexts.length || now - previous.requestedAt < 8000)) return;
+    if (previous && (previous.contextId === newestContextId || now - previous.requestedAt < 8000)) return;
 
-    lastAutomaticGenerationRef.current[visualMode] = { itemCount: screenContexts.length, requestedAt: now };
+    lastAutomaticGenerationRef.current[visualMode] = { contextId: newestContextId, requestedAt: now };
     console.info(
       `[Persuando Response] Code Practice auto trigger armed: sessionId=${history.session.id} screenContexts=${screenContexts.length}.`
     );
     const timer = window.setTimeout(() => requestGeneration(visualMode, "automatic"), 1200);
     return () => window.clearTimeout(timer);
-  }, [assistantMode, connectionState, generatingModes, history.session.id, panelModes.code, screenContexts.length, sessionStatus, visualMode]);
+  }, [assistantMode, connectionState, generatingModes, history.session.id, panelModes.code, screenContexts, sessionStatus, visualMode]);
+
+  useEffect(() => {
+    if (assistantMode !== "code_practice" || panelModes.systemDesign !== "automatic") return;
+    if (connectionState !== "live" || sessionStatus !== "active") return;
+    if (screenContexts.length === 0 || generatingModes.has("system_design")) return;
+
+    const newestContextId = screenContexts.at(-1)?.id;
+    if (!newestContextId) return;
+    const now = Date.now();
+    const previous = lastAutomaticGenerationRef.current.system_design;
+    if (previous && (previous.contextId === newestContextId || now - previous.requestedAt < 8000)) return;
+
+    lastAutomaticGenerationRef.current.system_design = { contextId: newestContextId, requestedAt: now };
+    console.info(
+      `[Persuando Response] System Design auto trigger armed: sessionId=${history.session.id} screenContexts=${screenContexts.length}.`
+    );
+    const timer = window.setTimeout(() => requestGeneration("system_design", "automatic"), 1200);
+    return () => window.clearTimeout(timer);
+  }, [assistantMode, connectionState, generatingModes, history.session.id, panelModes.systemDesign, screenContexts, sessionStatus]);
 
   const focusControl = (panel: FocusPanelKey, title: string) => (
     <HighlightPanelButton
@@ -283,6 +349,107 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
   );
   const panelClass = (panel: FocusPanelKey) => panelClassName(panel, highlightedPanel);
   const visualStatus = visualMode === "code_practice" ? codePracticeStatus(screenContexts.length, generatingModes.has(visualMode), panelModes.code) : undefined;
+  const visibleLayoutOrder = normalizeLayoutOrder(layoutOrder, assistantMode);
+  const currentLayoutLabels = assistantMode === "exam_study"
+    ? { ...layoutCardLabels, code: "Exam Study" }
+    : layoutCardLabels;
+  const toggleLayoutEditing = () => {
+    setHighlightedPanel(undefined);
+    setLayoutEditing((current) => {
+      const next = !current;
+      setLayoutAnnouncement(next
+        ? "Layout editing enabled. Drag cards or use their move buttons."
+        : "Layout saved for future sessions in this assistant mode.");
+      return next;
+    });
+  };
+  const resetLayout = () => {
+    setLayoutOrder(defaultLayoutOrder(assistantMode));
+    setLayoutAnnouncement("Default card order restored.");
+  };
+  const renderLayoutCard = (card: SessionLayoutCardKey): ReactNode => {
+    switch (card) {
+      case "transcript":
+        return (
+          <section className={`panel transcript-panel ${panelClass("transcript")}`}>
+            <div className="panel-heading">
+              <h1>Transcript</h1>
+              <div className="panel-controls">{lastEventAt ? <span className="muted">Updated {formatTime(lastEventAt)}</span> : null}{focusControl("transcript", "Transcript")}</div>
+            </div>
+            <TranscriptList segments={segments} />
+          </section>
+        );
+      case "summary":
+        return <SummaryPanel className={panelClass("summary")} focusControl={focusControl("summary", "Summary")} isGenerating={generatingModes.has("summary")} mode={panelModes.summary} onGenerate={() => requestGeneration("summary")} onModeChange={(mode) => updatePanelMode("summary", mode)} summary={latestSummary} />;
+      case "answers":
+        return <SuggestedAnswerPanel className={panelClass("answers")} focusControl={focusControl("answers", "What to say")} isGenerating={generatingModes.has("followups")} mode={panelModes.answers} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("answers", mode)} suggestions={directAnswers} />;
+      case "topics":
+        return <TopicPanel className={panelClass("topics")} focusControl={focusControl("topics", "Topics")} topics={topics} />;
+      case "insights":
+        return <InsightPanel className={panelClass("insights")} focusControl={focusControl("insights", "Insights")} insights={insights} isGenerating={generatingModes.has("insights")} mode={panelModes.insights} newInsightIds={newInsightIds} onGenerate={() => requestGeneration("insights")} onModeChange={(mode) => updatePanelMode("insights", mode)} />;
+      case "followups":
+        return <SuggestionPanel className={panelClass("followups")} focusControl={focusControl("followups", "Follow-ups")} isGenerating={generatingModes.has("followups")} mode={panelModes.followups} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("followups", mode)} suggestions={suggestions} />;
+      case "screen":
+        return <ScreenContextPanel className={panelClass("screen")} contexts={screenContexts} focusControl={focusControl("screen", "Screen context")} />;
+      case "code":
+        if (assistantMode === "exam_study") {
+          return (
+            <CopilotPanel
+              className={panelClass("code")}
+              codePracticeWorkflow={codePracticeWorkflow}
+              error={connectionError ?? providerError}
+              explanations={visibleExplanations}
+              focusControl={focusControl("code", "Exam Study")}
+              isGenerating={generatingModes.has("exam_study")}
+              mode={panelModes.code}
+              onGenerate={() => requestGeneration("exam_study")}
+              onModeChange={(mode) => updatePanelMode("code", mode)}
+              onWorkflowChange={setCodePracticeWorkflow}
+              status={visualStatus}
+              title="Exam Study"
+              visualMode="exam_study"
+            />
+          );
+        }
+        return (
+          <CopilotPanel
+            className={panelClass("code")}
+            codePracticeWorkflow={codePracticeWorkflow}
+            error={connectionError ?? providerError}
+            explanations={visibleExplanations}
+            focusControl={focusControl("code", "Code practice")}
+            isGenerating={generatingModes.has("code_practice")}
+            mode={panelModes.code}
+            onGenerate={() => requestGeneration("code_practice")}
+            onModeChange={(mode) => updatePanelMode("code", mode)}
+            onWorkflowChange={setCodePracticeWorkflow}
+            status={visualStatus}
+            title="Code practice"
+            visualMode="code_practice"
+          />
+        );
+      case "systemDesign":
+        return (
+          <CopilotPanel
+            className={panelClass("systemDesign")}
+            codePracticeWorkflow={codePracticeWorkflow}
+            error={connectionError ?? providerError}
+            explanations={systemDesignExplanations}
+            focusControl={focusControl("systemDesign", "System Design")}
+            isGenerating={generatingModes.has("system_design")}
+            mode={panelModes.systemDesign}
+            onGenerate={() => requestGeneration("system_design")}
+            onModeChange={(mode) => updatePanelMode("systemDesign", mode)}
+            onWorkflowChange={setCodePracticeWorkflow}
+            status={codePracticeStatus(screenContexts.length, generatingModes.has("system_design"), panelModes.systemDesign)}
+            title="System Design"
+            visualMode="system_design"
+          />
+        );
+      case "state":
+        return <SessionMeta className={panelClass("state")} deleteState={deleteState} focusControl={focusControl("state", "State")} history={history} providerError={connectionError ?? providerError} />;
+    }
+  };
   return (
     <>
       <header className="topbar">
@@ -291,6 +458,20 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
           <span>{statusCopy}</span>
         </div>
         <div className="stack horizontal">
+          <button
+            aria-pressed={layoutEditing}
+            className={layoutEditing ? "button layout-edit-button active" : "button subtle layout-edit-button"}
+            onClick={toggleLayoutEditing}
+            type="button"
+          >
+            {layoutEditing ? "Done arranging" : "Edit layout"}
+          </button>
+          {layoutEditing ? (
+            <button className="button subtle" onClick={resetLayout} type="button">
+              Reset layout
+            </button>
+          ) : null}
+          <LanguageSelector language={responseLanguage} onChange={setResponseLanguage} />
           {deleteState === "confirming" ? (
             <>
               <button className="button subtle" onClick={() => setDeleteState("idle")} type="button">
@@ -310,25 +491,29 @@ export function SessionRealtimeClient({ assistantMode, history, realtimeEndpoint
         </div>
       </header>
 
-      <section className={highlightedPanel ? "detail-grid has-highlight" : "detail-grid"}>
-        <section className={`panel transcript-panel ${panelClass("transcript")}`}>
-          <div className="panel-heading">
-            <h1>Transcript</h1>
-            <div className="panel-controls">{lastEventAt ? <span className="muted">Updated {formatTime(lastEventAt)}</span> : null}{focusControl("transcript", "Transcript")}</div>
-          </div>
-          <TranscriptList segments={segments} />
-        </section>
+      <p aria-atomic="true" aria-live="polite" className="sr-only">{layoutAnnouncement}</p>
 
-        <>
-          <SummaryPanel className={panelClass("summary")} focusControl={focusControl("summary", "Summary")} isGenerating={generatingModes.has("summary")} mode={panelModes.summary} onGenerate={() => requestGeneration("summary")} onModeChange={(mode) => updatePanelMode("summary", mode)} summary={latestSummary} />
-          <SuggestedAnswerPanel className={panelClass("answers")} focusControl={focusControl("answers", "What to say")} isGenerating={generatingModes.has("followups")} mode={panelModes.answers} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("answers", mode)} suggestions={directAnswers} />
-          <TopicPanel className={panelClass("topics")} focusControl={focusControl("topics", "Topics")} topics={topics} />
-          <InsightPanel className={panelClass("insights")} focusControl={focusControl("insights", "Insights")} insights={insights} isGenerating={generatingModes.has("insights")} mode={panelModes.insights} newInsightIds={newInsightIds} onGenerate={() => requestGeneration("insights")} onModeChange={(mode) => updatePanelMode("insights", mode)} />
-          <SuggestionPanel className={panelClass("followups")} focusControl={focusControl("followups", "Follow-ups")} isGenerating={generatingModes.has("followups")} mode={panelModes.followups} newSuggestionIds={newSuggestionIds} onGenerate={() => requestGeneration("followups")} onModeChange={(mode) => updatePanelMode("followups", mode)} suggestions={suggestions} />
-          <ScreenContextPanel className={panelClass("screen")} contexts={screenContexts} focusControl={focusControl("screen", "Screen context")} />
-          {assistantMode !== "conversation" ? <CopilotPanel className={panelClass("code")} codePracticeWorkflow={codePracticeWorkflow} error={connectionError ?? providerError} explanations={visibleExplanations} focusControl={focusControl("code", visualMode === "exam_study" ? "Exam Study" : "Code practice")} isGenerating={generatingModes.has(visualMode)} mode={panelModes.code} onGenerate={() => requestGeneration(visualMode)} onModeChange={(mode) => updatePanelMode("code", mode)} onWorkflowChange={setCodePracticeWorkflow} status={visualStatus} title={visualMode === "exam_study" ? "Exam Study" : "Code practice"} visualMode={visualMode} /> : null}
-          <SessionMeta className={panelClass("state")} deleteState={deleteState} focusControl={focusControl("state", "State")} history={history} providerError={connectionError ?? providerError} />
-        </>
+      {layoutEditing ? (
+        <aside className="layout-edit-banner" id="layout-edit-instructions">
+          <strong>Arrange your session</strong>
+          <span>Drag cards into place. The grid fills left to right, or use each card’s arrow buttons. Your order is saved for this assistant mode.</span>
+        </aside>
+      ) : null}
+
+      <section
+        aria-describedby={layoutEditing ? "layout-edit-instructions" : undefined}
+        className={`${highlightedPanel ? "detail-grid has-highlight" : "detail-grid"}${layoutEditing ? " layout-edit-mode" : ""}`}
+      >
+        <SortableSessionLayout
+          editing={layoutEditing}
+          highlightedCard={highlightedPanel}
+          items={visibleLayoutOrder}
+          labels={currentLayoutLabels}
+          onAnnouncement={setLayoutAnnouncement}
+          onItemsChange={setLayoutOrder}
+        >
+          {renderLayoutCard}
+        </SortableSessionLayout>
       </section>
     </>
   );
@@ -352,6 +537,25 @@ function HighlightPanelButton({ expanded, onToggle, title }: Readonly<{ expanded
     <button aria-label={label} className="icon-button small" onClick={onToggle} title={label} type="button">
       {expanded ? "-" : "+"}
     </button>
+  );
+}
+
+function LanguageSelector({
+  language,
+  onChange
+}: Readonly<{
+  language: InterviewResponseLanguage;
+  onChange(language: InterviewResponseLanguage): void;
+}>) {
+  return (
+    <div className="segmented language-selector" role="group" aria-label="Model response language">
+      <button className={language === "pt-BR" ? "segmented-option active" : "segmented-option"} onClick={() => onChange("pt-BR")} type="button">
+        Português
+      </button>
+      <button className={language === "en-US" ? "segmented-option active" : "segmented-option"} onClick={() => onChange("en-US")} type="button">
+        English
+      </button>
+    </div>
   );
 }
 
@@ -530,7 +734,7 @@ function ScreenContextPanel({ className, contexts, focusControl }: Readonly<Pane
   );
 }
 
-function CopilotPanel({ className, codePracticeWorkflow, error, explanations, focusControl, isGenerating, mode, onGenerate, onModeChange, onWorkflowChange, status, title, visualMode }: Readonly<GenerationPanelProps & { codePracticeWorkflow: CodePracticeWorkflow; error?: string; explanations: CopilotExplanation[]; onWorkflowChange(workflow: CodePracticeWorkflow): void; status?: string; title: string; visualMode: Extract<GenerateMode, "code_practice" | "exam_study"> }>) {
+function CopilotPanel({ className, codePracticeWorkflow, error, explanations, focusControl, isGenerating, mode, onGenerate, onModeChange, onWorkflowChange, status, title, visualMode }: Readonly<GenerationPanelProps & { codePracticeWorkflow: CodePracticeWorkflow; error?: string; explanations: CopilotExplanation[]; onWorkflowChange(workflow: CodePracticeWorkflow): void; status?: string; title: string; visualMode: VisualGenerationMode }>) {
   return (
     <section className={`panel ${className ?? ""}`}>
       <PanelTitle focusControl={focusControl} isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title={title} />
@@ -543,13 +747,11 @@ function CopilotPanel({ className, codePracticeWorkflow, error, explanations, fo
             <button className={codePracticeWorkflow === "repository" ? "segmented-option active" : "segmented-option"} onClick={() => onWorkflowChange("repository")} type="button">
               Repository
             </button>
-            <button className={codePracticeWorkflow === "design_system" ? "segmented-option active" : "segmented-option"} onClick={() => onWorkflowChange("design_system")} type="button">
-              Design System
-            </button>
           </div>
           {status ? <span className={isGenerating ? "pill active" : "pill"}>{status}</span> : null}
         </div>
       ) : null}
+      {visualMode === "system_design" ? <SystemDesignReferenceLauncher /> : null}
       <div className="artifact-list">
         {error ? (
           <span className="pill empty">
@@ -561,12 +763,186 @@ function CopilotPanel({ className, codePracticeWorkflow, error, explanations, fo
         ) : (
           explanations.map((explanation) => (
             <article className="artifact" key={explanation.contextId}>
-              <span className="pill active">{explanation.codePracticeWorkflow ?? explanation.kind}</span>
-              <MarkdownContent content={explanation.content} />
+              <span className="pill active">{explanation.assistantMode === "system_design" ? "system design" : explanation.codePracticeWorkflow ?? explanation.kind}</span>
+              {explanation.assistantMode === "system_design"
+                ? <SystemDesignExplanationContent content={explanation.content} />
+                : <MarkdownContent content={explanation.content} />}
+              {explanation.practiceSteps?.length ? <PracticeStepCards steps={explanation.practiceSteps} /> : null}
             </article>
           ))
         )}
       </div>
+    </section>
+  );
+}
+
+function SystemDesignReferenceLauncher() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <aside className="system-design-reference-callout">
+        <div>
+          <strong>Guia rápido de conceitos</strong>
+          <span>Revise componentes, quando usá-los e os trade-offs antes da solução.</span>
+        </div>
+        <button
+          aria-controls="system-design-reference-dialog"
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          className="button subtle"
+          onClick={() => setIsOpen(true)}
+          type="button"
+        >
+          Abrir guia rápido
+        </button>
+      </aside>
+      {isOpen ? <SystemDesignReferenceDialog onClose={() => setIsOpen(false)} /> : null}
+    </>
+  );
+}
+
+function SystemDesignReferenceDialog({ onClose }: Readonly<{ onClose(): void }>) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [content, setContent] = useState<string>();
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadError(false);
+    void fetch("/system-design-reference.md", { cache: "force-cache", signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`System Design reference request failed with status ${response.status}.`);
+        return response.text();
+      })
+      .then(setContent)
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setLoadError(true);
+      });
+    return () => controller.abort();
+  }, [loadAttempt]);
+
+  const closeDialog = () => dialogRef.current?.close();
+
+  return (
+    <dialog
+      aria-describedby="system-design-reference-description"
+      aria-labelledby="system-design-reference-title"
+      className="system-design-reference-dialog"
+      id="system-design-reference-dialog"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) closeDialog();
+      }}
+      onClose={onClose}
+      ref={dialogRef}
+    >
+      <div className="system-design-reference-surface">
+        <header className="system-design-reference-header">
+          <div>
+            <span className="pill active">referência rápida</span>
+            <h2 id="system-design-reference-title">Guia rápido de System Design</h2>
+            <p id="system-design-reference-description">Conceitos, usos, benefícios, custos e exemplos de como explicar decisões na entrevista.</p>
+          </div>
+          <button autoFocus aria-label="Fechar guia rápido" className="icon-button small" onClick={closeDialog} title="Fechar guia rápido" type="button">
+            ×
+          </button>
+        </header>
+        <div className="system-design-reference-body">
+          {!content && !loadError ? <p aria-live="polite" role="status">Carregando guia rápido…</p> : null}
+          {loadError ? (
+            <div className="system-design-reference-load-error" role="alert">
+              <p>Não foi possível carregar o guia rápido.</p>
+              <button className="button subtle" onClick={() => setLoadAttempt((attempt) => attempt + 1)} type="button">Tentar novamente</button>
+            </div>
+          ) : null}
+          {content ? <SystemDesignReferenceMarkdown content={content} /> : null}
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+function SystemDesignReferenceMarkdown({ content }: Readonly<{ content: string }>) {
+  return (
+    <div className="markdown-content system-design-reference-markdown">
+      <ReactMarkdown
+        components={{
+          code: MarkdownCode,
+          h2: SystemDesignConceptHeading,
+          h3: SystemDesignDetailHeading,
+          li: SystemDesignReferenceListItem,
+          pre: MarkdownPre
+        }}
+        rehypePlugins={[rehypeHighlight]}
+        skipHtml
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function SystemDesignConceptHeading({ children, ...props }: ComponentProps<"h2">) {
+  return <h2 className="system-design-reference-concept" {...props}>{children}</h2>;
+}
+
+function SystemDesignDetailHeading({ children, ...props }: ComponentProps<"h3">) {
+  const text = reactNodeText(children);
+  const tone = text.startsWith("✅") ? "positive" : text.startsWith("⚠") ? "negative" : "neutral";
+  return <h3 className={`system-design-reference-${tone}`} {...props}>{children}</h3>;
+}
+
+function SystemDesignReferenceListItem({ children, ...props }: ComponentProps<"li">) {
+  const text = reactNodeText(children).trim();
+  const tone = text.startsWith("✅") ? "positive" : text.startsWith("⚠") ? "negative" : "neutral";
+  return <li className={`system-design-reference-${tone}`} {...props}>{children}</li>;
+}
+
+function reactNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(reactNodeText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return reactNodeText(node.props.children);
+  return "";
+}
+
+function PracticeStepCards({ steps }: Readonly<{ steps: PracticeStep[] }>) {
+  return (
+    <section className="practice-steps" aria-label="Development steps with matching tests">
+      <h3>Etapas com testes correspondentes</h3>
+      {steps.map((step, index) => (
+        <article className="practice-step" key={`${index}-${step.title}`}>
+          <header>
+            <span className="pill active">etapa {index + 1}</span>
+            <h4>{step.title}</h4>
+            <p>{step.objective}</p>
+          </header>
+          <div className="code-test-grid">
+            <div>
+              <h5>Código completo nesta etapa</h5>
+              <figure className="code-block">
+                <pre><code>{step.completeCode}</code></pre>
+              </figure>
+            </div>
+            <div>
+              <h5>Teste desta etapa</h5>
+              <figure className="code-block">
+                <pre><code>{step.testCode}</code></pre>
+              </figure>
+              <p><strong>Resultado esperado:</strong> {step.expectedResult}</p>
+            </div>
+          </div>
+          <p>{step.explanation}</p>
+          <blockquote>
+            <strong>Fala para entrevista:</strong> {step.interviewerSpeech}
+          </blockquote>
+        </article>
+      ))}
     </section>
   );
 }
@@ -581,16 +957,113 @@ function MarkdownContent({ content }: Readonly<{ content: string }>) {
   );
 }
 
+function SystemDesignExplanationContent({ content }: Readonly<{ content: string }>) {
+  const paired = extractSystemDesignDiagramLegend(content);
+  if (!paired) return <MarkdownContent content={content} />;
+
+  return (
+    <div className="system-design-explanation">
+      {paired.before ? <MarkdownContent content={paired.before} /> : null}
+      <section aria-label="Diagrama da arquitetura e sua legenda" className="system-design-diagram-legend-grid">
+        <div className="system-design-diagram-column">
+          <span className="pill active">diagrama da solução</span>
+          <MermaidDiagram chart={paired.chart} />
+        </div>
+        <aside aria-label={paired.legendTitle} className="system-design-legend-column">
+          <span className="pill">leitura do diagrama</span>
+          <h3>{paired.legendTitle}</h3>
+          <MarkdownContent content={paired.legend} />
+        </aside>
+      </section>
+      {paired.after ? <SystemDesignExplanationContent content={paired.after} /> : null}
+    </div>
+  );
+}
+
+interface SystemDesignDiagramLegend {
+  after: string;
+  before: string;
+  chart: string;
+  legend: string;
+  legendTitle: string;
+}
+
+function extractSystemDesignDiagramLegend(content: string): SystemDesignDiagramLegend | undefined {
+  const match = systemDesignDiagramLegendPattern.exec(content);
+  if (!match || !match[1]?.trim() || !match[2]?.trim() || !match[3]?.trim()) return undefined;
+  return {
+    after: content.slice((match.index ?? 0) + match[0].length).trim(),
+    before: content.slice(0, match.index ?? 0).trim(),
+    chart: match[1].trim(),
+    legend: match[3].trim(),
+    legendTitle: match[2].trim()
+  };
+}
+
 function MarkdownPre({ children }: ComponentProps<"pre">) {
   const codeChild = Array.isArray(children) ? children[0] : children;
-  const className = typeof codeChild === "object" && codeChild && "props" in codeChild
-    ? (codeChild.props as { className?: string }).className
+  const codeProps = typeof codeChild === "object" && codeChild && "props" in codeChild
+    ? codeChild.props as { children?: ReactNode; className?: string }
+    : undefined;
+  const className = codeProps
+    ? codeProps.className
     : undefined;
   const language = /language-([\w#+.-]+)/.exec(className ?? "")?.[1];
+  if (language === "mermaid") {
+    return <MermaidDiagram chart={String(codeProps?.children ?? "").trim()} />;
+  }
   return (
     <figure className="code-block">
       {language ? <figcaption>{language}</figcaption> : null}
       <pre>{children}</pre>
+    </figure>
+  );
+}
+
+function MermaidDiagram({ chart }: Readonly<{ chart: string }>) {
+  const reactId = useId();
+  const [imageUrl, setImageUrl] = useState<string | undefined>();
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    const render = async () => {
+      try {
+        const { default: mermaid } = await import("mermaid");
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: "neutral"
+        });
+        const diagramId = `mermaid-${reactId.replaceAll(/[^a-zA-Z0-9_-]/g, "")}-${Date.now()}`;
+        const { svg } = await mermaid.render(diagramId, chart);
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+        setImageUrl(objectUrl);
+        setError(false);
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    };
+    void render();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [chart, reactId]);
+
+  if (imageUrl) {
+    return (
+      <figure className="mermaid-diagram">
+        <img alt="System Design architecture diagram" src={imageUrl} />
+      </figure>
+    );
+  }
+  return (
+    <figure className="code-block mermaid-fallback">
+      <figcaption>{error ? "mermaid source — diagram could not be rendered" : "rendering mermaid diagram"}</figcaption>
+      <pre><code>{chart}</code></pre>
     </figure>
   );
 }
@@ -685,7 +1158,12 @@ function shouldAcceptGeneratedEvent(
   }
   if (event.type === "copilot.explanation") {
     const mode = event.payload.assistantMode ?? "code_practice";
-    return panelModes.code === "automatic" || consumePendingMode(pendingManualModes, mode);
+    const panelMode = mode === "system_design" ? panelModes.systemDesign : panelModes.code;
+    return panelMode === "automatic" || consumePendingMode(pendingManualModes, mode);
+  }
+  if (event.type === "generation.completed") {
+    const panelMode = event.payload.mode === "system_design" ? panelModes.systemDesign : panelModes.code;
+    return panelMode === "automatic" || consumePendingMode(pendingManualModes, event.payload.mode);
   }
   return true;
 }
@@ -695,6 +1173,7 @@ function generatedModeForEvent(event: PersuandoWebSocketEvent): GenerateMode | u
   if (event.type === "insight.created") return "insights";
   if (event.type === "suggestion.created") return "followups";
   if (event.type === "copilot.explanation") return event.payload.assistantMode ?? "code_practice";
+  if (event.type === "generation.completed") return event.payload.mode;
   return undefined;
 }
 
@@ -727,10 +1206,11 @@ interface TopicExplanation {
 interface CopilotExplanation {
   id: string;
   contextId: string;
-  assistantMode?: Extract<AssistantMode, "code_practice" | "exam_study">;
+  assistantMode?: VisualGenerationMode;
   codePracticeWorkflow?: CodePracticeWorkflow;
   kind: CopilotExplanationEvent["payload"]["kind"];
   content: string;
+  practiceSteps?: PracticeStep[];
 }
 
 interface ScreenContext {
@@ -807,7 +1287,23 @@ function toCopilotExplanation(event: CopilotExplanationEvent): CopilotExplanatio
     contextId: event.payload.contextId,
     kind: event.payload.kind,
     assistantMode: event.payload.assistantMode,
-    content: event.payload.content
+    codePracticeWorkflow: event.payload.codePracticeWorkflow,
+    content: event.payload.content,
+    practiceSteps: event.payload.practiceSteps
+  };
+}
+
+function toCopilotExplanationFromHistory(
+  guidance: NonNullable<SessionHistoryResponse["generatedGuidance"]>[number]
+): CopilotExplanation {
+  return {
+    id: guidance.id,
+    contextId: guidance.id,
+    kind: "explanation",
+    assistantMode: guidance.assistantMode,
+    codePracticeWorkflow: guidance.codePracticeWorkflow,
+    content: guidance.content,
+    practiceSteps: guidance.practiceSteps
   };
 }
 
@@ -893,7 +1389,7 @@ function codePracticeStatus(screenContextCount: number, isGenerating: boolean, m
 function loadCodePracticeWorkflow(sessionId: string): CodePracticeWorkflow {
   if (typeof window === "undefined") return "exercise";
   const stored = window.localStorage.getItem(codePracticeWorkflowStorageKey(sessionId));
-  return stored === "repository" || stored === "design_system" ? stored : "exercise";
+  return stored === "repository" ? stored : "exercise";
 }
 
 function saveCodePracticeWorkflow(sessionId: string, workflow: CodePracticeWorkflow): void {
@@ -903,6 +1399,83 @@ function saveCodePracticeWorkflow(sessionId: string, workflow: CodePracticeWorkf
 function codePracticeWorkflowStorageKey(sessionId: string): string {
   return `persuando:${sessionId}:code-practice-workflow`;
 }
+
+function loadInterviewResponseLanguage(
+  sessionId: string,
+  fallback: InterviewResponseLanguage
+): InterviewResponseLanguage {
+  if (typeof window === "undefined") return fallback;
+  const stored = window.localStorage.getItem(interviewResponseLanguageStorageKey(sessionId));
+  return stored === "pt-BR" || stored === "en-US" ? stored : fallback;
+}
+
+function saveInterviewResponseLanguage(sessionId: string, language: InterviewResponseLanguage): void {
+  window.localStorage.setItem(interviewResponseLanguageStorageKey(sessionId), language);
+}
+
+function interviewResponseLanguageStorageKey(sessionId: string): string {
+  return `persuando:${sessionId}:interview-response-language:v1`;
+}
+
+function defaultLayoutOrder(assistantMode: AssistantMode): SessionLayoutCardKey[] {
+  const shared: SessionLayoutCardKey[] = [
+    "transcript",
+    "summary",
+    "answers",
+    "topics",
+    "insights",
+    "followups",
+    "screen"
+  ];
+  if (assistantMode === "code_practice") return [...shared, "code", "systemDesign", "state"];
+  if (assistantMode === "exam_study") return [...shared, "code", "state"];
+  return [...shared, "state"];
+}
+
+function normalizeLayoutOrder(
+  order: readonly SessionLayoutCardKey[],
+  assistantMode: AssistantMode
+): SessionLayoutCardKey[] {
+  const defaults = defaultLayoutOrder(assistantMode);
+  const allowed = new Set(defaults);
+  const seen = new Set<SessionLayoutCardKey>();
+  const normalized = order.filter((card) => {
+    if (!allowed.has(card) || seen.has(card)) return false;
+    seen.add(card);
+    return true;
+  });
+  return [...normalized, ...defaults.filter((card) => !seen.has(card))];
+}
+
+function loadLayoutOrder(assistantMode: AssistantMode): SessionLayoutCardKey[] {
+  const fallback = defaultLayoutOrder(assistantMode);
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(layoutOrderStorageKey(assistantMode)) ?? "[]") as unknown;
+    return Array.isArray(stored)
+      ? normalizeLayoutOrder(stored.filter(isSessionLayoutCardKey), assistantMode)
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveLayoutOrder(assistantMode: AssistantMode, order: readonly SessionLayoutCardKey[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    layoutOrderStorageKey(assistantMode),
+    JSON.stringify(normalizeLayoutOrder(order, assistantMode))
+  );
+}
+
+function layoutOrderStorageKey(assistantMode: AssistantMode): string {
+  return `persuando:response-layout:${assistantMode}:v1`;
+}
+
+function isSessionLayoutCardKey(value: unknown): value is SessionLayoutCardKey {
+  return typeof value === "string" && Object.hasOwn(layoutCardLabels, value);
+}
+
 function maxInitialSequence(_history: SessionHistoryResponse): number {
   return 0;
 }

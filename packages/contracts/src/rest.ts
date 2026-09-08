@@ -6,6 +6,7 @@ import type {
   ProviderCredentialMetadata,
   RetentionMode,
   Session,
+  SessionGeneratedGuidance,
   Suggestion,
   Summary,
   TranscriptSegment,
@@ -47,6 +48,7 @@ export interface SessionHistoryResponse extends SessionResponse {
   insights: Insight[];
   suggestions: Suggestion[];
   screenContexts?: SessionScreenContext[];
+  generatedGuidance?: SessionGeneratedGuidance[];
 }
 
 export interface SettingsResponse {

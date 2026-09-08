@@ -21,6 +21,7 @@ export const consentTypes = [
   "screenshot_capture",
   "visual_analysis",
   "code_copilot",
+  "simulation_only_use",
   "app_site_detection"
 ] as const;
 
@@ -49,7 +50,29 @@ export type ProviderCredentialStatus = "unverified" | "valid" | "invalid" | "rev
 export type RetentionMode = "seven_day_workspace" | "manual_deleted";
 export type AssistantMode = "conversation" | "code_practice" | "exam_study";
 export type CodePracticeWorkflow = "exercise" | "repository" | "design_system";
-export type ProviderOperation = "transcription" | "conversation" | "code_practice" | "exam_study";
+export type VisualGenerationMode = "code_practice" | "system_design" | "exam_study";
+export type InterviewResponseLanguage = "en-US" | "pt-BR";
+export type ProviderOperation = "transcription" | "conversation" | VisualGenerationMode;
+
+export interface PracticeStep {
+  title: string;
+  objective: string;
+  completeCode: string;
+  testCode: string;
+  expectedResult: string;
+  explanation: string;
+  interviewerSpeech: string;
+}
+
+export interface SessionGeneratedGuidance {
+  id: string;
+  content: string;
+  generatedAt: string;
+  assistantMode: VisualGenerationMode;
+  responseLanguage?: InterviewResponseLanguage;
+  codePracticeWorkflow?: CodePracticeWorkflow;
+  practiceSteps?: PracticeStep[];
+}
 
 export interface User {
   id: UserId;

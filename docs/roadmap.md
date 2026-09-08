@@ -103,7 +103,7 @@ Gate:
 
 - Do not build or market Persuando as an invisible app.
 - Do not bypass screen sharing, recording, browser focus detection, proctoring tools, or platform rules.
-- Do not make code copilot mode active without explicit consent and visible active state. Do not auto-generate copy-paste coding answers from live assessment, proctored, interview, contest, or platform-challenge screenshots.
+- Do not make visual practice active without explicit consent, visible active state, and simulation-only-use acceptance. Persuando accepts simulated practice sessions only; logos, timers, and realistic company/platform UI do not override the user-selected simulation mode.
 
 ## Update - 2026-08-22 Screenshot Debug Trace
 
@@ -158,3 +158,23 @@ Phase 3 now expands Code Practice from two workflows to three: `exercise` for co
 ## Update - 2026-08-31 Code Practice Conversational Interview Script
 
 Phase 3 Code Practice now treats code-problem practice as a conversational simulated interview. The solved code appears near the beginning, while the walkthrough highlights what the student should say aloud through `Fala para entrevista` blockquotes, current doubts, chosen coding moves, and corrected small false starts. Google guidance is limited to short interview-appropriate search terms. Remaining gates are full regression validation, Response production build, and real-provider VPS smoke to evaluate readability and answer quality.
+
+## Update - 2026-09-06 Independent Interview Practice And Retained Results
+
+Phase 3 now gives Code Practice and System Design independent Response panels, generation locks, Auto behavior, histories, and provider prompts. Both can generate concurrently from the same visual context. Completed results are differentiated and restored from the existing `code_copilot_contexts` table, so retention and manual deletion apply without a migration. Code steps pair complete code with a passing example test; System Design requires clarifying questions, staged interview speech, and a valid Mermaid diagram. Capture requires simulation-only-use acceptance, and the selected mode is authoritative despite realistic branding or timers. Remaining gates: real-provider Electron-to-VPS quality/latency smoke, mode-specific provider-error attribution during concurrent failures, and fixture scoring for Code Practice completeness and Mermaid architecture accuracy.
+
+## Update - 2026-09-06 Customizable Response Card Layout
+
+Phase 3 Response ergonomics now include an explicit layout-editing mode. Every visible session card can be reordered by pointer/touch drag, keyboard sorting, or earlier/later buttons; movement is announced accessibly, and the resulting left-to-right grid order persists per assistant mode in versioned browser local storage. Reset restores a stable default and normalization makes future card additions backward compatible. Remaining gate: manual responsive smoke in a production browser. Deferred non-goals for this slice are cross-device/server persistence, hiding cards, resizing cards, free-form pixel placement, undo history, and changes to session-retention data.
+
+## Update - 2026-09-07 System Design Concept Reference
+
+Phase 3 System Design learning support now includes an on-demand Markdown reference before generated answers. A responsive native dialog explains major architecture concepts with blue concept names, green labeled benefits, red labeled risks/trade-offs, and interview-speech examples. The static asset uses the existing safe Markdown path and has no backend or persistence impact. Remaining gate: manual responsive and keyboard/focus smoke. Deferred non-goals are server-managed content, personalized progress, search/table-of-contents navigation, runtime translation, and provider-generated reference text.
+
+## Update - 2026-09-07 System Design Diagram Legend
+
+Phase 3 System Design answer presentation now treats the first Mermaid architecture diagram and its immediately following Portuguese/English Markdown legend as one required teaching artifact. Provider validation repairs a missing or displaced legend once; Response renders the strict diagram and safe explanatory legend side by side with automatic narrow-screen stacking and a backward-compatible Markdown fallback. The change stays inside persisted answer Markdown and requires no contract or schema migration. Remaining gates are real-provider Portuguese/English visual smoke and measurable semantic scoring that verifies every important node and arrow is accurately explained. Deferred non-goals are graph-AST enforcement, automatic prose generation from Mermaid, and schema-level storage of diagram components.
+
+## Update - 2026-09-07 Ordered System Design Decision Cycle
+
+Phase 3 System Design guidance now follows one deterministic nine-stage interview method: Requirements, Access patterns, horizontal/vertical Scale, Data, High-level design, Bottlenecks, Consistency, Failures, and Trade-offs. Three to five grouped opening questions cover those areas in order; every stage exposes Problem -> Solution -> Trade-off and interview speech. An initial Mermaid hypothesis and final evolved diagram each retain the adjacent side-by-side legend contract. Provider validation and bounded repair enforce the structure without a schema or contract migration. Remaining gates are real-provider bilingual quality/latency smoke and semantic scoring for question coverage and diagram evolution. Deferred non-goals are interactive per-stage generation, stored stage entities, and automatic graph-level architectural correctness proof.

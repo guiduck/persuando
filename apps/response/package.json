@@ -6,9 +6,9 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
-    "build": "next build",
+    "build": "next build && node scripts/prepare-standalone.mjs",
     "dev": "next dev -H localhost -p 3100",
-    "start": "next start -H 0.0.0.0",
+    "start": "node .next/standalone/apps/response/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false",
     "test": "node --test"
   },

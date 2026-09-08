@@ -58,7 +58,12 @@ Current implementation validation:
 - Both the initial assumption-based Mermaid sketch and final evolved diagram, together with each
   immediately following `Legenda do diagrama` or `Diagram legend`, render as semantic artifacts. Every
   diagram and explanatory legend sit side by side when space permits and stack automatically on narrow
-  screens. Retained answers without the structured pairs continue through the safe Markdown renderer.
+  screens. Clicking or keyboard-activating either diagram opens a near-fullscreen native dialog with
+  a larger horizontally scrollable rendering and its complete legend below. Retained answers without
+  the structured pairs continue through the safe Markdown renderer.
+- System Design keeps its Generate state active after the three-minute slow threshold and shows an
+  informational message instead of a failure. Realtime completion still arrives over WebSocket; a
+  terminal client timeout is reserved for ten minutes or an explicit provider error.
 - Before those generated explanations, System Design shows a compact `Guia rápido de conceitos`
   callout. Its modal reference is loaded from Markdown on demand, closes with `Escape`, restores
   normal page interaction when dismissed, and handles loading, failure, and retry states. Concept

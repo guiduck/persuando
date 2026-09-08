@@ -9,8 +9,11 @@ interface ChatCompletionPayload {
 
 const CODE_PRACTICE_MAX_TOKENS = 5200;
 const CODE_PRACTICE_VISUAL_MAX_TOKENS = 4800;
+const SYSTEM_DESIGN_VISUAL_MAX_TOKENS = 1600;
 const DEFAULT_GENERATION_MAX_TOKENS = 900;
 const MAX_CODE_PRACTICE_IMAGES = 30;
+const MAX_SYSTEM_DESIGN_IMAGES = 6;
+const PROVIDER_REQUEST_TIMEOUT_MS = 240_000;
 type CodePracticeStage = "new_problem" | "building_simple" | "simple_correct" | "optimizing" | "optimal_correct" | "uncertain";
 
 export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
@@ -148,7 +151,8 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     attempt = 1
   ): Promise<string> {
     if (!input.apiKey) throw new ProviderAdapterError("PROVIDER_KEY_INVALID", "Provider API key is missing.", false);
-    const imageReferences = input.imageReferences?.filter(Boolean).slice(-MAX_CODE_PRACTICE_IMAGES) ?? [];
+    const imageLimit = input.task === "system_design" ? MAX_SYSTEM_DESIGN_IMAGES : MAX_CODE_PRACTICE_IMAGES;
+    const imageReferences = input.imageReferences?.filter(Boolean).slice(-imageLimit) ?? [];
     if (imageReferences.length === 0) {
       throw new ProviderAdapterError("PROVIDER_RESPONSE_INVALID", "Visual assistance generation requires screenshot context.", false);
     }
@@ -164,7 +168,7 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           { role: "user", content: codePracticeVisualAnalysisContent(input, imageReferences) }
         ],
         model: input.analysisModel,
-        ...generationControls(input.analysisModel, CODE_PRACTICE_VISUAL_MAX_TOKENS, 0),
+        ...generationControls(input.analysisModel, visualAnalysisMaxTokens(input.task), 0),
         response_format: { type: "json_object" }
       }),
       headers: { "content-type": "application/json" },
@@ -215,7 +219,10 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     let payload: unknown;
     try {
       payload = await response.json();
-    } catch {
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw new ProviderAdapterError("PROVIDER_TIMEOUT", "Provider response body timed out.", true);
+      }
       this.logger.warn(
         `Generation provider non-JSON HTTP response: generationId=${generationId} phase=${phase} httpStatus=${response.status}.`
       );
@@ -247,9 +254,18 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           headers: {
             authorization: `Bearer ${apiKey}`,
             ...(init.headers ?? {})
-          }
+          },
+          signal: init.signal
+            ? AbortSignal.any([init.signal, AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS)])
+            : AbortSignal.timeout(PROVIDER_REQUEST_TIMEOUT_MS)
         });
       } catch (error) {
+        if (isAbortError(error)) {
+          this.logger.warn(
+            `Provider request timed out: path=${path} attempt=${attempt}/${maxAttempts} timeoutMs=${PROVIDER_REQUEST_TIMEOUT_MS}.`
+          );
+          throw new ProviderAdapterError("PROVIDER_TIMEOUT", "Provider request timed out.", true);
+        }
         const retrying = attempt < maxAttempts;
         this.logger.warn(
           `Provider network request failed: path=${path} attempt=${attempt}/${maxAttempts} retrying=${retrying} errorType=${error instanceof Error ? error.name : "unknown"} causeCode=${providerNetworkCauseCode(error)}.`
@@ -340,6 +356,14 @@ function generationControls(model: string, maxTokens: number, temperature: numbe
 
 function generationMaxTokens(task: ProviderGenerationInput["task"]): number {
   return task === "code_practice" || task === "system_design" || task === "exam_study" ? CODE_PRACTICE_MAX_TOKENS : DEFAULT_GENERATION_MAX_TOKENS;
+}
+
+function visualAnalysisMaxTokens(task: ProviderGenerationInput["task"]): number {
+  return task === "system_design" ? SYSTEM_DESIGN_VISUAL_MAX_TOKENS : CODE_PRACTICE_VISUAL_MAX_TOKENS;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
 }
 
 function generationTemperature(task: ProviderGenerationInput["task"]): number {

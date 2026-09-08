@@ -620,7 +620,7 @@ test("OpenAiCompatibleProviderAdapter generates independent System Design guidan
   const output = await adapter.generate({
     apiKey: "sk-provider-secret",
     analysisModel: "gpt-4o-mini",
-    imageReferences: ["data:image/png;base64,url-shortener"],
+    imageReferences: Array.from({ length: 10 }, (_, index) => `data:image/png;base64,url-shortener-${index + 1}`),
     responseLanguage: "pt-BR",
     sessionId: "session-1",
     task: "system_design",
@@ -628,6 +628,11 @@ test("OpenAiCompatibleProviderAdapter generates independent System Design guidan
   });
 
   assert.equal(requests.length, 2);
+  assert.equal(requests[0].max_tokens, 1600);
+  const systemDesignImageParts = requests[0].messages[1].content.filter((part) => part.type === "image_url");
+  assert.equal(systemDesignImageParts.length, 6);
+  assert.equal(systemDesignImageParts[0].image_url.url, "data:image/png;base64,url-shortener-5");
+  assert.equal(systemDesignImageParts.at(-1).image_url.url, "data:image/png;base64,url-shortener-10");
   assert.match(requests[0].messages[0].content, /System Design interview tutor/);
   assert.match(requests[0].messages[0].content, /logos/i);
   assert.match(requests[1].messages[0].content, /simulation-only practice session/i);

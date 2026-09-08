@@ -32,7 +32,9 @@ type PanelKey = "summary" | "answers" | "insights" | "followups" | "code" | "sys
 type FocusPanelKey = SessionLayoutCardKey;
 
 const MAX_SCREEN_CONTEXTS = 30;
-const GENERATION_TIMEOUT_MS = 180_000;
+const MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS = 6;
+const GENERATION_SLOW_NOTICE_MS = 180_000;
+const GENERATION_TIMEOUT_MS = 600_000;
 const systemDesignDiagramLegendPattern = /(?:^|\r?\n)(?:#{2,3}[ \t]+(?:Diagrama da solução|Solution diagram|Architecture diagram)[^\r\n]*\r?\n+)?```mermaid[^\S\r\n]*\r?\n([\s\S]+?)```\s*\r?\n+#{2}[ \t]+(Legenda do diagrama|Diagram legend)[^\r\n]*\r?\n([\s\S]*?)(?=\r?\n#{1,2}[ \t]+|$)/i;
 const layoutCardLabels: Record<SessionLayoutCardKey, string> = {
   answers: "What to say",
@@ -198,6 +200,7 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
           if (accepted) {
             const completedMode = generatedModeForEvent(event);
             if (completedMode) {
+              setProviderError(undefined);
               setGeneratingModes((values) => {
                 const next = new Set(values);
                 next.delete(completedMode);
@@ -266,8 +269,9 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
     setProviderError(undefined);
     if (source === "manual") pendingManualModesRef.current.add(mode);
     setGeneratingModes((values) => new Set([...values, mode]));
+    const screenContextLimit = mode === "system_design" ? MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS : MAX_SCREEN_CONTEXTS;
     const requestScreenContexts = mode === "code_practice" || mode === "system_design" || mode === "exam_study"
-      ? screenContexts.slice(-MAX_SCREEN_CONTEXTS).map((context) => ({
+      ? screenContexts.slice(-screenContextLimit).map((context) => ({
           imageReference: context.imageReference,
           textContext: context.textContext
         }))
@@ -286,6 +290,10 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
       }
     });
     window.setTimeout(() => {
+      if (source !== "manual" || !pendingManualModesRef.current.has(mode)) return;
+      setProviderError("Generation is taking longer than usual, but it is still running. The result will appear automatically when it is ready.");
+    }, GENERATION_SLOW_NOTICE_MS);
+    window.setTimeout(() => {
       const timedOut = source === "manual" && pendingManualModesRef.current.delete(mode);
       setGeneratingModes((values) => {
         const next = new Set(values);
@@ -293,7 +301,7 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
         return next;
       });
       if (timedOut) {
-        setProviderError("Generation timed out before the provider returned a usable response. Check the API generation logs.");
+        setProviderError("Generation did not finish within 10 minutes. The provider request was stopped or failed to return a usable response. Check the API generation logs.");
       }
     }, GENERATION_TIMEOUT_MS);
   };
@@ -964,19 +972,91 @@ function SystemDesignExplanationContent({ content }: Readonly<{ content: string 
   return (
     <div className="system-design-explanation">
       {paired.before ? <MarkdownContent content={paired.before} /> : null}
+      <SystemDesignDiagramWithLegend chart={paired.chart} legend={paired.legend} legendTitle={paired.legendTitle} />
+      {paired.after ? <SystemDesignExplanationContent content={paired.after} /> : null}
+    </div>
+  );
+}
+
+function SystemDesignDiagramWithLegend({ chart, legend, legendTitle }: Readonly<{ chart: string; legend: string; legendTitle: string }>) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
       <section aria-label="Diagrama da arquitetura e sua legenda" className="system-design-diagram-legend-grid">
         <div className="system-design-diagram-column">
           <span className="pill active">diagrama da solução</span>
-          <MermaidDiagram chart={paired.chart} />
+          <MermaidDiagram chart={chart} onExpand={() => setIsOpen(true)} />
         </div>
-        <aside aria-label={paired.legendTitle} className="system-design-legend-column">
+        <aside aria-label={legendTitle} className="system-design-legend-column">
           <span className="pill">leitura do diagrama</span>
-          <h3>{paired.legendTitle}</h3>
-          <MarkdownContent content={paired.legend} />
+          <h3>{legendTitle}</h3>
+          <MarkdownContent content={legend} />
         </aside>
       </section>
-      {paired.after ? <SystemDesignExplanationContent content={paired.after} /> : null}
-    </div>
+      {isOpen ? (
+        <SystemDesignDiagramDialog
+          chart={chart}
+          legend={legend}
+          legendTitle={legendTitle}
+          onClose={() => setIsOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function SystemDesignDiagramDialog({ chart, legend, legendTitle, onClose }: Readonly<{
+  chart: string;
+  legend: string;
+  legendTitle: string;
+  onClose(): void;
+}>) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+
+  const closeDialog = () => dialogRef.current?.close();
+
+  return (
+    <dialog
+      aria-describedby={descriptionId}
+      aria-labelledby={titleId}
+      className="system-design-diagram-dialog"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) closeDialog();
+      }}
+      onClose={onClose}
+      ref={dialogRef}
+    >
+      <div className="system-design-diagram-dialog-surface">
+        <header className="system-design-reference-header">
+          <div>
+            <span className="pill active">visualização ampliada</span>
+            <h2 id={titleId}>Diagrama completo da arquitetura</h2>
+            <p id={descriptionId}>Explore o diagrama em tamanho maior e consulte a legenda completa logo abaixo.</p>
+          </div>
+          <button autoFocus aria-label="Fechar diagrama ampliado" className="icon-button small" onClick={closeDialog} title="Fechar diagrama ampliado" type="button">
+            ×
+          </button>
+        </header>
+        <div className="system-design-diagram-dialog-body">
+          <div className="system-design-diagram-dialog-canvas">
+            <MermaidDiagram chart={chart} />
+          </div>
+          <section aria-label={legendTitle} className="system-design-diagram-dialog-legend">
+            <span className="pill">leitura do diagrama</span>
+            <h3>{legendTitle}</h3>
+            <MarkdownContent content={legend} />
+          </section>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -1020,7 +1100,7 @@ function MarkdownPre({ children }: ComponentProps<"pre">) {
   );
 }
 
-function MermaidDiagram({ chart }: Readonly<{ chart: string }>) {
+function MermaidDiagram({ chart, onExpand }: Readonly<{ chart: string; onExpand?: () => void }>) {
   const reactId = useId();
   const [imageUrl, setImageUrl] = useState<string | undefined>();
   const [error, setError] = useState(false);
@@ -1056,7 +1136,19 @@ function MermaidDiagram({ chart }: Readonly<{ chart: string }>) {
   if (imageUrl) {
     return (
       <figure className="mermaid-diagram">
-        <img alt="System Design architecture diagram" src={imageUrl} />
+        {onExpand ? (
+          <button
+            aria-haspopup="dialog"
+            aria-label="Ampliar diagrama da arquitetura"
+            className="mermaid-diagram-expand"
+            onClick={onExpand}
+            title="Abrir diagrama em tela ampliada"
+            type="button"
+          >
+            <img alt="System Design architecture diagram" src={imageUrl} />
+            <span aria-hidden="true" className="mermaid-diagram-expand-label">⛶ Ampliar</span>
+          </button>
+        ) : <img alt="System Design architecture diagram" src={imageUrl} />}
       </figure>
     );
   }

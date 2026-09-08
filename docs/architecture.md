@@ -113,9 +113,11 @@ session is real from logos, timers, or assessment styling. Screenshot text is ev
 cannot override system instructions.
 
 Response exposes independent `code_practice` and `system_design` generation lanes. They may execute
-concurrently, while duplicate requests are single-flight within each lane. Both use the same newest
-30 screen contexts but retrieve prior guidance and visual-analysis fingerprints by lane. Meaningfully
-unchanged extracted facts publish `generation.completed` without another explanation.
+concurrently, while duplicate requests are single-flight within each lane. Code Practice retains and
+sends the newest 30 screen contexts; System Design selects only the newest six to bound redundant
+vision payload, latency, and cost. Both retrieve prior guidance and visual-analysis fingerprints by
+lane. Meaningfully unchanged extracted facts publish `generation.completed` without another
+explanation.
 
 System Design also exposes a static learning reference before generated guidance. The browser loads
 the bundled `public/system-design-reference.md` only when its native dialog opens and renders it
@@ -135,9 +137,13 @@ The provider adapter validates the ordered section boundaries, each per-stage cy
 and all adjacent legends, then performs the existing single repair attempt when the contract is
 incomplete. Visual analysis and change comparison now include the same nine concern groups, while
 remaining private string metadata. Response recursively extracts every diagram/legend pair from the
-persisted Markdown, renders each as a responsive two-column artifact, and falls back to the ordinary
-safe Markdown path for legacy or malformed output. REST, WebSocket, database, retention, and deletion
-shapes are unchanged; this feature has no migration.
+persisted Markdown, renders each as a responsive two-column artifact, and lets mouse/keyboard users
+open a near-fullscreen native dialog with an enlarged scrollable diagram and the complete legend
+below. Legacy or malformed output falls back to the ordinary safe Markdown path. Generation results
+arrive through the existing WebSocket. A three-minute client threshold is informational rather than
+terminal, the client keeps accepting the eventual result for up to ten minutes, and each provider
+request has a four-minute abort boundary. REST, WebSocket, database, retention, and deletion shapes
+are unchanged; this feature has no migration.
 
 The backend persists both output types in `code_copilot_contexts`, using structured metadata for the
 visual mode, response language, legacy Code Practice workflow, paired practice steps, and private

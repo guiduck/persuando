@@ -66,6 +66,7 @@ export type RealtimeHandleResult =
 export const REALTIME_INGESTION_OPTIONS = "REALTIME_INGESTION_OPTIONS";
 const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 const MAX_SCREEN_CONTEXTS = 30;
+const MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS = 6;
 const MAX_SCREEN_IMAGE_REFERENCE_LENGTH = 5_000_000;
 
 @Injectable()
@@ -567,6 +568,7 @@ export class RealtimeService implements OnModuleDestroy {
     if (!allowed) throw new ForbiddenException(`Generation mode ${requestedMode} is disabled while ${activeMode} is active.`);
 
     const isVisualMode = requestedMode === "code_practice" || requestedMode === "system_design" || requestedMode === "exam_study";
+    const screenContextLimit = requestedMode === "system_design" ? MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS : MAX_SCREEN_CONTEXTS;
     const codePracticeWorkflow = requestedMode === "code_practice" ? normalizeCodePracticeWorkflow(event.payload.codePracticeWorkflow) : undefined;
     const inFlightKey = manualGenerationKey(event.sessionId, requestedMode, codePracticeWorkflow);
     if (this.manualGenerationInFlight.has(inFlightKey)) {
@@ -584,10 +586,10 @@ export class RealtimeService implements OnModuleDestroy {
       const contextSegments = await this.getRecentTranscriptSegments(event.sessionId);
       const sourceSegmentIds = contextSegments.map((segment) => segment.id);
       const requestedScreenContexts = isVisualMode
-        ? event.payload.screenContexts?.slice(-MAX_SCREEN_CONTEXTS) ?? []
+        ? event.payload.screenContexts?.slice(-screenContextLimit) ?? []
         : [];
       const persistedScreenContexts = isVisualMode
-        ? await this.sessionsService.getRecentScreenContexts(event.sessionId, MAX_SCREEN_CONTEXTS)
+        ? await this.sessionsService.getRecentScreenContexts(event.sessionId, screenContextLimit)
         : [];
       const cachedScreenContexts = isVisualMode
         ? this.getCachedScreenContexts(event.sessionId)
@@ -596,7 +598,7 @@ export class RealtimeService implements OnModuleDestroy {
         ...requestedScreenContexts,
         ...persistedScreenContexts,
         ...cachedScreenContexts
-      ]).slice(-MAX_SCREEN_CONTEXTS);
+      ]).slice(-screenContextLimit);
       const screenContextSource = requestedScreenContexts.length > 0
         ? "response_payload+session_history"
         : "session_history";

@@ -479,3 +479,40 @@ Long fixed-format answers can become repetitive; grouped questions can technical
 Expected output:
 Produce a concise feature specification with measurable acceptance criteria, fixture and scoring matrix, navigation alternatives and recommendation, accessibility requirements, latency/cost budgets, compatibility analysis, rollout/rollback notes, and explicit deferred scope. Do not create tasks until /speckit-tasks is invoked.
 ```
+
+## Next Spec Prompt - 2026-09-08 Progressive Persisted System Design Generation
+
+```text
+/speckit-specify Specify progressive, resumable System Design generation for Persuando.
+
+Objective:
+Reduce time to first useful System Design guidance by publishing clarification questions first and then the ordered architectural stages incrementally, without allowing independent prompts to contradict one another.
+
+Source request/context:
+The current implementation performs hidden visual analysis followed by one complete strict-JSON answer containing interpretation, three to five clarifying questions, assumptions, initial Mermaid plus legend, nine ordered Problem -> Solution -> Trade-off stages with interview speech, and final Mermaid plus legend. Results arrive over WebSocket only after the complete answer passes validation. System Design now limits input to six recent screenshots, uses a 1,600-token visual-analysis budget, shows a non-terminal notice after three minutes, waits up to ten minutes, and aborts an individual provider request after four minutes. Code Practice must retain its independent 30-context policy.
+
+Project context:
+Use README.md, docs/architecture.md, docs/handoff.md, docs/reference-ui.md, docs/roadmap.md, specs/001-persuando-mvp/, the NestJS realtime/provider modules, Prisma persistence, contracts package, and Next.js Response app. Preserve simulation-authoritative prompting, independent Code Practice/System Design lanes, safe Markdown, strict Mermaid rendering, consent, retention, and deletion.
+
+Requirements:
+- Model the flow as one durable generation job with a stable generationId, not unrelated user prompts.
+- Publish interpretation, clarification questions, assumptions, and the initial diagram/legend as the first useful artifact.
+- Define whether progression waits for interviewer/user answers or offers an explicit Continue with assumptions action; Auto mode must never confuse a continuation with a new exercise.
+- Carry a compact canonical architecture state containing scope, requirements, scale assumptions, data decisions, chosen components, unresolved questions, and completed stage indexes.
+- Generate stages strictly in order and persist each accepted partial artifact idempotently so reconnect/replay and process restarts cannot duplicate or reorder content.
+- Publish WebSocket started/progress/partial/completed/failed events with mode, generationId, current stage, elapsed time, and safe error attribution.
+- Define retry and repair at the smallest failed stage; never regenerate already accepted stages unless the user explicitly restarts the exercise.
+- Build the final Mermaid and legend from the canonical accumulated state and validate agreement with earlier decisions.
+- Preserve existing completed Markdown history through a backward-compatible projection or additive versioned representation.
+- Keep Code Practice unchanged at up to 30 contexts and preserve simultaneous Code Practice/System Design execution.
+- Include cancellation, superseded screenshot, new-problem detection, provider timeout, reconnect, duplicate click, partial persistence failure, and resume-after-restart behavior.
+
+Artifact considerations:
+Expect additive WebSocket contracts and likely additive persistence for generation jobs/stages. Define migration and rollback behavior, retained-history projection, deletion/retention cascade, observability, and compatibility with existing complete Markdown answers. Do not store provider secrets, image bodies, or chain-of-thought in progress records.
+
+Risks/assumptions:
+More calls may increase total wall-clock time and cost even while improving perceived latency. Independent stage prompts can drift unless every call is grounded in one canonical state. Partial UI must clearly distinguish draft, waiting-for-answer, running, completed, failed, and superseded states. Model routing should be measured rather than silently changed.
+
+Expected output:
+Produce a concise feature specification with state/event diagrams, data model and migration options, compatibility boundary, stage prompts/state schema, idempotency and retry rules, latency/cost targets, failure taxonomy, observability fields, automated/manual validation matrix, VPS rollout/rollback plan, and explicit deferred scope. Do not create tasks until /speckit-tasks is invoked.
+```

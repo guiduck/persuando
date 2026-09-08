@@ -8,6 +8,7 @@ const sessionRoute = await readFile("apps/response/src/app/sessions/[sessionId]/
 const sessionLoader = await readFile("apps/response/src/app/sessions/[sessionId]/session-history-loader.tsx", "utf8");
 const sortableLayout = await readFile("apps/response/src/app/sessions/[sessionId]/sortable-session-layout.tsx", "utf8");
 const systemDesignReference = await readFile("apps/response/public/system-design-reference.md", "utf8");
+const standalonePreparation = await readFile("apps/response/scripts/prepare-standalone.mjs", "utf8");
 const loadingPage = await readFile("apps/response/src/app/sessions/[sessionId]/loading.tsx", "utf8");
 const errorPage = await readFile("apps/response/src/app/sessions/[sessionId]/error.tsx", "utf8");
 const globalCss = await readFile("apps/response/src/app/globals.css", "utf8");
@@ -30,6 +31,14 @@ test("Response session UI covers required live and retained states", () => {
   }
 });
 
+test("Response production scripts start the prepared Next standalone bundle", () => {
+  assert.equal(responsePackage.scripts.build, "next build && node scripts/prepare-standalone.mjs");
+  assert.equal(responsePackage.scripts.start, "node .next/standalone/apps/response/server.js");
+  assert.match(standalonePreparation, /standaloneRoot/);
+  assert.match(standalonePreparation, /resolve\(responseRoot, "public"\)/);
+  assert.match(standalonePreparation, /resolve\(responseRoot, "\.next", "static"\)/);
+});
+
 test("Response session UI includes topic, direct answer, and code-practice surfaces", () => {
   assert.match(sessionPage, /What to say/);
   assert.match(sessionPage, /Topics/);
@@ -43,7 +52,7 @@ test("Response session UI includes topic, direct answer, and code-practice surfa
 test("Response session UI retains, displays, and sends up to 30 screen contexts", () => {
   assert.match(sessionPage, /MAX_SCREEN_CONTEXTS = 30/);
   assert.match(sessionPage, /history\.screenContexts \?\? \[\]/);
-  assert.match(sessionPage, /screenContexts\.slice\(-MAX_SCREEN_CONTEXTS\)/);
+  assert.match(sessionPage, /screenContexts\.slice\(-screenContextLimit\)/);
   assert.ok(sessionPage.includes("newestFirstContexts.map((context, index)"));
   assert.ok(sessionPage.includes('scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" })'));
   assert.ok(sessionPage.includes('if (event.type === "copilot.context") return true'));
@@ -144,6 +153,26 @@ test("System Design pairs every Mermaid diagram with its explanatory legend", ()
   assert.match(sessionPage, /if \(!paired\) return <MarkdownContent content=\{content\} \/>/);
   assert.match(globalCss, /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 320px\), 1fr\)\)/);
   assert.match(globalCss, /\.system-design-legend-column/);
+});
+
+test("System Design diagrams open in an accessible near-fullscreen dialog with the legend below", () => {
+  assert.match(sessionPage, /SystemDesignDiagramWithLegend/);
+  assert.match(sessionPage, /SystemDesignDiagramDialog/);
+  assert.match(sessionPage, /aria-label="Ampliar diagrama da arquitetura"/);
+  assert.match(sessionPage, /aria-haspopup="dialog"/);
+  assert.match(sessionPage, /dialog\.showModal\(\)/);
+  assert.match(sessionPage, /Explore o diagrama em tamanho maior e consulte a legenda completa logo abaixo/);
+  assert.match(globalCss, /\.system-design-diagram-dialog/);
+  assert.match(globalCss, /height: calc\(100vh - 24px\)/);
+  assert.match(globalCss, /width: max\(100%, 1400px\)/);
+});
+
+test("System Design keeps waiting after the three-minute slow notice and sends a bounded visual context", () => {
+  assert.match(sessionPage, /MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS = 6/);
+  assert.match(sessionPage, /GENERATION_SLOW_NOTICE_MS = 180_000/);
+  assert.match(sessionPage, /GENERATION_TIMEOUT_MS = 600_000/);
+  assert.match(sessionPage, /Generation is taking longer than usual, but it is still running/);
+  assert.match(sessionPage, /mode === "system_design" \? MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS : MAX_SCREEN_CONTEXTS/);
 });
 
 test("System Design exposes an accessible Markdown cheat sheet before generated explanations", () => {

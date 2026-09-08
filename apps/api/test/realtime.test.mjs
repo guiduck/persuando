@@ -628,7 +628,10 @@ test("RealtimeService keeps legacy workflows and generates independent System De
   await settingsService.updateSettings("google:user-1", { ...settingsInput, assistantMode: "code_practice" });
   realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
   await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id, { lastSeenSequence: 0 }));
-  const screenContexts = [{ imageReference: "data:image/png;base64,current", textContext: "src/app.ts failing test" }];
+  const screenContexts = Array.from({ length: 10 }, (_, index) => ({
+    imageReference: `data:image/png;base64,current-${index + 1}`,
+    textContext: `src/app.ts failing test ${index + 1}`
+  }));
 
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", screenContexts }));
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "repository", screenContexts }));
@@ -648,6 +651,8 @@ test("RealtimeService keeps legacy workflows and generates independent System De
   assert.equal(generationInputs[2].codePracticeIncrementalHistory.length > 0, true);
   assert.equal(generationInputs[3].task, "system_design");
   assert.equal(generationInputs[3].responseLanguage, "en-US");
+  assert.equal(generationInputs[3].imageReferences.length, 6);
+  assert.equal(generationInputs[3].imageReferences[0], "data:image/png;base64,current-5");
   assert.equal(generationInputs[3].previousCodePracticeGuidance.length, 0);
   assert.equal(explanations.at(-1)?.payload.assistantMode, "system_design");
 });

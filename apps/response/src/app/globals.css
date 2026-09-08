@@ -869,6 +869,35 @@ button:focus-visible,
   max-width: 100%;
 }
 
+.mermaid-diagram-expand {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: zoom-in;
+  padding: 0;
+}
+
+.mermaid-diagram-expand:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 4px;
+}
+
+.mermaid-diagram-expand-label {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  background: rgba(7, 12, 18, 0.86);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
 .system-design-explanation {
   display: grid;
   gap: 18px;
@@ -916,6 +945,69 @@ button:focus-visible,
 
 .system-design-legend-column .markdown-content li {
   padding-left: 2px;
+}
+
+.system-design-diagram-dialog {
+  width: calc(100vw - 24px);
+  max-width: none;
+  height: calc(100vh - 24px);
+  max-height: none;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--blue) 48%, var(--border));
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72);
+}
+
+.system-design-diagram-dialog::backdrop {
+  background: rgba(2, 5, 8, 0.86);
+  backdrop-filter: blur(5px);
+}
+
+.system-design-diagram-dialog-surface {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.system-design-diagram-dialog-body {
+  overflow: auto;
+  padding: 20px 24px 32px;
+  overscroll-behavior: contain;
+}
+
+.system-design-diagram-dialog-canvas {
+  min-width: 0;
+}
+
+.system-design-diagram-dialog-canvas .mermaid-diagram {
+  margin: 0;
+  padding: 24px;
+}
+
+.system-design-diagram-dialog-canvas .mermaid-diagram img {
+  width: max(100%, 1400px);
+  max-width: none;
+}
+
+.system-design-diagram-dialog-legend {
+  max-width: 1180px;
+  margin: 20px auto 0;
+  border: 1px solid color-mix(in srgb, var(--green) 34%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--green) 4%, var(--panel-soft));
+  padding: 18px 20px;
+}
+
+.system-design-diagram-dialog-legend h3 {
+  margin: 12px 0 0;
+  font-size: 20px;
+}
+
+.system-design-diagram-dialog-legend .markdown-content {
+  margin-top: 10px;
 }
 
 @media (max-width: 900px) {

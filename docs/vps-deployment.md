@@ -39,7 +39,7 @@ Clone or copy the repo into `/srv/projects/persuando`.
 Install runtime dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 Create `.env.local` from `.env.example` and edit it:
@@ -133,6 +133,11 @@ npm run build
 npm run --workspace @persuando/response build
 ```
 
+The Response build prepares a Next.js standalone bundle and copies `public` plus `.next/static`
+into it. `npm run start:response` starts the generated
+`apps/response/.next/standalone/apps/response/server.js`; do not replace it with `next start` while
+`output: "standalone"` remains enabled.
+
 The session page resolves its realtime endpoint at request time from `WEBSOCKET_URL`, with
 `NEXT_PUBLIC_WEBSOCKET_URL` kept as a compatibility fallback. Production session rendering fails clearly if
 neither value exists. Keep the domain deployment values as HTTPS/WSS in `.env.local`.
@@ -161,15 +166,27 @@ pm2 save
 After pulling code or changing `.env.local`, reload the shell environment and restart the PM2 processes with updated env vars:
 
 ```bash
+cd /srv/projects/persuando
+git pull --ff-only origin master
+
 set -a
 source .env.local
 set +a
+
+npm ci
+npx prisma generate
+npm run build
+npm run --workspace @persuando/response build
 
 pm2 restart persuando-api --update-env
 pm2 restart persuando-worker --update-env
 pm2 restart persuando-response --update-env
 pm2 save
 ```
+
+Only run `npx prisma migrate deploy` when the pulled revision contains a new committed migration.
+The current System Design latency/diagram update has no schema change and needs no migration. Never
+run `npx prisma migrate reset` on the VPS: it drops production data before rebuilding the schema.
 
 Check status and logs:
 

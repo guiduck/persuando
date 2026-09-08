@@ -138,7 +138,7 @@ test("OpenAiCompatibleProviderAdapter uses GPT-5 completion controls without leg
     transcriptText: "Falamos sobre prazo."
   });
 
-  assert.equal(requestBody.max_completion_tokens, 900);
+  assert.equal(requestBody.max_completion_tokens, 1800);
   assert.equal("max_tokens" in requestBody, false);
   assert.equal("temperature" in requestBody, false);
 });
@@ -276,7 +276,7 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   const analysisBody = JSON.parse(requests[0].init.body);
   const answerBody = JSON.parse(requests[1].init.body);
 
-  assert.equal(analysisBody.max_tokens, 4800);
+  assert.equal(analysisBody.max_tokens, 6400);
   assert.equal(analysisBody.temperature, 0);
   assert.match(analysisBody.messages[0].content, /visual evidence analyst/i);
   assert.match(analysisBody.messages[0].content, /functionSignature/);
@@ -287,7 +287,7 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
   assert.equal(imageParts[0].image_url.url, "data:image/png;base64,image-1");
   assert.equal(imageParts.at(-1).image_url.url, "data:image/png;base64,image-30");
 
-  assert.equal(answerBody.max_tokens, 5200);
+  assert.equal(answerBody.max_tokens, 8000);
   assert.equal(answerBody.temperature, 0.15);
   assert.match(answerBody.messages[0].content, /exact contract/i);
   assert.match(answerBody.messages[0].content, /previous guidance as fallible history/i);
@@ -312,6 +312,7 @@ test("OpenAiCompatibleProviderAdapter requests substantial Code Practice output"
 });
 
 test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accepts fenced JSON", async () => {
+  const requests = [];
   const responses = [
     "not-json",
     "```json\n{\"problemTitle\":\"Tree: Level Order Traversal\",\"language\":\"javascript\"}\n```",
@@ -323,11 +324,12 @@ test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accep
     })
   ];
   let requestCount = 0;
-  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () =>
-    jsonResponse(200, {
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, {
       choices: [{ finish_reason: "stop", message: { content: responses[requestCount++] } }]
-    })
-  );
+    });
+  });
 
   const output = await adapter.generate({
     apiKey: "sk-provider-secret",
@@ -341,6 +343,9 @@ test("OpenAiCompatibleProviderAdapter retries invalid visual JSON once and accep
   });
 
   assert.equal(requestCount, 3);
+  assert.equal(requests[0].max_tokens, 6400);
+  assert.equal(requests[1].max_tokens, 8000);
+  assert.equal(requests[2].max_tokens, 8000);
   assert.match(output.suggestions[0].content, /```javascript/);
 });
 test("OpenAiCompatibleProviderAdapter retries a Code Practice answer that omits the selected-language solution", async () => {
@@ -628,7 +633,8 @@ test("OpenAiCompatibleProviderAdapter generates independent System Design guidan
   });
 
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].max_tokens, 1600);
+  assert.equal(requests[0].max_tokens, 3200);
+  assert.equal(requests[1].max_tokens, 12000);
   const systemDesignImageParts = requests[0].messages[1].content.filter((part) => part.type === "image_url");
   assert.equal(systemDesignImageParts.length, 6);
   assert.equal(systemDesignImageParts[0].image_url.url, "data:image/png;base64,url-shortener-5");
@@ -650,6 +656,67 @@ test("OpenAiCompatibleProviderAdapter generates independent System Design guidan
   assert.match(output.suggestions[0].content, /## Diagrama inicial/);
   assert.match(output.suggestions[0].content, /## Diagrama final/);
   assert.match(output.suggestions[0].content, /## Legenda do diagrama/);
+});
+
+test("OpenAiCompatibleProviderAdapter retries a truncated System Design answer with an expanded budget", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    if (requests.length === 1) {
+      return jsonResponse(200, {
+        choices: [{
+          finish_reason: "stop",
+          message: {
+            content: JSON.stringify({
+              activeProblemTitle: "Design a URL shortener",
+              problemFingerprint: "url-shortener",
+              prompt: "Design a URL shortener"
+            })
+          }
+        }]
+      });
+    }
+    if (requests.length === 2) {
+      return jsonResponse(200, {
+        choices: [{ finish_reason: "length", message: { content: "" } }]
+      });
+    }
+    return jsonResponse(200, {
+      choices: [{
+        finish_reason: "stop",
+        message: {
+          content: JSON.stringify({
+            summary: { content: "Design a URL shortener." },
+            insights: [],
+            suggestions: [{
+              category: "response",
+              content: validSystemDesignGuidance(),
+              urgency: "high"
+            }],
+            practiceSteps: []
+          })
+        }
+      }]
+    });
+  });
+
+  const output = await adapter.generate({
+    apiKey: "sk-provider-secret",
+    analysisModel: "gpt-4o-mini",
+    imageReferences: ["data:image/png;base64,url-shortener"],
+    responseLanguage: "pt-BR",
+    sessionId: "session-1",
+    task: "system_design",
+    transcriptText: "Design a URL shortener"
+  });
+
+  assert.equal(requests.length, 3);
+  assert.equal(requests[0].max_tokens, 3200);
+  assert.equal(requests[1].max_tokens, 12000);
+  assert.equal(requests[2].max_tokens, 16000);
+  assert.match(requests[2].messages[1].content, /REPAIR REQUIRED/);
+  assert.match(requests[2].messages[1].content, /previous provider answer could not be parsed/i);
+  assert.match(output.suggestions[0].content, /## Diagrama final/);
 });
 
 test("OpenAiCompatibleProviderAdapter repairs System Design guidance with a displaced diagram legend", async () => {

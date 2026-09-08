@@ -5,12 +5,26 @@ import { ProviderAdapterError, type ProviderAdapter, type ProviderGenerationInpu
 type FetchLike = typeof fetch;
 interface ChatCompletionPayload {
   choices?: { finish_reason?: string; message?: { content?: string } }[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    completion_tokens_details?: { reasoning_tokens?: number };
+  };
 }
 
-const CODE_PRACTICE_MAX_TOKENS = 5200;
-const CODE_PRACTICE_VISUAL_MAX_TOKENS = 4800;
-const SYSTEM_DESIGN_VISUAL_MAX_TOKENS = 1600;
-const DEFAULT_GENERATION_MAX_TOKENS = 900;
+const CODE_PRACTICE_MAX_TOKENS = 8_000;
+const CODE_PRACTICE_RETRY_MAX_TOKENS = 12_000;
+const SYSTEM_DESIGN_MAX_TOKENS = 12_000;
+const SYSTEM_DESIGN_RETRY_MAX_TOKENS = 16_000;
+const EXAM_STUDY_MAX_TOKENS = 7_000;
+const EXAM_STUDY_RETRY_MAX_TOKENS = 10_000;
+const DEFAULT_GENERATION_MAX_TOKENS = 1_800;
+const DEFAULT_GENERATION_RETRY_MAX_TOKENS = 2_400;
+const CODE_PRACTICE_VISUAL_MAX_TOKENS = 6_400;
+const CODE_PRACTICE_VISUAL_RETRY_MAX_TOKENS = 8_000;
+const SYSTEM_DESIGN_VISUAL_MAX_TOKENS = 3_200;
+const SYSTEM_DESIGN_VISUAL_RETRY_MAX_TOKENS = 4_800;
 const MAX_CODE_PRACTICE_IMAGES = 30;
 const MAX_SYSTEM_DESIGN_IMAGES = 6;
 const PROVIDER_REQUEST_TIMEOUT_MS = 240_000;
@@ -82,13 +96,15 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     generationId: string,
     imageCount: number,
     visualAnalysis: string | undefined,
-    attempt = 1
+    attempt = 1,
+    retryReason?: "invalid_json"
   ): Promise<ProviderGenerationOutput> {
     if (!input.apiKey) throw new ProviderAdapterError("PROVIDER_KEY_INVALID", "Provider API key is missing.", false);
     const workflow = normalizeCodePracticeWorkflow(input.codePracticeWorkflow);
     const startedAt = Date.now();
+    const maxTokens = generationMaxTokens(input.task, attempt);
     this.logger.log(
-      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} workflow=${workflow} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} incrementalHistory=${input.codePracticeIncrementalHistory?.length ?? 0} transcriptLength=${input.transcriptText.length}`
+      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer attempt=${attempt} model=${input.analysisModel} maxTokens=${maxTokens} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} workflow=${workflow} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} incrementalHistory=${input.codePracticeIncrementalHistory?.length ?? 0} transcriptLength=${input.transcriptText.length}`
     );
     const response = await this.fetchProvider("/chat/completions", input.apiKey, {
       body: JSON.stringify({
@@ -99,11 +115,13 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           },
           {
             role: "user",
-            content: generationUserContent(input, visualAnalysis) + answerRepairInstruction(input, attempt, visualAnalysis)
+            content: generationUserContent(input, visualAnalysis)
+              + answerRepairInstruction(input, attempt, visualAnalysis)
+              + answerRetryInstruction(retryReason)
           }
         ],
         model: input.analysisModel,
-        ...generationControls(input.analysisModel, generationMaxTokens(input.task), generationTemperature(input.task)),
+        ...generationControls(input.analysisModel, maxTokens, generationTemperature(input.task)),
         response_format: { type: "json_object" }
       }),
       headers: { "content-type": "application/json" },
@@ -115,9 +133,31 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
       : "";
     const finishReason = payload.choices?.[0]?.finish_reason ?? "missing";
     this.logger.log(
-      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
+      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer attempt=${attempt} model=${input.analysisModel} maxTokens=${maxTokens} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageCount} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} promptTokens=${payload.usage?.prompt_tokens ?? "missing"} outputTokens=${payload.usage?.completion_tokens ?? "missing"} reasoningTokens=${payload.usage?.completion_tokens_details?.reasoning_tokens ?? "missing"} totalTokens=${payload.usage?.total_tokens ?? "missing"} durationMs=${Date.now() - startedAt}`
     );
-    const output = parseGenerationContent(responseContent, input.transcriptText, input.task);
+    let output: ProviderGenerationOutput;
+    try {
+      output = parseGenerationContent(responseContent, input.transcriptText, input.task);
+    } catch (error) {
+      if (error instanceof ProviderAdapterError && error.code === "PROVIDER_RESPONSE_INVALID" && attempt === 1) {
+        this.logger.warn(
+          `Generation provider retrying answer: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "session_assistance"} phase=answer nextAttempt=2 reason=invalid_json finishReason=${finishReason} contentLength=${responseContent.length}.`
+        );
+        return this.generateAnswer(input, generationId, imageCount, visualAnalysis, 2, "invalid_json");
+      }
+      if (error instanceof ProviderAdapterError && error.code === "PROVIDER_RESPONSE_INVALID" && finishReason === "length") {
+        throw new ProviderAdapterError(
+          "PROVIDER_RESPONSE_INVALID",
+          input.task === "system_design"
+            ? "Provider exhausted the expanded output token budget while generating the final System Design answer."
+            : input.task === "code_practice"
+              ? "Provider exhausted the expanded output token budget while generating the final Code Practice answer."
+              : "Provider exhausted the expanded output token budget while generating the final answer.",
+          true
+        );
+      }
+      throw error;
+    }
     const stage = codePracticeStage(visualAnalysis);
     const incrementalCodePractice = isIncrementalCodePracticeStage(stage);
     const invalidCodePractice = input.task === "code_practice" && workflow === "exercise" && input.programmingLanguage
@@ -158,8 +198,9 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
     }
 
     const startedAt = Date.now();
+    const maxTokens = visualAnalysisMaxTokens(input.task, attempt);
     this.logger.log(
-      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "visual"} phase=visual_analysis attempt=${attempt} model=${input.analysisModel} workflow=${normalizeCodePracticeWorkflow(input.codePracticeWorkflow)} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageReferences.length} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} incrementalHistory=${input.codePracticeIncrementalHistory?.length ?? 0}`
+      `Generation provider request: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "visual"} phase=visual_analysis attempt=${attempt} model=${input.analysisModel} maxTokens=${maxTokens} workflow=${normalizeCodePracticeWorkflow(input.codePracticeWorkflow)} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageReferences.length} previousGuidance=${input.previousCodePracticeGuidance?.length ?? 0} incrementalHistory=${input.codePracticeIncrementalHistory?.length ?? 0}`
     );
     const response = await this.fetchProvider("/chat/completions", input.apiKey, {
       body: JSON.stringify({
@@ -168,7 +209,7 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
           { role: "user", content: codePracticeVisualAnalysisContent(input, imageReferences) }
         ],
         model: input.analysisModel,
-        ...generationControls(input.analysisModel, visualAnalysisMaxTokens(input.task), 0),
+        ...generationControls(input.analysisModel, maxTokens, 0),
         response_format: { type: "json_object" }
       }),
       headers: { "content-type": "application/json" },
@@ -180,7 +221,7 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
       : "";
     const finishReason = payload.choices?.[0]?.finish_reason ?? "missing";
     this.logger.log(
-      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "visual"} phase=visual_analysis attempt=${attempt} model=${input.analysisModel} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageReferences.length} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} durationMs=${Date.now() - startedAt}`
+      `Generation provider response: generationId=${generationId} sessionId=${input.sessionId} task=${input.task ?? "visual"} phase=visual_analysis attempt=${attempt} model=${input.analysisModel} maxTokens=${maxTokens} programmingLanguage=${input.programmingLanguage ?? "unspecified"} imageCount=${imageReferences.length} httpStatus=${response.status} finishReason=${finishReason} contentLength=${responseContent.length} promptTokens=${payload.usage?.prompt_tokens ?? "missing"} outputTokens=${payload.usage?.completion_tokens ?? "missing"} reasoningTokens=${payload.usage?.completion_tokens_details?.reasoning_tokens ?? "missing"} totalTokens=${payload.usage?.total_tokens ?? "missing"} durationMs=${Date.now() - startedAt}`
     );
 
     const parsed = parseJsonObject(responseContent);
@@ -202,11 +243,16 @@ export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
       );
       return this.analyzeCodePracticeVisuals(input, generationId, 2);
     }
+    const visualTaskName = input.task === "system_design"
+      ? "System Design"
+      : input.task === "exam_study"
+        ? "Exam Study"
+        : "Code Practice";
     throw new ProviderAdapterError(
       "PROVIDER_RESPONSE_INVALID",
       finishReason === "length"
-        ? "Provider response was truncated while reading Code Practice screenshots."
-        : "Provider returned invalid JSON while reading Code Practice screenshots.",
+        ? `Provider response was truncated while reading ${visualTaskName} screenshots.`
+        : `Provider returned invalid JSON while reading ${visualTaskName} screenshots.`,
       true
     );
   }
@@ -354,12 +400,24 @@ function generationControls(model: string, maxTokens: number, temperature: numbe
   return { max_tokens: maxTokens, temperature };
 }
 
-function generationMaxTokens(task: ProviderGenerationInput["task"]): number {
-  return task === "code_practice" || task === "system_design" || task === "exam_study" ? CODE_PRACTICE_MAX_TOKENS : DEFAULT_GENERATION_MAX_TOKENS;
+function generationMaxTokens(task: ProviderGenerationInput["task"], attempt: number): number {
+  if (task === "system_design") {
+    return attempt > 1 ? SYSTEM_DESIGN_RETRY_MAX_TOKENS : SYSTEM_DESIGN_MAX_TOKENS;
+  }
+  if (task === "code_practice") {
+    return attempt > 1 ? CODE_PRACTICE_RETRY_MAX_TOKENS : CODE_PRACTICE_MAX_TOKENS;
+  }
+  if (task === "exam_study") {
+    return attempt > 1 ? EXAM_STUDY_RETRY_MAX_TOKENS : EXAM_STUDY_MAX_TOKENS;
+  }
+  return attempt > 1 ? DEFAULT_GENERATION_RETRY_MAX_TOKENS : DEFAULT_GENERATION_MAX_TOKENS;
 }
 
-function visualAnalysisMaxTokens(task: ProviderGenerationInput["task"]): number {
-  return task === "system_design" ? SYSTEM_DESIGN_VISUAL_MAX_TOKENS : CODE_PRACTICE_VISUAL_MAX_TOKENS;
+function visualAnalysisMaxTokens(task: ProviderGenerationInput["task"], attempt: number): number {
+  if (task === "system_design") {
+    return attempt > 1 ? SYSTEM_DESIGN_VISUAL_RETRY_MAX_TOKENS : SYSTEM_DESIGN_VISUAL_MAX_TOKENS;
+  }
+  return attempt > 1 ? CODE_PRACTICE_VISUAL_RETRY_MAX_TOKENS : CODE_PRACTICE_VISUAL_MAX_TOKENS;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -777,6 +835,11 @@ function answerRepairInstruction(input: ProviderGenerationInput, attempt: number
     return `\n\nREPAIR REQUIRED: Return strict JSON for only the next useful ${input.programmingLanguage} development step, without repeating the initial lesson or optimal reference. Include Dúvida atual, O que eu faria, Fala para entrevista, and practiceSteps with at least one item containing non-empty title, objective, completeCode, testCode, expectedResult, explanation, and interviewerSpeech. completeCode must be the whole coherent function or method at this stage and testCode must test that exact version.`;
   }
   return `\n\nREPAIR REQUIRED: Return the full strict JSON again. In suggestions[0].content, include the complete platform solution under "Solução ótima de referência" in a non-empty fenced code block labeled ${input.programmingLanguage}. Include Perguntas de clarificação, Fala para entrevista, Termos para pesquisar no Google, Dúvida atual, and Construção passo a passo. Also return practiceSteps with at least one item containing non-empty title, objective, completeCode, testCode, expectedResult, explanation, and interviewerSpeech. The completeCode must be the whole coherent function or method for that stage, never an orphan body fragment. Do not replace it with pseudocode and do not merely ask for another screenshot.`;
+}
+
+function answerRetryInstruction(reason?: "invalid_json"): string {
+  if (reason !== "invalid_json") return "";
+  return "\n\nRETRY REQUIRED: The previous provider answer could not be parsed as complete JSON. Return one complete, compact strict JSON object now. Preserve every required teaching artifact, shorten repeated prose if necessary, close every string and object, and do not wrap the JSON in Markdown fences.";
 }
 
 function codePracticeStage(visualAnalysis?: string): CodePracticeStage {

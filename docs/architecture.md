@@ -145,6 +145,15 @@ terminal, the client keeps accepting the eventual result for up to ten minutes, 
 request has a four-minute abort boundary. REST, WebSocket, database, retention, and deletion shapes
 are unchanged; this feature has no migration.
 
+Provider output ceilings are task-specific because GPT completion budgets can include internal
+reasoning as well as visible JSON. System Design requests 3,200 visual-analysis tokens and 12,000
+answer tokens, expanding to 4,800 and 16,000 on the single repair attempt. Code Practice uses
+6,400/8,000 for visual analysis and 8,000/12,000 for answers; Exam Study uses 6,400/8,000 and
+7,000/10,000. Empty, truncated, or malformed final visual-practice JSON is retried once with the
+expanded budget and compact-JSON instruction. Logs record safe generation identifiers, task, phase,
+attempt, requested ceiling, finish reason, content length, duration, and provider-reported token
+counts without recording prompts, images, generated content, credentials, or chain-of-thought.
+
 The backend persists both output types in `code_copilot_contexts`, using structured metadata for the
 visual mode, response language, legacy Code Practice workflow, paired practice steps, and private
 visual analysis. Session history exposes safe generated guidance but strips internal visual-analysis

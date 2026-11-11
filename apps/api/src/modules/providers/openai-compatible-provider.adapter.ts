@@ -29,7 +29,7 @@ const SYSTEM_DESIGN_VISUAL_RETRY_MAX_TOKENS = 4_800;
 const MAX_CODE_PRACTICE_IMAGES = 30;
 const MAX_SYSTEM_DESIGN_IMAGES = 6;
 const PROVIDER_REQUEST_TIMEOUT_MS = 240_000;
-const REPOSITORY_TEACHING_VERSION = 2;
+const REPOSITORY_TEACHING_VERSION = 3;
 type CodePracticeStage = "new_problem" | "building_simple" | "simple_correct" | "optimizing" | "optimal_correct" | "uncertain";
 
 export class OpenAiCompatibleProviderAdapter implements ProviderAdapter {
@@ -735,7 +735,7 @@ Hard requirements:
 }
 function repositoryInstructionsFingerprint(input: ProviderGenerationInput): string {
   // Refresh old retained answers once when the Repository teaching contract changes.
-  return createHash("sha256").update(`repository-guide-v2\n${input.repositoryInstructions?.trim() ?? ""}`).digest("hex");
+  return createHash("sha256").update(`repository-guide-v3\n${input.repositoryInstructions?.trim() ?? ""}`).digest("hex");
 }
 
 function repositoryInstructionsContext(input: ProviderGenerationInput): string {
@@ -776,9 +776,12 @@ Hard requirements:
 - Preserve the conversational Code Problem teaching style: child-simple interpretation, useful clarifications, explicit assumptions, minimum working slice, progressive complete code/test pairs, concrete complexity/trade-offs and prominent natural blockquoted "Fala para entrevista" / "What I would say to the interviewer". Explain observable decisions and checks, not hidden reasoning.
 - For first-time setup, give exact commands and say where to run them and what each does. If React is required or a justified allowed recommendation and no project scaffold is visible, propose a NEW directory with npm create vite@latest product-dashboard -- --template react (react-ts for TypeScript), cd product-dashboard, npm install, npm run dev, and npm run build, after checking node --version and npm --version. Label that directory/framework as a proposal; never run a scaffold into a potentially occupied current directory. Reuse existing scripts when a manifest is visible. Show how to add/configure a test runner if proposing one; npm test is not supplied by the basic Vite template. For other stacks use their corresponding tools instead of forcing npm/Vite.
 - Separate architecture from observed files: label your folder tree "proposed" and explain each file's responsibility and imports/entrypoint wiring. A small task needs a small architecture, not a repository/service abstraction in every folder. For example a React UI may separate src/App.jsx, src/data/products.js and src/lib/filterProducts.js only if justified. JSX belongs in an entry/module supported by the selected build setup, not arbitrarily inside a standalone script.js.
-- Include a compact text flow such as Dataset -> pure selection function -> UI state -> rendered list and a requirement/file/validation table. Use text fences for the file tree and simple before/after input/output examples for each increment.
+- The folder tree, architecture diagram, requirement table and supplied code must describe the SAME implementation. Do not propose data/logic/component modules and then put everything in App.jsx. For an interactive product list, separate dataset, pure filtering/sorting logic and UI responsibilities when justified; supply complete contents and import wiring for every new file. Avoid artificial layers for trivial tasks.
+- Include a Mermaid flowchart showing the actual proposed files, imports, data and user events, immediately followed by a level-two "Legenda do diagrama" / "Diagram legend" with a non-empty explanation. Use quoted node labels, a text fence for the file tree, and concrete before/after input/output examples (including combined filters and an empty result) for each increment.
 - Put concrete code/test pairs in practiceSteps, ordered from a working minimal slice to additional requirements. title/objective must identify file/symbol and create/replace/insert. completeCode must be a full coherent unit; testCode may contain an actual matching test or a clearly labeled reproducible UI/manual check. expectedResult must be specific. interviewerSpeech must say what I would explain before/during/after that exact step, including why and its trade-off, not generic "I would implement it" filler.
-- Give integration/import wiring for every newly proposed file. Do not paste the same final component twice. Under "Mudanças propostas", summarize the ordered edits; refer to the last complete step as the final version and add only missing integration code.
+- Each practiceSteps item should include filePath, codeLanguage (e.g. jsx, typescript, python), testKind (code or manual), and testLanguage for runnable tests. Manual checks belong in testCode as Markdown numbered instructions, never a fenced prose paragraph. Keep each step focused on one responsibility; use a few coherent file-level increments rather than a tiny display component followed by one giant replacement that adds everything. Identify each final file version and keep earlier imports consistent.
+- Put EVERY interview speech on its own blockquote, separated by a blank line from list text. Do not hide it inline after a numbered explanation. Each speech must explain that step's decision, expected observation and trade-off naturally, in the selected response language.
+- Give integration/import wiring for every newly proposed file. Do not paste the same final component twice. Under "Mudanças propostas", summarize the ordered edits and identify the final version of EACH file, adding only missing integration code.
 - Treat supplied data as authoritative; never fabricate unseen production records. Synthetic examples are allowed only as clearly labeled test fixtures. If the real dataset is missing, mark that integration gap without withholding setup, architecture, or the rest of the useful practice plan.
 - Use recent screenshots and hot context first; use older screenshots only when they belong to the same current repository problem.
 - Continue the existing solution; do not silently replace earlier guidance with a disconnected answer.
@@ -816,11 +819,12 @@ function repositoryResponsePlan(turn: RepositoryTurn): string {
 2. "Perguntas de clarificação" / "Clarifying questions": ask three to five decisions that affect stack, permitted dependencies, dataset and acceptance criteria; do not ask what the supplied instructions already answer. State assumptions used to proceed.
 3. "Ambiente e stack" / "Environment and stack": distinguish required, observed and proposed tools/frameworks. Explain the choice and a practical alternative, prerequisites and current setup gaps, then include a natural blockquoted interview speech about this choice.
 4. "Instalação e execução" / "Setup and run": give a fenced shell command sequence with working directory, prerequisites, installation, start/build and verification. For an existing project, explicitly reuse its scaffold and available scripts. Never claim these commands have run.
-5. "Organização de arquivos" / "File organization": include a proposed file tree in a text fence, file responsibilities, import/entrypoint wiring, and a compact text data/component flow.
-6. "Plano por requisitos" / "Requirements plan": map each requested behavior to its implementation file and a concrete check in a short table; prioritize a working vertical slice.
-7. "Construção passo a passo" / "Step-by-step construction": explain two to four useful increments as Dúvida atual -> O que eu faria -> check/result -> Fala para entrevista. Return their full file/function versions and matching checks as practiceSteps, not orphan fragments. Include "Mudanças propostas" describing create/replace/insert and the final integration without duplicating the code already in step cards.
-8. "Validação" / "Validation": ordered unit/build/UI checks, exact expected outcomes, relevant complexity and trade-offs, and a concise closing interview speech.
-9. "Suposições e incertezas" / "Assumptions and uncertainties": distinguish proposed paths/tools and missing evidence from facts. Explicitly state what still needs to be installed, pasted, run or verified.`;
+5. "Organização de arquivos" / "File organization": include a proposed file tree in a text fence, file responsibilities and import/entrypoint wiring that match the actual step code.
+6. "Arquitetura e fluxo" / "Architecture and flow": illustrate the proposed files and data/events with a Mermaid flowchart immediately followed by a level-two "Legenda do diagrama" / "Diagram legend" explaining the arrows and responsibilities. Explain why this separation is enough for the task.
+7. "Plano por requisitos" / "Requirements plan": map each requested behavior to its implementation file and a concrete check in a short table; prioritize a working vertical slice.
+8. "Construção passo a passo" / "Step-by-step construction": use three to five focused increments for a multi-file task (two suffice for a genuinely small change). For each: current question, action/file, concrete before/after example, check/result and a standalone blockquoted interview speech. Return full file/function versions and matching checks as practiceSteps, not orphan fragments. Include "Mudanças propostas" describing create/replace/insert and the final integration without duplicating code already in step cards.
+9. "Validação" / "Validation": ordered unit/build/UI checks, exact expected outcomes, relevant complexity and trade-offs, and a concise closing interview speech.
+10. "Suposições e incertezas" / "Assumptions and uncertainties": distinguish proposed paths/tools and missing evidence from facts. Explicitly state what still needs to be installed, pasted, run or verified.`;
 }
 
 function hasRequiredRepositoryAnswer(output: ProviderGenerationOutput, turn: RepositoryTurn): boolean {
@@ -829,7 +833,7 @@ function hasRequiredRepositoryAnswer(output: ProviderGenerationOutput, turn: Rep
   const headings = turn === "initial" ? [
     "O que eu entendi|Understanding", "Perguntas de clarificação|Clarifying questions",
     "Ambiente e stack|Environment and stack", "Instalação e execução|Setup and run",
-    "Organização de arquivos|File organization", "Plano por requisitos|Requirements plan",
+    "Organização de arquivos|File organization", "Arquitetura e fluxo|Architecture and flow", "Plano por requisitos|Requirements plan",
     "Construção passo a passo|Step-by-step construction", "Validação|Validation",
     "Suposições e incertezas|Assumptions and uncertainties"
   ] : turn === "continuation" ? [
@@ -851,7 +855,8 @@ function hasRequiredRepositoryAnswer(output: ProviderGenerationOutput, turn: Rep
     !step.title.trim() || !step.objective.trim() || !step.completeCode.trim() || !step.testCode.trim()
     || !step.expectedResult.trim() || !step.explanation.trim() || !step.interviewerSpeech.trim())) return false;
   return turn !== "initial" || (/```(?:bash|sh|shell|powershell|cmd|console)\s*\r?\n\S[\s\S]*?```/i.test(content)
-    && /```(?:text|plaintext|tree)\s*\r?\n\S[\s\S]*?```/i.test(content));
+    && /```(?:text|plaintext|tree)\s*\r?\n\S[\s\S]*?```/i.test(content)
+    && [...content.matchAll(/```mermaid[^\S\r\n]*\r?\n\s*(?:flowchart|graph)\b[\s\S]+?```\s*\r?\n+##[ \t]+(?:\d+[.)—–-]?[ \t]+)?(?:Legenda do diagrama|Diagram legend)[^\r\n]*\r?\n([\s\S]*?)(?=\r?\n#{1,2}[ \t]+|$)/gi)].some((match) => match[1]?.trim()));
 }
 function designSystemCodePracticeUserText(
   input: ProviderGenerationInput,
@@ -1126,7 +1131,11 @@ function parsePracticeSteps(value: unknown): ProviderGenerationOutput["practiceS
       testCode: step.testCode as string,
       expectedResult: step.expectedResult as string,
       explanation: step.explanation as string,
-      interviewerSpeech: step.interviewerSpeech as string
+      interviewerSpeech: step.interviewerSpeech as string,
+      ...(typeof step.filePath === "string" && step.filePath.trim() && !/[\r\n]/.test(step.filePath) ? { filePath: step.filePath.trim().slice(0, 300) } : {}),
+      ...(typeof step.codeLanguage === "string" && /^[a-z0-9#+.-]{1,32}$/i.test(step.codeLanguage) ? { codeLanguage: step.codeLanguage.toLowerCase() } : {}),
+      ...(typeof step.testLanguage === "string" && /^[a-z0-9#+.-]{1,32}$/i.test(step.testLanguage) ? { testLanguage: step.testLanguage.toLowerCase() } : {}),
+      ...(step.testKind === "manual" || step.testKind === "code" ? { testKind: step.testKind as "manual" | "code" } : {})
     }];
   });
 }

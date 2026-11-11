@@ -10,8 +10,12 @@ Este procedimento usa o destino já documentado: `root@216.158.236.156`, checkou
 A versão atual inclui o guia completo de Repository e os controles de pedidos GPT-6 no backend,
 mais modelos novos e correção de pausa no Capture 0.1.2. Para essas mudanças, atualize/reinicie
 API e worker na VPS **e** instale o Capture novo no Windows. Não há migração nem variável nova.
-O web já sabe renderizar os cards de código/teste; não há mudança no contrato público. O rebuild
-do Response abaixo é o ciclo completo existente, mas não é necessário só para os prompts novos.
+O ajuste mais recente também corrige cores dos códigos, citações, checks manuais e diagramas de
+Repository no web. **É obrigatório reconstruir e reiniciar o Response**, além de API/worker.
+Os metadados dos passos são opcionais e compatíveis com respostas antigas; não há migração.
+Para este ajuste visual/roteiro, não é necessário gerar outro instalador Electron; o Capture
+0.1.2 já instalado continua servindo. Recarregue o web após o deploy: respostas antigas ganham a
+apresentação corrigida, e uma nova geração aplica o roteiro v3 com arquitetura ilustrada.
 
 ### 1. Enviar o código local ao GitHub
 
@@ -21,9 +25,9 @@ No PowerShell, revise os arquivos e envie a alteração (não inclua `.env.local
 cd C:\Users\guilherme\Downloads\persuando
 git status --short
 git diff
-git add -- README.md docs apps/api/src/modules/providers/openai-compatible-provider.adapter.ts apps/api/test/providers.test.mjs apps/capture package-lock.json
+git add -- README.md docs apps/api/src/modules/providers/openai-compatible-provider.adapter.ts apps/api/test/providers.test.mjs apps/response/src/app/globals.css "apps/response/src/app/sessions/[sessionId]/session-realtime-client.tsx" apps/response/src/lib/practice-presentation.mjs apps/response/test apps/response/tsconfig.json packages/contracts/src/types.ts
 git diff --cached --stat
-git commit -m "feat: improve repository coaching and add current model choices"
+git commit -m "fix: restore practice presentation and improve repository architecture coaching"
 git push origin master
 ```
 

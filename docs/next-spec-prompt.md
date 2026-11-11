@@ -14,9 +14,13 @@ Source request/context:
 A requirements-only inventory screenshot produced a large React component without setup, folder
 organization, useful incremental checks or natural interview speech. Repository now distinguishes
 required/observed/proposed stack; first turns require installation commands, a proposed folder tree
-and data flow, requirement mapping, and at least two complete structured code/test-or-manual-check
-steps. Continuations reuse setup; completion closes with evidence. A structural validator repairs
-once, then emits a safe error. Versioned private analysis refreshes pre-v2 guidance once.
+and a Mermaid file/data/event flow with adjacent legend, requirement mapping, and focused complete
+structured code/test-or-manual-check steps. Teaching v3 requests consistent folders/imports/code,
+concrete examples and standalone interview speeches. Response restores colored code cards, readable
+manual checks and consistent callouts, including retained legacy answers. Continuations reuse setup;
+completion closes with evidence. A structural validator repairs once, then emits a safe error.
+Versioned private analysis refreshes pre-v3 guidance once. Local tests/build and desktop/mobile
+fixture rendering pass; actual provider output still needs semantic evaluation.
 Capture 0.1.2 adds gpt-6-luna, gpt-6.1-terra, gpt-6.1-sol and gpt-6-astra; GPT-6 requests use low
 reasoning effort with Chat Completions. The saved model choice and previous controls are preserved.
 Pause/end/revoke/session changes now guard screenshots and discard stale in-flight results.
@@ -33,7 +37,11 @@ Requirements:
 - Score stack evidence versus proposal, correct prerequisites/install commands, no destructive
   re-scaffolding, accurate entrypoint/import wiring, minimal architecture, and requirement coverage.
 - Verify complete incremental files/functions, reproducible matching checks, expected results and
-  natural step-specific speech; detect duplicate code dumps and generic commentary.
+  natural step-specific speech; detect duplicate code dumps and generic commentary. Compare the
+  proposed tree, diagram labels/arrows, imports, actual implemented files and requirement coverage;
+  detect modules promised by the narrative but missing from code or collapsed into one large file.
+- Exercise legacy/new step metadata, JSX/TSX highlighting, inline versus structured speeches,
+  manual checks, invalid Mermaid fallback, diagram expansion and narrow layouts without overflow.
 - Compare GPT-6 Luna, Terra, Sol and Astra with the same screenshots/history and explicit account
   availability. Record visual/answer/repair latency, time to first useful artifact, tokens and cost
   without logging private prompts, screenshots, credentials or chain-of-thought.

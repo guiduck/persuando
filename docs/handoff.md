@@ -2,6 +2,12 @@
 
 ## Current Status
 
+- `latest_repository_presentation` (2026-11-11): restored syntax highlighting in practice cards,
+  consistent blue interview-speech callouts (including retained inline labels), readable manual
+  checks, and Repository architecture diagrams with adjacent legends and expansion. Teaching v3
+  asks for coherent folders/imports/code and smaller file-level increments. Deploy API/worker and
+  rebuild/restart Response; no database migration or new Capture installer is needed for this fix.
+
 - `latest_packaging_repair` (2026-11-11): restored lock-safe Windows packaging after the update
   discarded the earlier local runner/commands. Capture 0.1.2 now packages into unique build
   directories using the standard npm commands, with regression coverage for entrypoint wiring.
@@ -21,6 +27,34 @@
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
+
+### Repository presentation and architecture refinement - 2026-11-11
+
+- User evidence: code in structured cards bypassed Markdown/highlight; card blockquotes were outside
+  the styled Markdown scope; inline interview speech remained buried in lists. Manual UI instructions
+  rendered as code, and proposed architecture was not reflected in the mostly single-file walkthrough.
+- Response: shared safe fenced-code/highlight rendering for step code/tests, optional file/language/
+  test-kind metadata, legacy language/manual-check fallbacks, shared speech styling and normalization
+  outside code fences. Manual checks wrap as Markdown; cards remove default figure indentation and
+  stack on mobile. Repository reuses strict Mermaid/legend rendering and the existing dialog.
+- Provider: v3 requires architecture/flow and a non-empty adjacent diagram legend on initial turns,
+  with the existing single repair; requests synchronized tree/import/code, concrete examples and
+  smaller increments. Continuations/completion retain their bounded scope. Optional metadata is
+  preserved through the additive PracticeStep contract. Previous guides refresh once on generation.
+- Validation: `npm test` passed all 180 tests; updated provider assertions also passed all 33 provider
+  tests. Production Response build passed, including TypeScript and standalone preparation. Initial
+  sandbox standalone assembly hit EPERM; the authorized local build outside the sandbox passed.
+  Playwright on the production bundle with synthetic history verified distinct syntax colors, four
+  blue speech callouts, manual numbered checks without pre blocks, zero figure indentation, diagram
+  expansion/Escape, and no page overflow at 1440px/390px. Desktop/mobile/architecture images were
+  visually inspected. Only the unrelated missing favicon returned 404 during that fixture smoke.
+  `npm run lint` and `git diff --check` passed. Global `npm run format` still reports missing final
+  newlines in two pre-existing generated `release/capture*/win-unpacked/vk_swiftshader_icd.json`
+  vendor files; changed source files have final newlines and those generated artifacts were preserved.
+- Remaining: no real-provider calls, production deployment, or semantic evaluation of generated
+  multi-file code was performed. Structural validation cannot prove diagram/code consistency.
+  Refresh the web for legacy presentation fixes; generate again for the new architectural content.
+  Recommended next Spec Kit step: Repository quality and latency evaluation in docs/next-spec-prompt.md.
 
 ### Windows packaging recurrence - 2026-11-11
 

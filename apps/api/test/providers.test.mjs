@@ -502,6 +502,7 @@ function repositoryAnswer(turn = "initial", english = false) {
   const steps = [
     {
       title: "src/lib/selectProducts.js — criar seleção mínima", objective: "Create the first complete selection function.",
+      filePath: "src/lib/selectProducts.js", codeLanguage: "javascript", testLanguage: "javascript", testKind: "code",
       completeCode: "export function selectProducts(products) { return products.filter(product => product.stock > 0); }",
       testCode: "import assert from 'node:assert/strict';\nimport { selectProducts } from './selectProducts.js';\n// Synthetic test fixture\nassert.deepEqual(selectProducts([{stock: 0}, {stock: 2}]), [{stock: 2}]);",
       expectedResult: "Only the product with stock 2 is returned.", explanation: "Filtering creates a new list and preserves the input.",
@@ -530,6 +531,8 @@ function repositoryAnswer(turn = "initial", english = false) {
           heading("Ambiente e stack", "Environment and stack", `JavaScript está visível; React/Vite são uma proposta se permitidos, não fatos observados. Alternativa: DOM nativo.\n${speech}`),
           heading("Instalação e execução", "Setup and run", "Proposta para uma pasta nova, fora da pasta existente; conferir Node/npm antes.\n```bash\nnode --version\nnpm --version\nnpm create vite@latest product-dashboard -- --template react\ncd product-dashboard\nnpm install\nnpm run dev\nnpm run build\n```\nO template não contém npm test; configurar o runner antes de usar esse script."),
           heading("Organização de arquivos", "File organization", "Árvore proposta:\n```text\nsrc/\n  App.jsx\n  data/products.js\n  lib/selectProducts.js\n```\nO entrypoint importa App, App importa dados e seleção. Dataset -> função pura -> estado -> lista."),
+          heading("Arquitetura e fluxo", "Architecture and flow", "```mermaid\nflowchart LR\n  Data[\"data/products.js\"] --> App[\"App.jsx\"]\n  App --> Select[\"lib/selectProducts.js\"]\n  Select --> List[\"Lista renderizada\"]\n```"),
+          heading("Legenda do diagrama", "Diagram legend", "- **data/products.js** fornece os dados a **App.jsx**.\n- **App.jsx** passa dados e filtros à função pura **lib/selectProducts.js** e renderiza a lista retornada."),
           heading("Plano por requisitos", "Requirements plan", "| Requisito | Arquivo | Checagem |\n| --- | --- | --- |\n| Busca e estoque | src/lib/selectProducts.js | BOOK e estoque zero |"),
           ...common
         ].join("\n\n");
@@ -637,6 +640,12 @@ test("Repository repairs an answer missing setup, architecture and paired steps 
   assert.doesNotMatch(requests[2].messages[1].content, /include the complete platform solution under/);
   assert.match(output.suggestions[0].content, /npm create vite@latest/);
   assert.equal(output.practiceSteps.length, 2);
+  assert.equal(output.practiceSteps[0].filePath, "src/lib/selectProducts.js");
+  assert.equal(output.practiceSteps[0].codeLanguage, "javascript");
+  assert.equal(output.practiceSteps[0].testKind, "code");
+  assert.equal(output.practiceSteps[0].testLanguage, "javascript");
+  assert.match(requests[1].messages[1].content, /SAME implementation/);
+  assert.match(requests[1].messages[1].content, /EVERY interview speech on its own blockquote/);
 });
 
 test("Repository rejects persistently incomplete answers after the bounded repair", async () => {
@@ -649,10 +658,12 @@ test("Repository rejects persistently incomplete answers after the bounded repai
   assert.equal(requests, 3);
 });
 
-test("Repository repairs missing interview speech, file tree or a second incremental step", async () => {
+test("Repository repairs missing interview speech, tree, diagram/legend or a second step", async () => {
   for (const breakAnswer of [
     (answer) => { answer.suggestions[0].content = answer.suggestions[0].content.replace(/^>.*$/gm, ""); },
     (answer) => { answer.suggestions[0].content = answer.suggestions[0].content.replace(/```text[\s\S]*?```/, "Paths are proposed."); },
+    (answer) => { answer.suggestions[0].content = answer.suggestions[0].content.replace(/```mermaid[\s\S]*?```/, "Dataset -> UI"); },
+    (answer) => { answer.suggestions[0].content = answer.suggestions[0].content.replace(/(## Legenda do diagrama)[\s\S]*?(?=\n\n##)/, "$1\n"); },
     (answer) => { answer.practiceSteps = answer.practiceSteps.slice(0, 1); }
   ]) {
     let count = 0;
@@ -676,7 +687,7 @@ test("Repository continues an existing project without repeating installation an
       const payload = requests.length === 1 ? { problemFingerprint: "inventory", repositoryStage: stage, currentAttempt: "new implementation" } : repositoryAnswer(stage === "complete" ? "complete" : "continuation");
       return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(payload) } }] });
     });
-    const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["The project already starts with Vite and the parser exists."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "inventory", currentAttempt: "earlier implementation", repositoryTeachingVersion: 2 }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "new screenshot" });
+    const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["The project already starts with Vite and the parser exists."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "inventory", currentAttempt: "earlier implementation", repositoryTeachingVersion: 3 }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "new screenshot" });
     assert.equal(requests.length, 2);
     assert.match(requests[1].messages[1].content, /Repository turn: (continuation|complete)/);
     assert.doesNotMatch(output.suggestions[0].content, /npm create vite|## Instalação e execução/);
@@ -705,13 +716,13 @@ test("Repository recognizes setup progress with unchanged implementation and acc
   assert.match(next.suggestions[0].content, /## File organization/);
 });
 
-test("Repository refreshes pre-v2 retained guidance even for an unchanged problem", async () => {
+test("Repository refreshes v2 retained guidance even for an unchanged problem", async () => {
   const requests = [];
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
     requests.push(JSON.parse(init.body));
     return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(requests.length === 1 ? { problemFingerprint: "new-inventory", currentAttempt: "same" } : repositoryAnswer()) } }] });
   });
-  const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["Old guide without setup."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "new-inventory", currentAttempt: "same", repositoryInstructionsFingerprint: "old-v1-fingerprint" }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "same task" });
+  const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["Old guide with everything in App.jsx."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "new-inventory", currentAttempt: "same", repositoryTeachingVersion: 2, repositoryInstructionsFingerprint: "old-v2-fingerprint" }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "same task" });
   assert.equal(requests.length, 2);
   assert.match(requests[1].messages[1].content, /Repository turn: initial/);
   assert.equal(output.practiceSteps.length, 2);

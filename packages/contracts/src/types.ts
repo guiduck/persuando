@@ -55,6 +55,10 @@ export type InterviewResponseLanguage = "en-US" | "pt-BR";
 export type ProviderOperation = "transcription" | "conversation" | VisualGenerationMode;
 
 export interface PracticeStep {
+  filePath?: string;
+  codeLanguage?: string;
+  testLanguage?: string;
+  testKind?: "code" | "manual";
   title: string;
   objective: string;
   completeCode: string;

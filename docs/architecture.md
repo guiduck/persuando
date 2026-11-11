@@ -123,12 +123,18 @@ metadata in `capture_events`; raw audio bytes are not logged or stored by this i
 
 Repository tutoring now has separate initial, continuation and completion teaching contracts. Initial
 responses include environment/stack evidence and proposals, setup commands, a proposed file tree and
-data flow, requirement mapping, and at least two complete structured code/check steps. Continuations
+an illustrated Mermaid file/data/event flow with adjacent legend, requirement mapping, and at least
+two complete structured code/check steps (three to five focused increments for multi-file tasks). Continuations
 reuse setup and require only the next useful code/check step; visible completion closes the exercise.
 The provider validates headings/artifacts and retries one malformed answer before a safe error.
 Private visual analysis includes repository environment/stage fields in change comparison. A versioned
-instructions fingerprint refreshes old retained analysis once; no schema/public contract change is needed.
-Response already renders PracticeStep cards, so no web UI change is needed to show Repository pairs.
+instructions fingerprint v3 refreshes old retained analysis once; no database migration is needed.
+PracticeStep gains optional filePath/codeLanguage/testLanguage/testKind metadata; legacy payloads
+remain valid. Response renders step code through its existing Markdown/highlight pipeline, manual
+checks as readable Markdown, and all interview speeches through the shared blue callout style.
+Repository reuses the strict diagram/legend renderer and accessible expansion dialog. Existing
+retained answers receive presentation fixes without rewriting persisted content. API/worker and
+Response must be rebuilt/restarted for this delivery.
 
 The AI pipeline processes authorized session context only. MVP processing starts with backend-orchestrated microphone transcription, incremental summaries, topic/keyword explanations, direct suggested responses to questions, and code/practice explanations from consented screen/coding context. Future processing may add robust system audio, diarization, automatic platform detection, and broader visual context automation only through later consent-gated specs.
 

@@ -449,6 +449,14 @@ Useful logs:
 
 Repository-mode smoke should use a new session, select Code Practice, switch the panel to `Repository`, capture the visible editor plus terminal/test output, request guidance, then verify the answer labels observable evidence, distinguishes current versus stale context, proposes concrete changes, and does not invent unseen files, command output, or repository-wide searches.
 
+Repository teaching v3 adds an illustrated file/data/event flow with an adjacent legend and requests
+consistent folder responsibilities, imports and complete incremental files. Practice cards share the
+main Markdown syntax highlighting and blue interview-speech callouts; manual checks render as readable
+instructions. Retained answers receive presentation fixes on reload; regenerate for the revised
+architecture narrative. This delivery requires rebuilding/restarting Response and API/worker, with no
+database migration or new Electron installer. See [Repository practice](docs/repository-practice.md)
+and [VPS deployment](docs/vps-deployment.md).
+
 ### Independent Code Practice And System Design Panels
 
 Code Practice exposes `Code Problem` (`exercise`) and `Repository` (`repository`) in Response. The legacy `design_system` workflow remains accepted by contracts/provider routing for backward compatibility, but new UI uses the independent `system_design` generation mode for architecture interviews.

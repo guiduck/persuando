@@ -64,6 +64,13 @@ Current implementation validation:
 - Code Practice structured steps render complete code and the matching runnable example test side by
   side, with expected output, rationale, and prominent interview speech. The layout stacks on narrow
   screens.
+- Step code and runnable tests now share the main answer's syntax highlighting, including retained
+  legacy cards. Optional file paths appear in the header; manual checks render as wrapping Markdown
+  instructions instead of horizontally scrolling code. Cards and narrative quotations share the blue
+  speech callout, including legacy inline interview-speech labels outside fenced code.
+- Repository architecture now uses the same strict Mermaid/adjacent-legend presentation and expansion
+  dialog as System Design. The generated folder tree, file responsibilities, imports and steps should
+  describe one coherent implementation; this semantic quality still needs real-provider smoke.
 - System Design renders provider-supplied fenced Mermaid diagrams through strict lazy-loaded Mermaid;
   invalid diagrams fall back to visible source instead of executing arbitrary page content.
 - System Design makes progress explicit through nine numbered headings in the fixed order Requirements,

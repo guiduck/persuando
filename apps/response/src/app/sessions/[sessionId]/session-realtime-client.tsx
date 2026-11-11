@@ -25,6 +25,7 @@ import { isValidElement, useEffect, useId, useMemo, useRef, useState, type Compo
 
 import { SortableSessionLayout, type SessionLayoutCardKey } from "./sortable-session-layout";
 import { clearRepositorySetup, loadRepositorySetup, RepositoryInstructionsStep, saveRepositorySetup, type RepositoryPracticeSetup } from "./repository-instructions";
+import { codeLanguage, emphasizeInterviewSpeech, fencedCode, isManualCheck } from "../../../lib/practice-presentation.mjs";
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "offline" | "deleted";
 type GenerateMode = "summary" | "insights" | "followups" | VisualGenerationMode;
@@ -36,7 +37,7 @@ const MAX_SCREEN_CONTEXTS = 30;
 const MAX_SYSTEM_DESIGN_SCREEN_CONTEXTS = 6;
 const GENERATION_SLOW_NOTICE_MS = 180_000;
 const GENERATION_TIMEOUT_MS = 600_000;
-const systemDesignDiagramLegendPattern = /(?:^|\r?\n)(?:#{2,3}[ \t]+(?:Diagrama da solução|Solution diagram|Architecture diagram)[^\r\n]*\r?\n+)?```mermaid[^\S\r\n]*\r?\n([\s\S]+?)```\s*\r?\n+#{2}[ \t]+(Legenda do diagrama|Diagram legend)[^\r\n]*\r?\n([\s\S]*?)(?=\r?\n#{1,2}[ \t]+|$)/i;
+const systemDesignDiagramLegendPattern = /(?:^|\r?\n)(?:#{2,3}[ \t]+(?:Diagrama da solução|Solution diagram|Architecture diagram)[^\r\n]*\r?\n+)?```mermaid[^\S\r\n]*\r?\n([\s\S]+?)```\s*\r?\n+#{2}[ \t]+(?:\d+[.)—–-]?[ \t]+)?(Legenda do diagrama|Diagram legend)[^\r\n]*\r?\n([\s\S]*?)(?=\r?\n#{1,2}[ \t]+|$)/i;
 const layoutCardLabels: Record<SessionLayoutCardKey, string> = {
   answers: "What to say",
   code: "Code practice",
@@ -807,8 +808,8 @@ function CopilotPanel({ className, codePracticeWorkflow, error, explanations, fo
           explanations.map((explanation) => (
             <article className="artifact" key={explanation.contextId}>
               <span className="pill active">{explanation.assistantMode === "system_design" ? "system design" : explanation.codePracticeWorkflow ?? explanation.kind}</span>
-              {explanation.assistantMode === "system_design"
-                ? <SystemDesignExplanationContent content={explanation.content} />
+              {explanation.assistantMode === "system_design" || explanation.codePracticeWorkflow === "repository"
+                ? <SystemDesignExplanationContent content={explanation.content} diagramLabel={explanation.codePracticeWorkflow === "repository" ? "Repository architecture diagram" : "System Design architecture diagram"} />
                 : <MarkdownContent content={explanation.content} />}
               {explanation.practiceSteps?.length ? <PracticeStepCards steps={explanation.practiceSteps} /> : null}
             </article>
@@ -963,25 +964,24 @@ function PracticeStepCards({ steps }: Readonly<{ steps: PracticeStep[] }>) {
           <header>
             <span className="pill active">etapa {index + 1}</span>
             <h4>{step.title}</h4>
+            {step.filePath ? <code className="practice-file-path">{step.filePath}</code> : null}
             <p>{step.objective}</p>
           </header>
           <div className="code-test-grid">
             <div>
               <h5>Código completo nesta etapa</h5>
-              <figure className="code-block">
-                <pre><code>{step.completeCode}</code></pre>
-              </figure>
+              <MarkdownContent content={fencedCode(step.completeCode, codeLanguage(step.completeCode, step.codeLanguage ?? step.filePath ?? step.title))} />
             </div>
             <div>
-              <h5>Teste desta etapa</h5>
-              <figure className="code-block">
-                <pre><code>{step.testCode}</code></pre>
-              </figure>
+              <h5>{isManualCheck(step) ? "Verificação manual desta etapa" : "Teste desta etapa"}</h5>
+              <div className={isManualCheck(step) ? "practice-manual-check" : undefined}>
+                <MarkdownContent content={isManualCheck(step) ? step.testCode : fencedCode(step.testCode, codeLanguage(step.testCode, step.testLanguage ?? step.codeLanguage ?? step.filePath ?? step.title))} />
+              </div>
               <p><strong>Resultado esperado:</strong> {step.expectedResult}</p>
             </div>
           </div>
           <p>{step.explanation}</p>
-          <blockquote>
+          <blockquote className="interview-speech">
             <strong>Fala para entrevista:</strong> {step.interviewerSpeech}
           </blockquote>
         </article>
@@ -994,26 +994,26 @@ function MarkdownContent({ content }: Readonly<{ content: string }>) {
   return (
     <div className="markdown-content">
       <ReactMarkdown components={{ code: MarkdownCode, pre: MarkdownPre }} rehypePlugins={[rehypeHighlight]} skipHtml>
-        {content}
+        {emphasizeInterviewSpeech(content)}
       </ReactMarkdown>
     </div>
   );
 }
 
-function SystemDesignExplanationContent({ content }: Readonly<{ content: string }>) {
+function SystemDesignExplanationContent({ content, diagramLabel = "System Design architecture diagram" }: Readonly<{ content: string; diagramLabel?: string }>) {
   const paired = extractSystemDesignDiagramLegend(content);
   if (!paired) return <MarkdownContent content={content} />;
 
   return (
     <div className="system-design-explanation">
       {paired.before ? <MarkdownContent content={paired.before} /> : null}
-      <SystemDesignDiagramWithLegend chart={paired.chart} legend={paired.legend} legendTitle={paired.legendTitle} />
-      {paired.after ? <SystemDesignExplanationContent content={paired.after} /> : null}
+      <SystemDesignDiagramWithLegend chart={paired.chart} diagramLabel={diagramLabel} legend={paired.legend} legendTitle={paired.legendTitle} />
+      {paired.after ? <SystemDesignExplanationContent content={paired.after} diagramLabel={diagramLabel} /> : null}
     </div>
   );
 }
 
-function SystemDesignDiagramWithLegend({ chart, legend, legendTitle }: Readonly<{ chart: string; legend: string; legendTitle: string }>) {
+function SystemDesignDiagramWithLegend({ chart, diagramLabel, legend, legendTitle }: Readonly<{ chart: string; diagramLabel?: string; legend: string; legendTitle: string }>) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -1021,7 +1021,7 @@ function SystemDesignDiagramWithLegend({ chart, legend, legendTitle }: Readonly<
       <section aria-label="Diagrama da arquitetura e sua legenda" className="system-design-diagram-legend-grid">
         <div className="system-design-diagram-column">
           <span className="pill active">diagrama da solução</span>
-          <MermaidDiagram chart={chart} onExpand={() => setIsOpen(true)} />
+          <MermaidDiagram chart={chart} label={diagramLabel} onExpand={() => setIsOpen(true)} />
         </div>
         <aside aria-label={legendTitle} className="system-design-legend-column">
           <span className="pill">leitura do diagrama</span>
@@ -1032,6 +1032,7 @@ function SystemDesignDiagramWithLegend({ chart, legend, legendTitle }: Readonly<
       {isOpen ? (
         <SystemDesignDiagramDialog
           chart={chart}
+          diagramLabel={diagramLabel}
           legend={legend}
           legendTitle={legendTitle}
           onClose={() => setIsOpen(false)}
@@ -1041,8 +1042,9 @@ function SystemDesignDiagramWithLegend({ chart, legend, legendTitle }: Readonly<
   );
 }
 
-function SystemDesignDiagramDialog({ chart, legend, legendTitle, onClose }: Readonly<{
+function SystemDesignDiagramDialog({ chart, diagramLabel, legend, legendTitle, onClose }: Readonly<{
   chart: string;
+  diagramLabel?: string;
   legend: string;
   legendTitle: string;
   onClose(): void;
@@ -1082,7 +1084,7 @@ function SystemDesignDiagramDialog({ chart, legend, legendTitle, onClose }: Read
         </header>
         <div className="system-design-diagram-dialog-body">
           <div className="system-design-diagram-dialog-canvas">
-            <MermaidDiagram chart={chart} />
+            <MermaidDiagram chart={chart} label={diagramLabel} />
           </div>
           <section aria-label={legendTitle} className="system-design-diagram-dialog-legend">
             <span className="pill">leitura do diagrama</span>
@@ -1135,7 +1137,7 @@ function MarkdownPre({ children }: ComponentProps<"pre">) {
   );
 }
 
-function MermaidDiagram({ chart, onExpand }: Readonly<{ chart: string; onExpand?: () => void }>) {
+function MermaidDiagram({ chart, label = "Architecture diagram", onExpand }: Readonly<{ chart: string; label?: string; onExpand?: () => void }>) {
   const reactId = useId();
   const [imageUrl, setImageUrl] = useState<string | undefined>();
   const [error, setError] = useState(false);
@@ -1180,10 +1182,10 @@ function MermaidDiagram({ chart, onExpand }: Readonly<{ chart: string; onExpand?
             title="Abrir diagrama em tela ampliada"
             type="button"
           >
-            <img alt="System Design architecture diagram" src={imageUrl} />
+            <img alt={label} src={imageUrl} />
             <span aria-hidden="true" className="mermaid-diagram-expand-label">⛶ Ampliar</span>
           </button>
-        ) : <img alt="System Design architecture diagram" src={imageUrl} />}
+        ) : <img alt={label} src={imageUrl} />}
       </figure>
     );
   }

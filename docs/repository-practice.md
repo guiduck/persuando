@@ -9,16 +9,39 @@ Na primeira resposta de um problema, Repository agora segue esta ordem:
 3. **Ambiente e stack**: ferramentas exigidas pelo enunciado, observadas na tela e propostas, com justificativa.
 4. **Instalação e execução**: comandos, pasta em que rodar, dependências, inicialização, build e resultado esperado.
 5. **Organização de arquivos**: árvore proposta, responsabilidades, imports/entrypoint e fluxo de dados.
-6. **Plano por requisitos**: tabela que relaciona cada comportamento a arquivo e checagem.
-7. **Construção passo a passo**: dois a quatro incrementos, do mínimo funcional às demais regras.
-8. **Validação**: testes/checks, resultados esperados, complexidade e trade-offs.
-9. **Suposições e incertezas**: o que ainda falta instalar, colar, executar ou confirmar.
+6. **Arquitetura e fluxo**: diagrama Mermaid dos arquivos e dados/eventos, seguido de legenda.
+7. **Plano por requisitos**: tabela que relaciona cada comportamento a arquivo e checagem.
+8. **Construção passo a passo**: três a cinco incrementos por responsabilidade em tarefas com vários
+   arquivos; dois bastam para uma mudança pequena.
+9. **Validação**: testes/checks, resultados esperados, complexidade e trade-offs.
+10. **Suposições e incertezas**: o que ainda falta instalar, colar, executar ou confirmar.
 
 Cada incremento usa os mesmos cards de Code Problem: arquivo/ação no título, objetivo, código
 completo, teste ou check manual reproduzível, resultado esperado, explicação e **Fala para entrevista**.
 O texto descreve a sequência sem repetir o mesmo componente inteiro em várias seções. Uma continuação
 do mesmo exercício mostra diagnóstico, próximo incremento e validação; um problema novo reinicia o
 guia. Uma conclusão com evidências encerra o exercício sem inventar novas alterações.
+
+A árvore, o diagrama, os imports e os códigos devem representar a mesma implementação. Para uma
+lista interativa, a proposta pode separar dados, seleção pura e componentes de interface, explicando
+por que isso basta. Cada arquivo novo alterado pelo exercício deve ter conteúdo completo e ligação
+com o entrypoint. O roteiro pede exemplos concretos antes/depois, incluindo filtros combinados e
+resultado vazio; não deve prometer módulos na árvore e concentrar todas as regras em `App.jsx`.
+
+Os cards usam o mesmo realce de sintaxe do Markdown principal. `filePath`, `codeLanguage`,
+`testLanguage` e `testKind` são metadados opcionais: respostas antigas continuam funcionando, com
+inferência de linguagem pelo arquivo/código e detecção de checks manuais identificados. Checks
+manuais aparecem como instruções Markdown; testes executáveis mantêm blocos de código. Falas dos
+cards e citações no texto compartilham o destaque azul. Rótulos antigos inline como
+`**Interview speech** → ...` passam a uma citação, preservando a explicação e os blocos de código.
+
+O diagrama e sua legenda renderizam lado a lado quando há espaço e empilham no celular; o diagrama
+pode ser ampliado e fechado com Escape. O Mermaid usa o renderer estrito existente e mantém fonte
+visível se a renderização falhar. A validação v3 exige o par diagrama/legenda na resposta inicial e
+mantém uma tentativa de reparo. A próxima geração renova guias anteriores uma vez. A apresentação
+de respostas antigas melhora ao recarregar, mas seu conteúdo só muda com uma nova geração.
+Testes estruturais não garantem a qualidade semântica de todos os arquivos produzidos pelo modelo;
+o smoke com provedor real continua necessário.
 
 Um `script.js` com comentários e um array incompleto não prova que React/Vite esteja instalado nem
 que esse framework seja obrigatório. Se o enunciado pedir React (ou permitir essa escolha), o tutor

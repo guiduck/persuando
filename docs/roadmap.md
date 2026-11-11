@@ -3,6 +3,19 @@
 This file describes the stable product direction. For current execution status, see
 `docs/handoff.md`.
 
+## Update - 2026-11-11 Repository Presentation And Architecture
+
+- Phase 3 quality correction: practice cards regain syntax highlighting and consistent speech
+  callouts; manual checks render as readable instructions. Retained answers remain supported.
+- Repository v3 adds an illustrated file/data/event flow with adjacent legend and asks for coherent
+  folder responsibilities, imports, complete files and smaller incremental steps. The web reuses
+  the strict Mermaid renderer and accessible expansion dialog. New metadata remains optional.
+- Validation: 180 tests, production Response build, and fixture-based desktop/mobile visual smoke
+  passed. Gates: deploy/rebuild API/worker/Response and evaluate generated code/architecture with a
+  real provider. No new Capture installer or database migration is required for this correction.
+- Semantic architecture scoring and latency measurement remain in the next quality evaluation;
+  this delivery does not claim a model benchmark or guarantee arbitrary generated code correctness.
+
 ## Update - 2026-11-11 Repeatable Windows Packaging
 
 - Phase 3 release repair: both Windows packaging commands now use the shared Node runner with

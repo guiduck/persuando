@@ -149,7 +149,7 @@ test("System Design pairs every Mermaid diagram with its explanatory legend", ()
   assert.match(sessionPage, /Diagrama da arquitetura e sua legenda/);
   assert.match(sessionPage, /paired\.chart/);
   assert.match(sessionPage, /paired\.legend/);
-  assert.match(sessionPage, /paired\.after \? <SystemDesignExplanationContent content=\{paired\.after\} \/>/);
+  assert.match(sessionPage, /paired\.after \? <SystemDesignExplanationContent content=\{paired\.after\} diagramLabel=\{diagramLabel\} \/>/);
   assert.match(sessionPage, /if \(!paired\) return <MarkdownContent content=\{content\} \/>/);
   assert.match(globalCss, /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 320px\), 1fr\)\)/);
   assert.match(globalCss, /\.system-design-legend-column/);

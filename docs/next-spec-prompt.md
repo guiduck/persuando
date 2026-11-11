@@ -1,6 +1,63 @@
 ## Command
 speckit.specify
 
+## Latest Prepared Prompt - 2026-11-11 Repository Quality And Latency Evaluation
+
+```text
+/speckit-specify Specify measured Repository tutoring quality and latency across current model choices.
+
+Objective:
+Evaluate environment/setup/architecture coaching and progressive code/test guidance while reducing
+time to the first useful answer without losing accuracy or interview communication quality.
+
+Source request/context:
+A requirements-only inventory screenshot produced a large React component without setup, folder
+organization, useful incremental checks or natural interview speech. Repository now distinguishes
+required/observed/proposed stack; first turns require installation commands, a proposed folder tree
+and data flow, requirement mapping, and at least two complete structured code/test-or-manual-check
+steps. Continuations reuse setup; completion closes with evidence. A structural validator repairs
+once, then emits a safe error. Versioned private analysis refreshes pre-v2 guidance once.
+Capture 0.1.2 adds gpt-6-luna, gpt-6.1-terra, gpt-6.1-sol and gpt-6-astra; GPT-6 requests use low
+reasoning effort with Chat Completions. The saved model choice and previous controls are preserved.
+Pause/end/revoke/session changes now guard screenshots and discard stale in-flight results.
+
+Project context:
+Read README.md, docs/repository-practice.md, docs/architecture.md, docs/reference-ui.md,
+docs/vps-deployment.md, docs/handoff.md, docs/roadmap.md, the provider adapter/validation tests,
+Capture screenshot lifecycle helper/tests, existing PracticeStep contracts and Response renderer.
+Honor Constitution II: visible consented practice; no hidden capture or indicator suppression.
+
+Requirements:
+- Define PT/EN fixtures for a bare script, explicit React requirement, framework-free task, existing
+  manifest/lockfile, mobile/backend stack, missing data, conflicting instructions and repeated views.
+- Score stack evidence versus proposal, correct prerequisites/install commands, no destructive
+  re-scaffolding, accurate entrypoint/import wiring, minimal architecture, and requirement coverage.
+- Verify complete incremental files/functions, reproducible matching checks, expected results and
+  natural step-specific speech; detect duplicate code dumps and generic commentary.
+- Compare GPT-6 Luna, Terra, Sol and Astra with the same screenshots/history and explicit account
+  availability. Record visual/answer/repair latency, time to first useful artifact, tokens and cost
+  without logging private prompts, screenshots, credentials or chain-of-thought.
+- Measure sequential-phase latency before proposing streaming, per-phase model routing, screenshot
+  pruning or effort controls. Never assume a faster tier or more expensive service mode is enabled.
+- Cover paused/ended/revoked/replaced sessions, rapid pause/resume, old retained analyses, invalid
+  output, budget exhaustion, unavailable model and provider compatibility.
+
+Artifact considerations:
+Current persisted Markdown/PracticeSteps and private visual metadata need no migration. Any future
+streaming/routing changes need explicit contracts, cancellation, retention, replay and rollout rules.
+Keep Windows privacy indicators and existing Code Problem/System Design behavior intact.
+
+Risks/assumptions:
+Structural tests do not prove tutoring quality or latency improvement. Longer initial answers may
+increase total latency; benchmarks must distinguish that from shorter continuation turns. An
+unseen package.json is not proof of an empty project, and a dev server is not an automated test.
+
+Expected output:
+Produce a scoped quality/latency specification with fixtures, scoring thresholds, comparative
+measurements, manual smoke, rollout/rollback and documentation closeout. Do not generate tasks or
+activate paid provider traffic until the actual evaluation work is requested and configured.
+```
+
 ## Latest Prepared Prompt - 2026-11-11 Capture Release Verification
 
 ```text

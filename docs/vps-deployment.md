@@ -7,10 +7,11 @@ This guide describes the current practical deployment shape for Persuando.
 Este procedimento usa o destino já documentado: `root@216.158.236.156`, checkout em
 `/srv/projects/persuando`, branch `master`, API `4100`, Response `3100`, processos PM2
 `persuando-api`, `persuando-worker` e `persuando-response`. Não houve deploy automático.
-A correção de inicialização do Capture 0.1.1 é feita no Windows. Ela não exige reiniciar a VPS,
-novas variáveis de ambiente ou migração do banco. O roteiro abaixo também permite sincronizar o
-checkout da VPS e reiniciar os serviços, se necessário. O prompt opcional de Repository já é parte
-do fluxo web documentado.
+A versão atual inclui o guia completo de Repository e os controles de pedidos GPT-6 no backend,
+mais modelos novos e correção de pausa no Capture 0.1.2. Para essas mudanças, atualize/reinicie
+API e worker na VPS **e** instale o Capture novo no Windows. Não há migração nem variável nova.
+O web já sabe renderizar os cards de código/teste; não há mudança no contrato público. O rebuild
+do Response abaixo é o ciclo completo existente, mas não é necessário só para os prompts novos.
 
 ### 1. Enviar o código local ao GitHub
 
@@ -20,9 +21,9 @@ No PowerShell, revise os arquivos e envie a alteração (não inclua `.env.local
 cd C:\Users\guilherme\Downloads\persuando
 git status --short
 git diff
-git add -- README.md docs apps/capture/electron-main.cjs apps/capture/bootstrap-log.cjs apps/capture/package.json apps/capture/test/bootstrap-log.test.mjs package-lock.json
+git add -- README.md docs apps/api/src/modules/providers/openai-compatible-provider.adapter.ts apps/api/test/providers.test.mjs apps/capture package-lock.json
 git diff --cached --stat
-git commit -m "fix: repair packaged Capture startup logging"
+git commit -m "feat: improve repository coaching and add current model choices"
 git push origin master
 ```
 
@@ -337,7 +338,44 @@ http://216.158.236.156:3100
 
 The Electron app is not deployed to the VPS. It runs on the Windows machine that captures microphone and screen context.
 
-### Correção de inicialização do instalador 0.1.1
+### Versão atual 0.1.2: pausa de screenshots e modelos novos
+
+Instale **0.1.2** para a lista GPT-6 e a pausa corrigida. Pausar impede novas aquisições de
+screenshots; terminar, revogar, trocar sessão ou pausar/retomar enquanto uma captura está em voo
+descarta a imagem antiga. O fallback do navegador também libera o elemento de vídeo temporário.
+Nenhuma opção para ocultar captura/indicador foi adicionada.
+
+Para gerar sem sobrescrever a pasta do Capture que está aberto, há uma saída alternativa:
+
+```powershell
+npm.cmd run --workspace @persuando/capture dist:win -- --config.directories.output=../../release/capture-0.1.2
+```
+
+Foi essa saída que gerou o artefato atual:
+`release/capture-0.1.2/Persuando-Capture-Setup-0.1.2.exe`. A pasta
+`release/capture-0.1.2/win-unpacked` acompanha o mesmo build. Feche o app pela bandeja antes de
+executar o instalador; copie o instalador novo para o outro PC. A instalação antiga não é
+substituída apenas por compilar o projeto.
+
+Depois de atualizar o backend, faça login no Capture e escolha **Analysis model**: Terra para
+comparar velocidade em screenshots, Sol para código, Luna para tarefas focadas ou Astra para
+maior capacidade. A escolha salva e os modelos anteriores continuam disponíveis. Não houve
+benchmark nem chamada real ao provedor nesta alteração; acesso depende da sua conta/provedor.
+
+### Borda amarela de captura no Windows
+
+O código não cria um overlay de tela inteira. A borda fina é compatível com o indicador que o
+[Windows desenha no item capturado](https://learn.microsoft.com/en-us/windows/uwp/audio-video-camera/screen-capture).
+Não foi possível atribuir o indicador a um processo específico só pelo screenshot: outros apps de
+captura e ferramentas de automação também podem mantê-lo. O indicador do sistema não é desativado.
+
+Para interromper novas capturas, use **Pause**, **End**, desative **Periodic screen context** ou
+saia do Capture pelo **Quit** da bandeja. Uma chamada nativa já em voo pode terminar antes de
+liberar seus recursos, mas seu resultado é descartado se a sessão mudou. Se o indicador persistir
+após sair, confira os outros aplicativos que estão capturando a tela. Ocultar a toolbar não pausa
+captura.
+
+### Correção de inicialização herdada da versão 0.1.1
 
 O instalador antigo 0.1.0 tentava gravar `electron-debug.log` em
 `resources/app.asar/electron-debug.log`. ASAR é somente leitura; esse caminho causava o diálogo
@@ -352,11 +390,11 @@ cd C:\Users\guilherme\Downloads\persuando
 # Feche o Capture pelo menu Quit da bandeja antes de recompilar.
 npm.cmd ci
 npm.cmd run capture:dist:win
-Get-Item .\release\capture\Persuando-Capture-Setup-0.1.1.exe | Select-Object Name, LastWriteTime, Length
+Get-Item .\release\capture\Persuando-Capture-Setup-0.1.2.exe | Select-Object Name, LastWriteTime, Length
 ```
 
 Esse comando gera a pasta `win-unpacked` e o novo instalador. Abra especificamente
-`release/capture/Persuando-Capture-Setup-0.1.1.exe` para atualizar a instalação antiga. Um atalho
+`release/capture/Persuando-Capture-Setup-0.1.2.exe` para atualizar a instalação antiga. Um atalho
 existente ainda executa a versão instalada em `%LOCALAPPDATA%\Programs\Persuando Capture`
 até que o instalador novo seja executado. O `0.1.0.exe` antigo pode continuar na pasta de saída;
 ele não é atualizado pelo comando `pack:win` e não deve ser usado para testar a correção.
@@ -367,7 +405,7 @@ Para abrir a versão nova diretamente, sem instalar:
 & '.\release\capture\win-unpacked\Persuando Capture.exe'
 ```
 
-Para o outro PC, copie o instalador **0.1.1** e instale-o lá. Alternativamente, copie toda a pasta
+Para o outro PC, copie o instalador **0.1.2** e instale-o lá. Alternativamente, copie toda a pasta
 `win-unpacked` e abra `Persuando Capture.exe` dentro dela; não copie apenas o executável.
 Não é necessário Node/npm no PC que apenas executa o app pronto. `pack:win` gera somente a pasta;
 `dist:win` também gera o instalador NSIS. Execute um comando de cada vez e espere sua conclusão.
@@ -401,7 +439,7 @@ npm.cmd run capture:dist:win
 Output:
 
 ```text
-release/capture/Persuando-Capture-Setup-0.1.1.exe
+release/capture/Persuando-Capture-Setup-0.1.2.exe
 ```
 
 The current installer is suitable for local smoke testing. Production distribution still needs app icon, publisher/signing decisions, update strategy, and release-channel policy.

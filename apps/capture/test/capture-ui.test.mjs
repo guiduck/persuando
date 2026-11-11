@@ -36,7 +36,10 @@ test("Capture app includes settings, consent, toolbar, and microphone upload sur
   }
 });
 
-test("Capture app offers current GPT-5.6 analysis models", () => {
+test("Capture app offers current GPT-6 choices and preserves GPT-5.6 compatibility", () => {
+  for (const model of ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra"]) {
+    assert.ok(renderer.includes(`value="${model}"`));
+  }
   assert.match(renderer, /gpt-5\.6-sol/);
   assert.match(renderer, /gpt-5\.6-terra/);
   assert.match(renderer, /gpt-5\.6-luna/);

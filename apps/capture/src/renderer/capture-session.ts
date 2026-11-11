@@ -13,6 +13,8 @@ const AUDIO_CHUNK_DURATION_MS = 6000;
 const DEFAULT_COPILOT_PROGRAMMING_LANGUAGE = "javascript";
 
 export interface ActiveCapture {
+  isActive(): boolean;
+  readonly captureRevision: number;
   pause(): void;
   resume(): void;
   sendContext(input: { debugId?: string; explanationMode: "hint" | "explain" | "review"; imageReference?: string; textContext?: string }): void;
@@ -55,6 +57,7 @@ export async function startMicrophoneCapture(
   let chunkTimer: number | undefined;
   let recorder: MediaRecorder | undefined;
   let captureState: "recording" | "paused" | "stopped" = "recording";
+  let captureRevision = 0;
   let stoppedByUser = false;
 
   const clearChunkTimer = () => {
@@ -104,6 +107,7 @@ export async function startMicrophoneCapture(
     if (parsed?.type === "realtime.error") {
       stoppedByUser = true;
       captureState = "stopped";
+      captureRevision += 1;
       const safeMessage = parsed.safeMessage ?? "Provider or realtime error.";
       console.warn(`[Persuando Capture] Realtime error received: sessionId=${session.id} safeMessage=${safeMessage}.`);
       stopCurrentRecorder();
@@ -115,14 +119,22 @@ export async function startMicrophoneCapture(
     }
   });
   socket.addEventListener("close", () => {
+    captureRevision += 1;
     console.warn(`[Persuando Capture] Capture WebSocket closed: sessionId=${session.id} stoppedByUser=${stoppedByUser}.`);
     if (!stoppedByUser) callbacks.onStatus("reconnecting");
   });
 
   return {
+    get captureRevision() {
+      return captureRevision;
+    },
+    isActive() {
+      return captureState === "recording" && socket.readyState === WebSocket.OPEN;
+    },
     pause() {
       if (captureState === "recording") {
         captureState = "paused";
+        captureRevision += 1;
         stopCurrentRecorder();
         sendCaptureStatus(socket, session.id, "paused");
       }
@@ -130,11 +142,13 @@ export async function startMicrophoneCapture(
     resume() {
       if (captureState === "paused") {
         captureState = "recording";
+        captureRevision += 1;
         sendCaptureStatus(socket, session.id, "resumed");
         startNextRecorder();
       }
     },
     sendContext(input) {
+      if (captureState !== "recording") throw new Error("Resume or start capture before sending context.");
       if (socket.readyState !== WebSocket.OPEN) throw new Error("Capture WebSocket is not connected");
       const programmingLanguage = normalizeProgrammingLanguage(settings.preferredProgrammingLanguage);
       const screenPrefix = input.debugId ? `[screen:${input.debugId}] ` : "";
@@ -162,8 +176,10 @@ export async function startMicrophoneCapture(
     },
     session,
     stop() {
+      if (captureState === "stopped") return;
       stoppedByUser = true;
       captureState = "stopped";
+      captureRevision += 1;
       sendCaptureStatus(socket, session.id, "ended");
       stopCurrentRecorder();
       for (const track of stream.getTracks()) track.stop();

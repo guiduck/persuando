@@ -15,6 +15,20 @@
 
 ### Capture App
 
+Capture 0.1.2 guards screenshot requests with the active session's recording/socket state and a
+monotonic capture revision. Pause, resume, stop, provider error and disconnect invalidate pending
+images. Both periodic and manual screenshot paths check before acquisition and before dispatch,
+including session replacement or periodic-consent revocation. Context sends reject paused/stopped
+sessions. Browser fallback detaches its temporary video element and stops owned tracks. This stops
+unwanted work while paused; it does not suppress Windows capture indicators or introduce hidden capture.
+Shared main-process state is applied to the actual capture owner in either renderer, so toolbar/
+dashboard pause/end/revoke controls cannot leave the other window recording. Stop is idempotent;
+consent revocation stops acquisition before its API call.
+
+The model selector adds current GPT-6 Luna, GPT-6.1 Terra/Sol and GPT-6 Astra options, preserving
+previous model IDs and saved preferences. Both provider phases use low reasoning effort and
+max_completion_tokens without temperature for GPT-6; GPT-5/legacy controls are unchanged.
+
 The CommonJS bootstrap delegates diagnostics to `bootstrap-log.cjs`, included explicitly in the
 Electron package. It creates `logs/electron-debug.log` under `app.getPath("userData")`, outside
 the read-only ASAR and installation directory. File/directory and console logging errors are
@@ -106,6 +120,15 @@ per-session chunk sequence, and available buffer capacity. Accepted chunks persi
 metadata in `capture_events`; raw audio bytes are not logged or stored by this ingestion slice.
 
 ### AI Pipeline And Jobs
+
+Repository tutoring now has separate initial, continuation and completion teaching contracts. Initial
+responses include environment/stack evidence and proposals, setup commands, a proposed file tree and
+data flow, requirement mapping, and at least two complete structured code/check steps. Continuations
+reuse setup and require only the next useful code/check step; visible completion closes the exercise.
+The provider validates headings/artifacts and retries one malformed answer before a safe error.
+Private visual analysis includes repository environment/stage fields in change comparison. A versioned
+instructions fingerprint refreshes old retained analysis once; no schema/public contract change is needed.
+Response already renders PracticeStep cards, so no web UI change is needed to show Repository pairs.
 
 The AI pipeline processes authorized session context only. MVP processing starts with backend-orchestrated microphone transcription, incremental summaries, topic/keyword explanations, direct suggested responses to questions, and code/practice explanations from consented screen/coding context. Future processing may add robust system audio, diarization, automatic platform detection, and broader visual context automation only through later consent-gated specs.
 

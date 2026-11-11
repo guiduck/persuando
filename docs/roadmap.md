@@ -3,6 +3,23 @@
 This file describes the stable product direction. For current execution status, see
 `docs/handoff.md`.
 
+## Update - 2026-11-11 Repository Setup Coaching, Models And Capture Pause
+
+- Phase 3 additive improvement: Repository now provides evidence-aware stack choice, installation,
+  proposed file architecture/data flow, requirements mapping and structured incremental code/test
+  cards with natural interview speech. Initial, continuation and completion answers have distinct
+  validators plus one bounded repair. Old Repository analysis is refreshed once for the new guide.
+- Capture 0.1.2 adds current GPT-6 Luna, GPT-6.1 Terra/Sol and GPT-6 Astra choices. GPT-6 calls use
+  low reasoning effort without changing saved preferences or older-model controls. Compatibility
+  is verified against current official docs and deterministic request tests; measured latency and
+  account-specific model access still need real-provider evaluation.
+- Capture pause/stop/revoke/session changes guard screenshot acquisition and discard stale in-flight
+  results, even across a rapid pause/resume. Native Windows capture indicators remain supported.
+  Hidden capture, stealth and indicator suppression are explicitly outside scope under Constitution II.
+- Remaining gates: deploy API/worker, install Capture 0.1.2 on each PC, and smoke a permitted practice
+  example with a real provider in PT/EN. No schema migration is needed. Streaming/progressive answers
+  and per-phase model routing remain separate future work.
+
 ## Update - 2026-11-11 Packaged Capture Startup
 
 - Phase 3 release repair: Capture 0.1.1 moves bootstrap logs from the read-only application archive

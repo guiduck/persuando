@@ -1,5 +1,75 @@
 # Treino de problemas de repositório
 
+## Roteiro completo: ambiente, arquivos e implementação
+
+Na primeira resposta de um problema, Repository agora segue esta ordem:
+
+1. **O que eu entendi**: entradas, comportamento e saída em linguagem simples, com fala de entrevista.
+2. **Perguntas de clarificação**: três a cinco decisões úteis e as suposições adotadas.
+3. **Ambiente e stack**: ferramentas exigidas pelo enunciado, observadas na tela e propostas, com justificativa.
+4. **Instalação e execução**: comandos, pasta em que rodar, dependências, inicialização, build e resultado esperado.
+5. **Organização de arquivos**: árvore proposta, responsabilidades, imports/entrypoint e fluxo de dados.
+6. **Plano por requisitos**: tabela que relaciona cada comportamento a arquivo e checagem.
+7. **Construção passo a passo**: dois a quatro incrementos, do mínimo funcional às demais regras.
+8. **Validação**: testes/checks, resultados esperados, complexidade e trade-offs.
+9. **Suposições e incertezas**: o que ainda falta instalar, colar, executar ou confirmar.
+
+Cada incremento usa os mesmos cards de Code Problem: arquivo/ação no título, objetivo, código
+completo, teste ou check manual reproduzível, resultado esperado, explicação e **Fala para entrevista**.
+O texto descreve a sequência sem repetir o mesmo componente inteiro em várias seções. Uma continuação
+do mesmo exercício mostra diagnóstico, próximo incremento e validação; um problema novo reinicia o
+guia. Uma conclusão com evidências encerra o exercício sem inventar novas alterações.
+
+Um `script.js` com comentários e um array incompleto não prova que React/Vite esteja instalado nem
+que esse framework seja obrigatório. Se o enunciado pedir React (ou permitir essa escolha), o tutor
+pode propor React + Vite e orientar sua criação numa **pasta nova**. Com um manifest/lockfile visível,
+deve reutilizar os scripts e convenções existentes em vez de recriar o projeto. Exemplo de comando
+de scaffolding confirmado na [documentação do Vite](https://vite.dev/guide/):
+
+```bash
+node --version
+npm --version
+npm create vite@latest product-dashboard -- --template react
+cd product-dashboard
+npm install
+npm run dev
+npm run build
+```
+
+Para TypeScript, o template proposto é `react-ts` e os arquivos JSX usam `.tsx`. As versões de Node
+devem atender aos engines da ferramenta escolhida. `npm run dev` inicia o servidor; não é um teste.
+O template básico do Vite não cria `npm test`: o tutor deve mostrar a configuração de um runner ou
+fornecer checks manuais explícitos. Dados reais ausentes não devem ser inventados; fixtures sintéticas
+servem apenas a testes claramente identificados.
+
+As duas fases do provedor consideram o progresso de instalação/ambiente além do código. Respostas
+sem a estrutura mínima, fala, comandos, árvore ou pares completos recebem uma tentativa de reparo;
+se ela falhar, o app mostra um erro seguro em vez de aceitar o guia incompleto. O contrato novo
+invalida uma vez a comparação antiga de screenshots para permitir uma próxima resposta atualizada.
+
+## Modelos para comparar velocidade
+
+O Capture 0.1.2 oferece `gpt-6-luna`, `gpt-6.1-terra`, `gpt-6.1-sol` e `gpt-6-astra`, mantendo
+as opções anteriores e a seleção salva. Conforme a documentação oficial consultada em 2026-11-11:
+
+| Opção | Uso para comparar |
+| --- | --- |
+| [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) | Tarefas focadas e alta eficiência |
+| [GPT-6.1 Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra) | Raciocínio visual rápido para screenshots |
+| [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) | Código complexo e equilíbrio de capacidade/custo |
+| [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra) | Maior capacidade para tarefas exigentes |
+
+Todos esses modelos suportam imagens, Chat Completions e saída estruturada. Os pedidos GPT-6 do
+app usam `max_completion_tokens`, `reasoning_effort: low` e omitem `temperature`, de acordo com o
+[guia de parâmetros](https://developers.openai.com/api/docs/guides/latest-model). Modelos anteriores
+mantêm os controles existentes; nenhum plano de processamento premium é ativado.
+
+Selecione o modelo em **Capture → Analysis model** após instalar a versão nova. Comece comparando
+Terra e Sol com as mesmas telas e requisitos; Luna é outra opção para casos focados. Acesso depende
+da conta/provedor. Não foi feito benchmark nem chamada real nesta alteração. O fluxo continua com
+leitura visual seguida de geração, e um guia inicial detalhado produz mais texto que uma continuação;
+tempo total depende também de tokens, screenshots, rede e eventual reparo.
+
 ## Como usar as instruções específicas
 
 1. Abra a sessão no Response web e selecione **Code practice → Repository**.

@@ -14,14 +14,24 @@ The backend is a NestJS API with PostgreSQL, Prisma, native WebSocket realtime, 
 boundaries, encrypted provider credentials, consent enforcement, and 7-day session retention with
 manual delete.
 
-Windows Capture startup fix: version **0.1.1** writes bootstrap diagnostics under the current
+Windows Capture includes the startup fix introduced in **0.1.1**, writing bootstrap diagnostics under the current
 user's data directory instead of the read-only `app.asar`. Run `npm.cmd run capture:dist:win`
-on Windows and install `release/capture/Persuando-Capture-Setup-0.1.1.exe`, or open
+on Windows and install `release/capture/Persuando-Capture-Setup-0.1.2.exe`, or open
 `release/capture/win-unpacked/Persuando Capture.exe` directly. `capture:pack:win` creates only
 the unpacked folder; it does not refresh an older installer. Close Capture through its tray Quit
 action before rebuilding. See [Windows packaging and VPS instructions](docs/vps-deployment.md#electron-capture-app).
 
 ## Interview Practice
+
+Repository now starts with stack/environment selection, installation commands, a proposed folder
+tree and data flow, requirement mapping, and progressive code/test cards with interview speech.
+Later turns continue the same task without reinstalling or repeating the full lesson. Incomplete
+guidance receives one provider repair attempt. See [Repository practice](docs/repository-practice.md).
+
+Capture **0.1.2** also adds current GPT-6 model options and fixes screenshot acquisition while paused,
+including discarding in-flight images after lifecycle changes. Windows capture indicators remain in
+place. Install the new Capture for these desktop changes and deploy the API/worker for the teaching
+and GPT-6 request controls; no database migration is required.
 
 Repository practice now includes an optional preparation step in Response Mode: select **Repository**,
 paste the specific test prompt, requirements, or full invitation email, then choose **Continuar com

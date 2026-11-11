@@ -1,6 +1,6 @@
 {
   "name": "@persuando/capture",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Persuando Windows Capture app for consented meeting and interview practice context.",
   "author": "Persuando",
   "private": true,

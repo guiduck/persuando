@@ -17,6 +17,7 @@ import {
   validateProviderCredential
 } from "./api.js";
 import { startMicrophoneCapture, type ActiveCapture } from "./capture-session.js";
+import { captureActiveScreenImage, synchronizeCaptureActivity } from "./screen-context.js";
 import "./styles.css";
 
 const requiredCaptureConsents = [
@@ -83,8 +84,17 @@ function App() {
   const [audioLevel, setAudioLevel] = useState(0);
 
   useEffect(() => {
-    void window.persuandoCapture?.getState().then(setRuntimeState);
-    return window.persuandoCapture?.onState(setRuntimeState);
+    const applyState = (state: CaptureRuntimeState) => {
+      if (activeCapture && !synchronizeCaptureActivity(activeCapture, state)) {
+        periodicScreenCapture?.stop();
+        periodicScreenCapture = undefined;
+        activeCapture = undefined;
+        setAudioLevel(0);
+      }
+      setRuntimeState(state);
+    };
+    void window.persuandoCapture?.getState().then(applyState);
+    return window.persuandoCapture?.onState(applyState);
   }, []);
 
   useEffect(() => {
@@ -316,13 +326,22 @@ function Dashboard({
                 onChange={(event) => void updateSettingsField(settings, setSettings, { analysisModel: event.currentTarget.value })}
                 value={settings?.analysisModel ?? "gpt-4o-mini"}
               >
-                <option value="gpt-5.6-sol">gpt-5.6-sol (best quality)</option>
-                <option value="gpt-5.6-terra">gpt-5.6-terra (balanced)</option>
-                <option value="gpt-5.6-luna">gpt-5.6-luna (fastest)</option>
-                <option value="gpt-4o-mini">gpt-4o-mini</option>
-                <option value="gpt-4.1">gpt-4.1</option>
-                <option value="gpt-4o">gpt-4o</option>
+                <optgroup label="Current models">
+                  <option value="gpt-6-luna">gpt-6-luna (fast, focused tasks)</option>
+                  <option value="gpt-6.1-terra">gpt-6.1-terra (fast visual reasoning)</option>
+                  <option value="gpt-6.1-sol">gpt-6.1-sol (coding and quality balance)</option>
+                  <option value="gpt-6-astra">gpt-6-astra (highest reasoning capability)</option>
+                </optgroup>
+                <optgroup label="Previous models — compatibility">
+                  <option value="gpt-5.6-sol">gpt-5.6-sol</option>
+                  <option value="gpt-5.6-terra">gpt-5.6-terra</option>
+                  <option value="gpt-5.6-luna">gpt-5.6-luna</option>
+                  <option value="gpt-4o-mini">gpt-4o-mini</option>
+                  <option value="gpt-4.1">gpt-4.1</option>
+                  <option value="gpt-4o">gpt-4o</option>
+                </optgroup>
               </select>
+              <small>Try Terra for fast screenshot guidance, Sol for coding, or Luna for focused tasks. GPT-6 uses low reasoning effort for latency. Availability depends on your provider/account; the saved selection is preserved.</small>
             </label>
           </div>
           <div className="split">
@@ -812,17 +831,19 @@ async function maybeStartPeriodicScreenCapture(
         console.warn(`[Persuando Capture] ${screenPrefix}Periodic tick skipped: previous screen capture is still in flight.`);
         return;
       }
-      if (!activeCapture) {
-        console.warn(`[Persuando Capture] ${screenPrefix}Periodic screen context skipped: no active capture in this renderer.`);
+      const captureSession = activeCapture;
+      if (!captureSession?.isActive()) {
+        console.info(`[Persuando Capture] ${screenPrefix}Periodic screen context skipped: session is paused, ended, or disconnected.`);
         return;
       }
       captureInFlight = true;
       try {
-        console.info(`[Persuando Capture] ${screenPrefix}Periodic tick fired: activeSessionId=${activeCapture.session.id}.`);
+        console.info(`[Persuando Capture] ${screenPrefix}Periodic tick fired: activeSessionId=${captureSession.session.id}.`);
         console.info(`[Persuando Capture] ${screenPrefix}Screen capture requested from capture bridge.`);
-        const image = await captureScreenImageFallback(debugId);
+        const image = await captureActiveScreenImage(captureSession, () => captureScreenImageFallback(debugId), () => !stopped && activeCapture === captureSession);
+        if (!image) return;
         console.info(`[Persuando Capture] ${screenPrefix}Screen capture result: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
-        activeCapture.sendContext({
+        captureSession.sendContext({
           debugId,
           explanationMode: "explain",
           imageReference: image.dataUrl,
@@ -864,13 +885,15 @@ async function captureScreenContext(setCaptureError: (error: string | undefined)
   const screenPrefix = `[screen:${debugId}] `;
   try {
     console.info(`[Persuando Capture] ${screenPrefix}Manual screen context requested: activeCapture=${Boolean(activeCapture)} activeSessionId=${activeCapture?.session.id ?? "none"} screenConsent=${hasConsentGrant(consentGrants, "screen_coding_context_capture")} codeConsent=${hasConsentGrant(consentGrants, "code_copilot")}.`);
-    if (!activeCapture) throw new Error("Start listening before screen context capture.");
+    const captureSession = activeCapture;
+    if (!captureSession?.isActive()) throw new Error("Resume or start capture before screen context capture.");
     const missingConsent = missingConsentLabels(consentGrants, requiredContextConsents);
     if (missingConsent.length > 0) throw new Error(`Enable consent before screen context: ${missingConsent.join(", ")}.`);
     console.info(`[Persuando Capture] ${screenPrefix}Screen capture requested from capture bridge.`);
-    const image = await captureScreenImageFallback(debugId);
+    const image = await captureActiveScreenImage(captureSession, () => captureScreenImageFallback(debugId), () => activeCapture === captureSession);
+    if (!image) return;
     console.info(`[Persuando Capture] ${screenPrefix}Screen capture result: source=${image.sourceLabel} dataUrlLength=${image.dataUrl.length}.`);
-    activeCapture.sendContext({
+    captureSession.sendContext({
       debugId,
       explanationMode: "explain",
       imageReference: image.dataUrl,
@@ -912,12 +935,17 @@ async function captureStreamFrame(stream: MediaStream): Promise<HTMLCanvasElemen
   const video = document.createElement("video");
   video.srcObject = stream;
   video.muted = true;
-  await video.play();
-  await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d")?.drawImage(video, 0, 0);
-  return canvas;
+  try {
+    await video.play();
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    return canvas;
+  } finally {
+    video.pause();
+    video.srcObject = null;
+  }
 }
 
 function useElapsed(startedAt: string | undefined, listening: boolean): string {
@@ -1086,6 +1114,14 @@ async function revokeConsentFlow(
 ): Promise<void> {
   setState("saving");
   try {
+    // Stop local acquisition immediately, including an image waiting on the native bridge.
+    periodicScreenCapture?.stop();
+    periodicScreenCapture = undefined;
+    if (activeCapture) {
+      activeCapture.stop();
+      activeCapture = undefined;
+    }
+    await window.persuandoCapture?.setStatus({ activeSessionId: undefined, listening: false, paused: false, status: "revoked" });
     await revokeConsent(grantId);
     setConsentGrants(await listConsentGrants());
     setState("saved");

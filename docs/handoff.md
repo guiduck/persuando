@@ -2,9 +2,11 @@
 
 ## Current Status
 
-- `latest_change` (2026-11-11): Capture 0.1.1 fixes packaged startup logging in read-only ASARs;
-  generated artifacts and direct packaged dashboard startup are validated. The locally installed
-  0.1.0 copy remains old until upgraded with the new installer.
+- `latest_change` (2026-11-11): Repository has full environment/setup/architecture coaching,
+  structured code/check steps and bounded repair; Capture 0.1.2 adds current GPT-6 choices and
+  prevents screenshots while paused, discarding stale in-flight images. API/worker deployment and
+  Capture installation are required; there is no database migration. Capture 0.1.1 startup logging
+  repair remains included.
 
 - `previous_change` (2026-11-10): Repository practice supports optional per-test instructions before
   generation. The existing step-by-step and interview-coaching behavior remains in place; see
@@ -15,6 +17,58 @@
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
+
+### Latest delivery - 2026-11-11 Repository teaching, GPT-6 choices and Capture 0.1.2
+
+- Goal: replace disconnected component dumps with a full preparation guide: child-simple problem
+  interpretation, clarifications, required/observed/proposed stack, prerequisite/setup commands,
+  proposed folders/imports/data flow, requirement mapping and progressive complete code/check cards
+  with prominent, specific interview speech. A standalone script.js is not proof of React/Vite.
+- Provider: initial turns require nine substantive sections, shell commands, a file tree and at least
+  two full PracticeSteps. Continuation requires the next useful pair; completion requires evidence
+  and no extra code step. Missing artifacts receive one Repository-specific repair and then a safe
+  error. No algorithm-only repair template is used for Repository. The newest private environment
+  metadata participates in change comparison; guide version 2 + a versioned instructions hash refresh
+  pre-v2 retained guidance even when the problem screenshots are unchanged. Public contracts/schema
+  are unchanged and the existing Response step-card renderer is reused.
+- Capture: screenshot acquisition checks active state/socket and a capture revision both before
+  and after awaiting the image. Pause/stop/revoke/disconnect or replacement discards pending images,
+  including rapid pause/resume. Consent revocation stops local acquisition before awaiting the API.
+  The temporary browser video is detached after a frame; owned fallback tracks are still stopped.
+  Shared main-process state now pauses/resumes/stops the actual owner across dashboard/toolbar
+  renderer boundaries; lifecycle stop is idempotent even after a provider error.
+- Boundary: no full-screen overlay is drawn by the app. The reported yellow outline is compatible
+  with Windows' capture indicator, but the exact capturing process was not established from the
+  screenshot. Indicators/consent remain visible under Constitution II; no stealth or suppression
+  feature was implemented. The prior UI-inspection JavaScript session was reset to release its own
+  resources, and no new real screen-capture smoke was initiated for this release.
+- Models: added gpt-6-luna, gpt-6.1-terra, gpt-6.1-sol and gpt-6-astra after checking official model
+  pages and the GPT-6 guide on 2026-11-11. All support image input, structured output and Chat
+  Completions. GPT-6 requests now use max_completion_tokens and reasoning_effort=low, omitting
+  temperature; older controls, existing IDs and saved selections stay unchanged. No premium tier
+  is enabled and no account-specific model access, live quality or speed benchmark is claimed.
+- Rollout: unlike the previous bootstrap-only change, this release requires API/worker rebuild and
+  restart on the VPS plus Capture 0.1.2 installation on each Windows PC. No migration/new environment
+  value is required. Existing Response code can render the new steps without rebuilding the web.
+- Validation: final `npm.cmd test` passed **172/172**, including Repository initial/continuation/
+  completion, bounded repair, numbered headings, environment progress, pre-v2 refresh, GPT-6 controls,
+  screenshot races, rapid pause/resume and cross-window lifecycle controls. The Windows release build
+  passed with `npm.cmd run --workspace @persuando/capture dist:win -- --config.directories.output=../../release/capture-0.1.2`.
+  Final ASAR extraction matched the current bootstrap, preload, compiled main, capture lifecycle/
+  renderer code and exact Vite bundle; all four current model IDs were present. Lint and
+  `git diff --check` passed. Format still flags the vendor-generated vk_swiftshader_icd.json in the
+  old and new packaged output directories. No live provider, native capture, login or VPS smoke was
+  performed for this release; no source commit/push, deployment or installed-app replacement was made.
+- Artifact: `release/capture-0.1.2/Persuando-Capture-Setup-0.1.2.exe`, SHA-256
+  `7EC718832B4F7FD265DD946429C20C0BA68C8A1DF33DFB3D5FD921D4FC8E0596`.
+  The separate output directory preserves the user's running 0.1.1 unpacked app. Normal dist:win
+  still targets release/capture; close Capture before using that shared folder.
+- Remaining gates: publish/deploy, install the new Capture, compare PT/EN real-provider outputs on
+  bare/explicit-stack/existing-project fixtures, measure latency and repair rate, and smoke native
+  pause/end/revoke against the VPS. New model access depends on provider/account. Streaming/per-phase
+  routing, signing/icon/update channels and the earlier Redis health investigation remain separate.
+- Recommended next Spec Kit step: use the Repository quality/latency evaluation prompt at the top
+  of `docs/next-spec-prompt.md`; preserve prior release and System Design follow-ups.
 
 ### Latest delivery - 2026-11-11 Capture 0.1.1 packaged startup
 

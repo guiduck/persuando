@@ -20,6 +20,14 @@ This file tracks prototype and UI reference decisions for Persuando.
 
 ## Design Decisions
 
+- Repository uses the existing code/test step cards with file/action titles and prominent interview
+  speech. The initial narrative adds stack/setup, proposed folder tree/data flow, and a requirements
+  table; continuation responses stay focused on the next increment. Raw code is not repeated across
+  several narrative sections.
+- Capture 0.1.2 groups current GPT-6 model choices ahead of compatibility options and explains the
+  speed/quality use cases. Saved model choice is preserved. Pause also prevents new screenshots and
+  discards pending ones; consent/status indicators remain visible.
+
 - Selecting Repository reveals **Antes do treino: instruções específicas (opcional)** before
   generation: a labeled multiline field for a full prompt/email, a 16,000-character counter,
   **Continuar com instruções**, and **Pular / continuar sem instruções**. Generate is disabled and

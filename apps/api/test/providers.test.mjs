@@ -496,6 +496,46 @@ test("OpenAiCompatibleProviderAdapter maps rejected generation requests separate
   );
 });
 
+function repositoryAnswer(turn = "initial", english = false) {
+  const heading = (pt, en, body) => `## ${english ? en : pt}\n${body}`;
+  const speech = english ? "> **What I would say to the interviewer:** I will isolate the selection logic so we can check it before wiring the UI." : "> **Fala para entrevista:** Vou separar a seleção dos produtos para testar os filtros antes de ligar a interface.";
+  const steps = [
+    {
+      title: "src/lib/selectProducts.js — criar seleção mínima", objective: "Create the first complete selection function.",
+      completeCode: "export function selectProducts(products) { return products.filter(product => product.stock > 0); }",
+      testCode: "import assert from 'node:assert/strict';\nimport { selectProducts } from './selectProducts.js';\n// Synthetic test fixture\nassert.deepEqual(selectProducts([{stock: 0}, {stock: 2}]), [{stock: 2}]);",
+      expectedResult: "Only the product with stock 2 is returned.", explanation: "Filtering creates a new list and preserves the input.",
+      interviewerSpeech: "Vou começar pela seleção em estoque para validar uma regra pequena antes de combinar os filtros."
+    },
+    {
+      title: "src/lib/selectProducts.js — substituir por busca e estoque", objective: "Add case-insensitive search to the same complete function.",
+      completeCode: "export function selectProducts(products, query = '') { return products.filter(product => product.stock > 0 && product.name.toLowerCase().includes(query.trim().toLowerCase())); }",
+      testCode: "import assert from 'node:assert/strict';\nimport { selectProducts } from './selectProducts.js';\n// Synthetic test fixture\nassert.equal(selectProducts([{name: 'Book', stock: 2}], 'BOOK').length, 1);",
+      expectedResult: "BOOK matches Book and the input is unchanged.", explanation: "The name and query use the same normalization; category/sort can follow as the next increment.",
+      interviewerSpeech: "Vou normalizar os dois lados da busca para cumprir o requisito de ignorar maiúsculas, mantendo a função fácil de testar."
+    }
+  ];
+  const common = [
+    heading("Construção passo a passo", "Step-by-step construction", `Dúvida atual: como validar a seleção? O que eu faria: extrair e testar a função.\n### Mudanças propostas\nCriar/substituir o arquivo indicado nos cards. Importar selectProducts de ./lib/selectProducts.js em src/App.jsx; o último card contém a versão atual.\n${speech}`),
+    heading("Validação", "Validation", `Execute os testes configurados e verifique a lista no navegador; nenhum comando foi executado aqui. A seleção percorre n produtos em O(n), com uma nova lista O(n).\n${speech}`),
+    heading("Suposições e incertezas", "Assumptions and uncertainties", "Os caminhos são propostos. O dataset real e o manifest não estão visíveis; os dados dos testes são fictícios.")
+  ];
+  const content = turn === "complete"
+    ? [heading("Conclusão", "Completion", `Os testes visíveis passaram.\n${speech}`), heading("Validação", "Validation", "Confirme o build e a interface antes de encerrar.")].join("\n\n")
+    : turn === "continuation"
+      ? [heading("Diagnóstico objetivo", "Current diagnosis", "A instalação foi concluída e agora o filtro falha com maiúsculas."), heading("Continuação incremental", "Incremental continuation", "Reutilizar o projeto e o arquivo existente; corrigir a normalização sem reinstalar."), ...common].join("\n\n")
+      : [
+          heading("O que eu entendi", "Understanding", `Receber produtos e mostrar os que atendem aos filtros.\n${speech}`),
+          heading("Perguntas de clarificação", "Clarifying questions", "- React é obrigatório?\n- Dependências são permitidas?\n- Qual é o dataset real?\nAssumo um app web local para seguir."),
+          heading("Ambiente e stack", "Environment and stack", `JavaScript está visível; React/Vite são uma proposta se permitidos, não fatos observados. Alternativa: DOM nativo.\n${speech}`),
+          heading("Instalação e execução", "Setup and run", "Proposta para uma pasta nova, fora da pasta existente; conferir Node/npm antes.\n```bash\nnode --version\nnpm --version\nnpm create vite@latest product-dashboard -- --template react\ncd product-dashboard\nnpm install\nnpm run dev\nnpm run build\n```\nO template não contém npm test; configurar o runner antes de usar esse script."),
+          heading("Organização de arquivos", "File organization", "Árvore proposta:\n```text\nsrc/\n  App.jsx\n  data/products.js\n  lib/selectProducts.js\n```\nO entrypoint importa App, App importa dados e seleção. Dataset -> função pura -> estado -> lista."),
+          heading("Plano por requisitos", "Requirements plan", "| Requisito | Arquivo | Checagem |\n| --- | --- | --- |\n| Busca e estoque | src/lib/selectProducts.js | BOOK e estoque zero |"),
+          ...common
+        ].join("\n\n");
+  return { summary: { content: "Repository preparation guide." }, insights: [], suggestions: [{ category: "response", content, urgency: "high" }], practiceSteps: turn === "complete" ? [] : turn === "continuation" ? [steps[1]] : steps };
+}
+
 test("OpenAiCompatibleProviderAdapter selects repository workflow prompts and incremental history", async () => {
   const requests = [];
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
@@ -505,15 +545,7 @@ test("OpenAiCompatibleProviderAdapter selects repository workflow prompts and in
         message: {
           content: requests.length === 1
             ? JSON.stringify({ activeProblemTitle: "Repository kata", filesAndSymbols: ["src/app.ts handleRequest"] })
-            : JSON.stringify({
-                summary: { content: "Continue the repository fix." },
-                insights: [],
-                suggestions: [{
-                  category: "response",
-                  content: "## Diagnóstico objetivo\nO teste falha em `handleRequest`.\n\n## Mudanças propostas\n```typescript\nexport function handleRequest() { return true; }\n```",
-                  urgency: "high"
-                }]
-              })
+            : JSON.stringify(repositoryAnswer())
         }
       }]
     });
@@ -549,7 +581,10 @@ test("OpenAiCompatibleProviderAdapter selects repository workflow prompts and in
     assert.doesNotMatch(request.messages[0].content, /90 minutes; mobile simulator/);
   }
   assert.match(requests[1].messages[0].content, /step by step/);
-  assert.match(requests[1].messages[1].content, /Roteiro de entrevista/);
+  assert.match(requests[1].messages[1].content, /Ambiente e stack/);
+  assert.match(requests[1].messages[1].content, /Organização de arquivos/);
+  assert.match(requests[1].messages[1].content, /npm create vite@latest product-dashboard -- --template react/);
+  assert.match(requests[1].messages[1].content, /npm test is not supplied by the basic Vite template/);
   assert.match(requests[1].messages[1].content, /Construção passo a passo/);
 });
 
@@ -560,10 +595,7 @@ test("repository instructions changes and removal regenerate unchanged screensho
     const request = JSON.parse(init.body);
     requests.push(request);
     const visual = Array.isArray(request.messages[1].content);
-    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(visual ? analysis : {
-      summary: { content: "Continue the fix." }, insights: [],
-      suggestions: [{ category: "response", content: "## Validação\nRun the parser tests.", urgency: "high" }]
-    }) } }] });
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(visual ? analysis : repositoryAnswer()) } }] });
   });
   const input = {
     apiKey: "sk-provider-secret", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository",
@@ -584,6 +616,139 @@ test("repository instructions changes and removal regenerate unchanged screensho
   const omittedAgain = await adapter.generate({ ...input, previousVisualAnalysis: removed.visualAnalysis });
   assert.equal(requests.length, 8);
   assert.equal(omittedAgain.skippedReason, "unchanged_visual_context");
+});
+
+test("Repository repairs an answer missing setup, architecture and paired steps once", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    const payload = requests.length === 1
+      ? { problemFingerprint: "inventory", repositoryEnvironment: { status: "unknown", observedFiles: ["script.js"], requestedStack: ["React"] } }
+      : requests.length === 2
+        ? { summary: { content: "Paste this component after the array." }, insights: [], suggestions: [{ category: "response", content: "function Dashboard() { return null; }", urgency: "high" }] }
+        : repositoryAnswer();
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(payload) } }] });
+  });
+  const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", programmingLanguage: "javascript", repositoryInstructions: "Use React to build the inventory UI; no project has been created yet.", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "script.js contains only requirements and an incomplete products array" });
+  assert.equal(requests.length, 3);
+  assert.match(requests[2].messages[1].content, /REPAIR REQUIRED: The Repository answer/);
+  assert.match(requests[2].messages[1].content, /Instalação e execução/);
+  assert.doesNotMatch(requests[2].messages[1].content, /include the complete platform solution under/);
+  assert.match(output.suggestions[0].content, /npm create vite@latest/);
+  assert.equal(output.practiceSteps.length, 2);
+});
+
+test("Repository rejects persistently incomplete answers after the bounded repair", async () => {
+  let requests = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+    requests += 1;
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(requests === 1 ? { problemFingerprint: "inventory" } : { summary: { content: "Incomplete" }, insights: [], suggestions: [] }) } }] });
+  });
+  await assert.rejects(() => adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "requirements" }), (error) => error.code === "PROVIDER_RESPONSE_INVALID" && /Repository environment/.test(error.message));
+  assert.equal(requests, 3);
+});
+
+test("Repository repairs missing interview speech, file tree or a second incremental step", async () => {
+  for (const breakAnswer of [
+    (answer) => { answer.suggestions[0].content = answer.suggestions[0].content.replace(/^>.*$/gm, ""); },
+    (answer) => { answer.suggestions[0].content = answer.suggestions[0].content.replace(/```text[\s\S]*?```/, "Paths are proposed."); },
+    (answer) => { answer.practiceSteps = answer.practiceSteps.slice(0, 1); }
+  ]) {
+    let count = 0;
+    const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+      count += 1;
+      const answer = repositoryAnswer();
+      if (count === 2) breakAnswer(answer);
+      return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(count === 1 ? { problemFingerprint: "inventory" } : answer) } }] });
+    });
+    const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "requirements" });
+    assert.equal(count, 3);
+    assert.equal(output.practiceSteps.length, 2);
+  }
+});
+
+test("Repository continues an existing project without repeating installation and closes visible completion", async () => {
+  for (const stage of ["implementation", "complete"]) {
+    const requests = [];
+    const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      const payload = requests.length === 1 ? { problemFingerprint: "inventory", repositoryStage: stage, currentAttempt: "new implementation" } : repositoryAnswer(stage === "complete" ? "complete" : "continuation");
+      return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(payload) } }] });
+    });
+    const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["The project already starts with Vite and the parser exists."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "inventory", currentAttempt: "earlier implementation", repositoryTeachingVersion: 2 }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "new screenshot" });
+    assert.equal(requests.length, 2);
+    assert.match(requests[1].messages[1].content, /Repository turn: (continuation|complete)/);
+    assert.doesNotMatch(output.suggestions[0].content, /npm create vite|## Instalação e execução/);
+    assert.equal(output.practiceSteps.length, stage === "complete" ? 0 : 1);
+  }
+});
+
+test("Repository recognizes setup progress with unchanged implementation and accepts English guidance", async () => {
+  let count = 0;
+  let running = false;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    const request = JSON.parse(init.body);
+    count += 1;
+    const payload = Array.isArray(request.messages[1].content)
+      ? { problemFingerprint: "inventory", currentAttempt: "unchanged", repositoryEnvironment: { status: running ? "running" : "missing", setupProgress: running ? "npm run dev succeeded" : "not scaffolded" } }
+      : repositoryAnswer("initial", true);
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(payload) } }] });
+  });
+  const input = { apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "en-US", sessionId: "repo", transcriptText: "setup" };
+  const first = await adapter.generate(input);
+  running = true;
+  const next = await adapter.generate({ ...input, previousVisualAnalysis: first.visualAnalysis });
+  assert.equal(count, 4);
+  assert.equal(next.skippedReason, undefined);
+  assert.match(next.suggestions[0].content, /## Environment and stack/);
+  assert.match(next.suggestions[0].content, /## File organization/);
+});
+
+test("Repository refreshes pre-v2 retained guidance even for an unchanged problem", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(requests.length === 1 ? { problemFingerprint: "new-inventory", currentAttempt: "same" } : repositoryAnswer()) } }] });
+  });
+  const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["Old guide without setup."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "new-inventory", currentAttempt: "same", repositoryInstructionsFingerprint: "old-v1-fingerprint" }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "same task" });
+  assert.equal(requests.length, 2);
+  assert.match(requests[1].messages[1].content, /Repository turn: initial/);
+  assert.equal(output.practiceSteps.length, 2);
+});
+
+test("Repository accepts numbered section titles without an unnecessary repair", async () => {
+  let count = 0;
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
+    count += 1;
+    const answer = repositoryAnswer("initial", true);
+    let section = 0;
+    answer.suggestions[0].content = answer.suggestions[0].content.replace(/^## /gm, () => `## ${++section}. `);
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(count === 1 ? { problemFingerprint: "inventory" } : answer) } }] });
+  });
+  const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "en-US", sessionId: "repo", transcriptText: "requirements" });
+  assert.equal(count, 2);
+  assert.equal(output.practiceSteps.length, 2);
+});
+
+test("GPT-6 models use compatible low-effort Chat Completions controls in both visual and answer phases", async () => {
+  for (const model of ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra"]) {
+    const requests = [];
+    const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(requests.length === 1 ? { problemFingerprint: "inventory" } : repositoryAnswer()) } }] });
+    });
+    await adapter.generate({ apiKey: "test", analysisModel: model, task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "requirements" });
+    assert.equal(requests.length, 2);
+    for (const request of requests) {
+      assert.equal(request.model, model);
+      assert.equal(request.reasoning_effort, "low");
+      assert.equal(typeof request.max_completion_tokens, "number");
+      assert.equal(request.max_tokens, undefined);
+      assert.equal(request.temperature, undefined);
+      assert.deepEqual(request.response_format, { type: "json_object" });
+    }
+  }
 });
 
 test("OpenAiCompatibleProviderAdapter selects design-system workflow prompts", async () => {

@@ -2,11 +2,44 @@
 
 ## Current Status
 
+- `latest_change` (2026-11-10): Repository practice supports optional per-test instructions before
+  generation. The existing step-by-step and interview-coaching behavior remains in place; see
+  `docs/repository-practice.md` and the deployment procedure in `docs/vps-deployment.md`.
+
 - `current_phase`: MVP implementation closeout for `specs/001-persuando-mvp`.
 - `current_focus`: the first end-to-end MVP slice is implemented and validated; recent runtime fixes focused on reliable periodic screen context startup, active-session reconciliation, safer Code Practice image-context tutoring quality, automatic screenshot-triggered Code Practice generation in Response Mode, Markdown/code-block rendering for longer teaching answers, VPS domain deployment, production subdomain Google OAuth bridge login, Electron-specific Google sign-in completion, default Code Practice programming-language fallback, and Windows Capture packaging scripts.
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
+
+### Latest delivery - 2026-11-10 Repository instructions
+
+- Status: implemented locally; optional full-text test prompt/email step with continue, skip, edit,
+  16,000-character limit, and per-session tab-local memory. Manual/Auto wait for the choice.
+- Provider behavior: both visual analysis and answer generation receive quoted exercise context;
+  incremental diagnosis, concrete edits, walkthrough, validation and interview coaching remain.
+  Changed/removed context regenerates unchanged screenshots using a retained hash, without a new
+  database table or migration. Other modes do not receive the field.
+- Browser decision: restore workflow, language, layout and instructions after hydration; avoid
+  saving default preferences before storage restoration. Session changes key the realtime client,
+  and observed delete/retention events clear this tab's saved instructions.
+- Validation: `npm.cmd test` passed 155/155; `npm.cmd run --workspace @persuando/response build`
+  passed, including standalone asset preparation; `npm.cmd run lint` and `git diff --check` passed.
+  `npm.cmd run format` still reports the existing, unchanged packaged
+  `release/capture/win-unpacked/vk_swiftshader_icd.json` missing its final newline.
+- Browser smoke: production standalone with a fictitious HTTP/WebSocket backend verified prompt
+  transmission, refresh restoration, edit, skip/removal, Manual/Auto gating, one Auto request after
+  skip, another session's empty field, field limit, Code Problem/System Design isolation, and
+  a 390px viewport without horizontal overflow. The first smoke exposed a preference hydration
+  mismatch; the final build restored both supplied instructions and skip state without that error.
+  Provider tests cover omitted/blank/maximum/invalid/oversized input and context change/removal.
+- Remaining work: commit/push and VPS rollout using `docs/vps-deployment.md`, followed by a real
+  provider smoke with an invitation plus actual task screenshots. No VPS or real provider call was
+  performed here. Cross-device prompt storage and prompt libraries remain deferred.
+- Recommended next Spec Kit step: the command-ready Repository instructions evaluation prompt at
+  the top of `docs/next-spec-prompt.md`; progressive System Design remains a separate prepared spec.
+
+### Existing MVP scope
 
 - Backend: NestJS modules for config, auth, users, workspaces, sessions, consent, credentials, providers, realtime, jobs, retention, logging, audit, and health.
 - Persistence: Prisma application data access with PostgreSQL schema mirrored by SQL migrations. Raw SQL is limited to migrations and the migration runner.

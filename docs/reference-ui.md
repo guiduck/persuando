@@ -20,6 +20,12 @@ This file tracks prototype and UI reference decisions for Persuando.
 
 ## Design Decisions
 
+- Selecting Repository reveals **Antes do treino: instruções específicas (opcional)** before
+  generation: a labeled multiline field for a full prompt/email, a 16,000-character counter,
+  **Continuar com instruções**, and **Pular / continuar sem instruções**. Generate is disabled and
+  Repository Auto waits while this step is open. Confirmed context has an **Editar instruções**
+  action; skip clears prior instructions. The original walkthrough/interview speech is preserved.
+
 - Treat settings and consent as first-class product surfaces, not hidden preferences.
 - Make the floating toolbar the primary Capture App surface during live use.
 - Keep the Capture App quiet and operational, with clear status rather than a marketing-style interface or oversized dashboard.

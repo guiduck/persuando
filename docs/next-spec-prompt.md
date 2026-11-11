@@ -1,6 +1,56 @@
 ## Command
 speckit.specify
 
+## Latest Prepared Prompt - 2026-11-10 Repository Instructions Evaluation
+
+```text
+/speckit-specify Specify measurable evaluation of optional per-test Repository practice instructions.
+
+Objective:
+Validate that pasted requirements or a full interview invitation improve preparation guidance while
+preserving the existing step-by-step repository walkthrough, concrete code, validation, and interview speech.
+
+Source request/context:
+Users can now paste a full test email before Repository practice, continue with instructions, skip,
+or edit/remove them later. The current web UI limits text to 16,000 characters, remembers confirmed
+context per session in sessionStorage, and pauses Repository Manual/Auto while editing. The API
+accepts the optional repositoryInstructions field only for code_practice + repository. Both provider
+phases receive quoted context, and a retained SHA-256 fingerprint permits regeneration when context
+changes or is removed even with unchanged screenshots.
+
+Project context:
+Read README.md, docs/repository-practice.md, docs/architecture.md, docs/reference-ui.md,
+docs/handoff.md, docs/roadmap.md, and existing provider/realtime/Response contracts and tests.
+Keep simulation-only preparation, consent, ownership, bounded history, retention, and mode isolation.
+
+Requirements:
+- Define PT/EN fixtures for a full email, concise technical prompt, blank/omitted context, irrelevant
+  logistics, conflicting requirements, changed/removed instructions, and attempted prompt overrides.
+- Score extraction of platform, dataset, time budget, testing requirements, and communication goals
+  without inventing the missing technical task or treating email logistics as implementation facts.
+- Verify incremental diagnosis, concrete edits, complete relevant code, validation, and natural
+  interview speech remain intact with and without custom instructions.
+- Cover Manual/Auto, reload, unavailable browser storage, another session/tab, mode switching,
+  unchanged screenshots, edits during generation, provider repair, and retention/deletion.
+- Measure provider cost/latency for long context without logging invitation text, personal links,
+  screenshots, credentials, or provider payloads.
+- Keep cross-device prompt storage and reusable prompt libraries out of this evaluation scope.
+
+Artifact considerations:
+The feature has no database migration. Preserve the optional WebSocket field, legacy clients,
+tab-local storage semantics, private visual-analysis metadata, and existing Markdown guidance.
+Retain the separately prepared progressive System Design specification as independent follow-up.
+
+Risks/assumptions:
+An invitation email describes the interview format, not the task itself. A real-provider quality
+smoke and VPS deployment remain manual gates; deterministic tests do not prove tutoring quality.
+
+Expected output:
+Produce an evaluation specification with fixtures, measurable acceptance thresholds, regressions,
+manual smoke, rollout/rollback checks, and documentation closeout. Do not implement speculative
+prompt persistence or generate tasks until requested.
+```
+
 ## Objective
 Create the next focused Persuando specification for Windows Capture App release polish, UI polish, and production-readiness hardening after the first MVP implementation slice and initial VPS/installer smoke path.
 

@@ -20,6 +20,7 @@ import {
   type Insight,
   type InsightId,
   isKnownWebSocketEventType,
+  MAX_REPOSITORY_INSTRUCTIONS_LENGTH,
   type PersuandoWebSocketEvent,
   type ResponseAckEvent,
   type ResponseGenerateEvent,
@@ -636,6 +637,7 @@ export class RealtimeService implements OnModuleDestroy {
           analysisModel: settings.analysisModel,
           codePracticeIncrementalHistory: incrementalHistory,
           codePracticeWorkflow,
+          repositoryInstructions: codePracticeWorkflow === "repository" ? event.payload.repositoryInstructions?.trim() || undefined : undefined,
           generationId,
           programmingLanguage,
           responseLanguage,
@@ -1364,6 +1366,14 @@ function parseRealtimeEvent(event: unknown): PersuandoWebSocketEvent {
     }
     if (generate.payload.responseLanguage !== undefined && normalizeInterviewResponseLanguage(generate.payload.responseLanguage) === undefined) {
       throw new BadRequestException("Realtime generate responseLanguage is invalid");
+    }
+    if (generate.payload.repositoryInstructions !== undefined) {
+      if (typeof generate.payload.repositoryInstructions !== "string" || generate.payload.repositoryInstructions.length > MAX_REPOSITORY_INSTRUCTIONS_LENGTH) {
+        throw new BadRequestException(`Realtime generate repositoryInstructions must be text with at most ${MAX_REPOSITORY_INSTRUCTIONS_LENGTH} characters`);
+      }
+      if (generate.payload.mode !== "code_practice" || generate.payload.codePracticeWorkflow !== "repository") {
+        throw new BadRequestException("Repository instructions require the repository workflow");
+      }
     }
     validateRequestedScreenContexts(generate);
   }

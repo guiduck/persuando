@@ -30,6 +30,21 @@ Closing the main window should minimize the app to the Windows tray instead of e
 
 ### Response App
 
+Repository practice has an optional pre-generation instructions step. Response sends the additive
+`repositoryInstructions` field on `response.generate` only for `code_practice` + `repository`.
+Manual and Auto generation wait until the user continues or skips; editing pauses new Repository
+requests until confirmed again. Confirmed instructions/skip state use versioned, per-session
+`sessionStorage`, with an in-memory fallback when storage is unavailable. Other panels remain
+independent. Browser preferences restore after hydration, and save effects wait for that restoration;
+the realtime client is keyed by session to keep drafts isolated. Observed delete/retention events
+clear the tab's saved instructions. The API validates a string of at most 16,000 characters and keeps existing consent and
+ownership gates. The provider includes the quoted exercise context in visual analysis and answer
+generation while preserving its system prompt, tutoring structure, and evidence boundaries. A
+SHA-256 fingerprint in retained visual-analysis JSON ensures changed/removed instructions regenerate
+even when screenshots are unchanged. Raw instructions are not saved in a new database record or
+operational logs; provider-generated guidance and analysis still follow normal session retention.
+No schema migration or Capture change is required.
+
 The Response App owns the intelligence display for a session. It receives authorized context from the backend and shows transcripts, summaries, topic explanations, keyword definitions, suggested responses, questions, risks, and code-practice explanations. Response Mode may run on the same Capture App machine or on a second browser/device signed in to the same account.
 
 The first Response App scaffold uses Next.js App Router on the Node.js runtime. Server Components

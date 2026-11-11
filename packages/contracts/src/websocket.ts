@@ -35,6 +35,8 @@ export const websocketEventTypes = [
 
 export type WebSocketEventType = (typeof websocketEventTypes)[number];
 
+export const MAX_REPOSITORY_INSTRUCTIONS_LENGTH = 16_000;
+
 export interface BaseWebSocketEvent<TType extends WebSocketEventType, TPayload> {
   version: 1;
   type: TType;
@@ -72,6 +74,7 @@ export type ResponseGenerateEvent = BaseWebSocketEvent<
   {
     mode: "summary" | "insights" | "followups" | VisualGenerationMode;
     codePracticeWorkflow?: CodePracticeWorkflow;
+    repositoryInstructions?: string;
     responseLanguage?: InterviewResponseLanguage;
     screenContexts?: {
       imageReference?: string;

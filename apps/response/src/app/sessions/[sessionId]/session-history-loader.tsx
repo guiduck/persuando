@@ -46,6 +46,7 @@ export function SessionHistoryLoader({ assistantMode, initialHistory, initialRes
   if (history) {
     return (
       <SessionRealtimeClient
+        key={sessionId}
         assistantMode={assistantMode}
         history={history}
         initialResponseLanguage={initialResponseLanguage}

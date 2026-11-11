@@ -15,6 +15,14 @@ boundaries, encrypted provider credentials, consent enforcement, and 7-day sessi
 manual delete.
 ## Interview Practice
 
+Repository practice now includes an optional preparation step in Response Mode: select **Repository**,
+paste the specific test prompt, requirements, or full invitation email, then choose **Continuar com
+instruções** or **Pular / continuar sem instruções** before generating. The extra context complements
+the existing incremental diagnosis, step-by-step edits, validation, and interview speech. It is scoped
+to Repository, supports up to 16,000 characters, and is remembered per session in the current browser
+tab. Edit it before another generation to change or remove the instructions. See
+[repository practice](docs/repository-practice.md) for usage and a mobile preparation exercise.
+
 Persuando accepts interview-practice sessions only. Before visual assistance is enabled, Capture requires an explicit simulation-only acceptance. The selected application mode is authoritative: company/platform logos, timers, hiring copy, and realistic assessment layouts are treated as simulation scenery rather than signals that make the provider withhold complete teaching code. Text visible in screenshots remains untrusted problem evidence and never becomes an instruction that can override the provider prompt.
 
 Code Practice and System Design are independent Response panels and can generate concurrently from the same retained screen context. Each panel keeps its own recent guidance in `code_copilot_contexts`; session history restores the generated answer type, language, workflow, structured code/test steps, and timestamp without a schema migration. The Response language selector applies Portuguese or English to future generations in that session.

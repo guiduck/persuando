@@ -24,6 +24,7 @@ import rehypeHighlight from "rehype-highlight";
 import { isValidElement, useEffect, useId, useMemo, useRef, useState, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
 import { SortableSessionLayout, type SessionLayoutCardKey } from "./sortable-session-layout";
+import { clearRepositorySetup, loadRepositorySetup, RepositoryInstructionsStep, saveRepositorySetup, type RepositoryPracticeSetup } from "./repository-instructions";
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "offline" | "deleted";
 type GenerateMode = "summary" | "insights" | "followups" | VisualGenerationMode;
@@ -85,11 +86,11 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
   const [highlightedPanel, setHighlightedPanel] = useState<FocusPanelKey | undefined>();
   const [layoutEditing, setLayoutEditing] = useState(false);
   const [layoutAnnouncement, setLayoutAnnouncement] = useState("");
-  const [layoutOrder, setLayoutOrder] = useState<SessionLayoutCardKey[]>(() => loadLayoutOrder(assistantMode));
-  const [codePracticeWorkflow, setCodePracticeWorkflow] = useState<CodePracticeWorkflow>(() => loadCodePracticeWorkflow(history.session.id));
-  const [responseLanguage, setResponseLanguage] = useState<InterviewResponseLanguage>(
-    () => loadInterviewResponseLanguage(history.session.id, initialResponseLanguage)
-  );
+  const [layoutOrder, setLayoutOrder] = useState<SessionLayoutCardKey[]>(() => defaultLayoutOrder(assistantMode));
+  const [codePracticeWorkflow, setCodePracticeWorkflow] = useState<CodePracticeWorkflow>("exercise");
+  const [repositorySetup, setRepositorySetup] = useState<RepositoryPracticeSetup>({ instructions: "", ready: false });
+  const [responseLanguage, setResponseLanguage] = useState<InterviewResponseLanguage>(initialResponseLanguage);
+  const [preferencesReady, setPreferencesReady] = useState(false);
   const lastSequenceRef = useRef(maxInitialSequence(history));
   const joinedAtRef = useRef(new Date().toISOString());
   const reconnectTimerRef = useRef<number | undefined>(undefined);
@@ -117,16 +118,36 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
   }, [generatingModes]);
 
   useEffect(() => {
-    saveCodePracticeWorkflow(history.session.id, codePracticeWorkflow);
-  }, [codePracticeWorkflow, history.session.id]);
+    // Restore browser-only preferences after hydration so the first client render matches the server.
+    setLayoutOrder(loadLayoutOrder(assistantMode));
+    setRepositorySetup(loadRepositorySetup(history.session.id));
+    try {
+      setCodePracticeWorkflow(loadCodePracticeWorkflow(history.session.id));
+      setResponseLanguage(loadInterviewResponseLanguage(history.session.id, initialResponseLanguage));
+    } catch { /* Keep defaults when browser storage is unavailable. */ }
+    setPreferencesReady(true);
+  }, [assistantMode, history.session.id, initialResponseLanguage]);
 
   useEffect(() => {
-    saveInterviewResponseLanguage(history.session.id, responseLanguage);
-  }, [history.session.id, responseLanguage]);
+    if (!preferencesReady) return;
+    try { saveCodePracticeWorkflow(history.session.id, codePracticeWorkflow); } catch { /* Keep the in-memory preference. */ }
+  }, [codePracticeWorkflow, history.session.id, preferencesReady]);
 
   useEffect(() => {
-    saveLayoutOrder(assistantMode, layoutOrder);
-  }, [assistantMode, layoutOrder]);
+    if (!preferencesReady) return;
+    try { saveInterviewResponseLanguage(history.session.id, responseLanguage); } catch { /* Keep the in-memory preference. */ }
+  }, [history.session.id, preferencesReady, responseLanguage]);
+
+  useEffect(() => {
+    if (!preferencesReady) return;
+    try { saveLayoutOrder(assistantMode, layoutOrder); } catch { /* Keep the in-memory preference. */ }
+  }, [assistantMode, layoutOrder, preferencesReady]);
+
+  useEffect(() => {
+    if (connectionState !== "deleted" && deleteState !== "deleted") return;
+    clearRepositorySetup(history.session.id);
+    setRepositorySetup({ instructions: "", ready: false });
+  }, [connectionState, deleteState, history.session.id]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -256,6 +277,7 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
   const topics = deriveTopics(segments, insights);
   const statusCopy = useMemo(() => statusLabel(connectionState, sessionStatus), [connectionState, sessionStatus]);
   const requestGeneration = (mode: GenerateMode, source: "manual" | "automatic" = "manual") => {
+    if (mode === "code_practice" && codePracticeWorkflow === "repository" && !repositorySetup.ready) return;
     if (connectionState !== "live") {
       setConnectionError(
         `Cannot generate until live updates connect to ${safeRealtimeEndpoint(realtimeEndpoint)}. The app is retrying automatically.`
@@ -285,6 +307,7 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
       payload: {
         mode,
         codePracticeWorkflow: mode === "code_practice" ? codePracticeWorkflow : undefined,
+        repositoryInstructions: mode === "code_practice" && codePracticeWorkflow === "repository" ? repositorySetup.instructions.trim() || undefined : undefined,
         responseLanguage,
         screenContexts: requestScreenContexts
       }
@@ -308,10 +331,18 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
   const updatePanelMode = (panel: PanelKey, mode: PanelMode) => {
     setPanelModes((current) => ({ ...current, [panel]: mode }));
   };
+  const updateRepositorySetup = (setup: RepositoryPracticeSetup) => {
+    setRepositorySetup(setup);
+    if (setup.ready) {
+      saveRepositorySetup(history.session.id, setup);
+      delete lastAutomaticGenerationRef.current.code_practice;
+    }
+  };
 
   useEffect(() => {
     if (assistantMode === "conversation") return;
     if (panelModes.code !== "automatic") return;
+    if (codePracticeWorkflow === "repository" && !repositorySetup.ready) return;
     if (connectionState !== "live" || sessionStatus !== "active") return;
     if (screenContexts.length === 0 || generatingModes.has(visualMode)) return;
 
@@ -327,7 +358,7 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
     );
     const timer = window.setTimeout(() => requestGeneration(visualMode, "automatic"), 1200);
     return () => window.clearTimeout(timer);
-  }, [assistantMode, connectionState, generatingModes, history.session.id, panelModes.code, screenContexts, sessionStatus, visualMode]);
+  }, [assistantMode, codePracticeWorkflow, connectionState, generatingModes, history.session.id, panelModes.code, repositorySetup, screenContexts, sessionStatus, visualMode]);
 
   useEffect(() => {
     if (assistantMode !== "code_practice" || panelModes.systemDesign !== "automatic") return;
@@ -434,6 +465,8 @@ export function SessionRealtimeClient({ assistantMode, history, initialResponseL
             status={visualStatus}
             title="Code practice"
             visualMode="code_practice"
+            generateDisabled={codePracticeWorkflow === "repository" && !repositorySetup.ready}
+            repositoryInstructions={codePracticeWorkflow === "repository" ? <RepositoryInstructionsStep disabled={generatingModes.has("code_practice")} onChange={updateRepositorySetup} setup={repositorySetup} /> : undefined}
           />
         );
       case "systemDesign":
@@ -533,6 +566,7 @@ interface PanelFrameProps {
 }
 
 interface GenerationPanelProps extends PanelFrameProps {
+  generateDisabled?: boolean;
   isGenerating: boolean;
   mode: PanelMode;
   onGenerate(): void;
@@ -567,7 +601,7 @@ function LanguageSelector({
   );
 }
 
-function PanelTitle({ focusControl, isGenerating, mode, onGenerate, onModeChange, title }: Readonly<GenerationPanelProps & { title: string }>) {
+function PanelTitle({ focusControl, generateDisabled, isGenerating, mode, onGenerate, onModeChange, title }: Readonly<GenerationPanelProps & { title: string }>) {
   return (
     <div className="panel-heading controls-heading">
       <h2>{title}</h2>
@@ -580,7 +614,7 @@ function PanelTitle({ focusControl, isGenerating, mode, onGenerate, onModeChange
             On demand
           </button>
         </div>
-        <button className="button subtle small" disabled={isGenerating} onClick={onGenerate} type="button">
+        <button className="button subtle small" disabled={isGenerating || generateDisabled} onClick={onGenerate} type="button">
           {isGenerating ? "Generating" : "Generate"}
         </button>
         {focusControl}
@@ -742,10 +776,10 @@ function ScreenContextPanel({ className, contexts, focusControl }: Readonly<Pane
   );
 }
 
-function CopilotPanel({ className, codePracticeWorkflow, error, explanations, focusControl, isGenerating, mode, onGenerate, onModeChange, onWorkflowChange, status, title, visualMode }: Readonly<GenerationPanelProps & { codePracticeWorkflow: CodePracticeWorkflow; error?: string; explanations: CopilotExplanation[]; onWorkflowChange(workflow: CodePracticeWorkflow): void; status?: string; title: string; visualMode: VisualGenerationMode }>) {
+function CopilotPanel({ className, codePracticeWorkflow, error, explanations, focusControl, generateDisabled, isGenerating, mode, onGenerate, onModeChange, onWorkflowChange, repositoryInstructions, status, title, visualMode }: Readonly<GenerationPanelProps & { codePracticeWorkflow: CodePracticeWorkflow; error?: string; explanations: CopilotExplanation[]; onWorkflowChange(workflow: CodePracticeWorkflow): void; repositoryInstructions?: ReactNode; status?: string; title: string; visualMode: VisualGenerationMode }>) {
   return (
     <section className={`panel ${className ?? ""}`}>
-      <PanelTitle focusControl={focusControl} isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title={title} />
+      <PanelTitle focusControl={focusControl} generateDisabled={generateDisabled} isGenerating={isGenerating} mode={mode} onGenerate={onGenerate} onModeChange={onModeChange} title={title} />
       {visualMode === "code_practice" ? (
         <div className="workflow-row">
           <div className="segmented workflow-segmented" role="group" aria-label="Code Practice workflow">
@@ -760,6 +794,7 @@ function CopilotPanel({ className, codePracticeWorkflow, error, explanations, fo
         </div>
       ) : null}
       {visualMode === "system_design" ? <SystemDesignReferenceLauncher /> : null}
+      {repositoryInstructions}
       <div className="artifact-list">
         {error ? (
           <span className="pill empty">

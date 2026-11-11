@@ -22,6 +22,7 @@ export interface ProviderGenerationInput {
   previousVisualAnalysis?: string;
   codePracticeIncrementalHistory?: string[];
   codePracticeWorkflow?: CodePracticeWorkflow;
+  repositoryInstructions?: string;
   programmingLanguage?: string;
   generationId?: string;
 }

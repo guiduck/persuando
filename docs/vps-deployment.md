@@ -2,6 +2,108 @@
 
 This guide describes the current practical deployment shape for Persuando.
 
+## Atualizar esta alteração de Repository na VPS
+
+Este procedimento usa o destino já documentado: `root@216.158.236.156`, checkout em
+`/srv/projects/persuando`, branch `master`, API `4100`, Response `3100`, processos PM2
+`persuando-api`, `persuando-worker` e `persuando-response`. Não houve deploy automático.
+O recurso não exige novas variáveis de ambiente, atualização do Capture ou migração do banco.
+
+### 1. Enviar o código local ao GitHub
+
+No PowerShell, revise os arquivos e envie a alteração (não inclua `.env.local` ou segredos):
+
+```powershell
+cd C:\Users\guilherme\Downloads\persuando
+git status --short
+git diff
+git add -- README.md docs/architecture.md docs/reference-ui.md docs/repository-practice.md docs/vps-deployment.md docs/handoff.md docs/roadmap.md docs/next-spec-prompt.md apps/api/src/modules/providers/openai-compatible-provider.adapter.ts apps/api/src/modules/providers/provider-adapter.ts apps/api/src/modules/realtime/realtime.service.ts apps/api/test/providers.test.mjs apps/api/test/realtime.test.mjs apps/response/src/app/globals.css 'apps/response/src/app/sessions/[sessionId]/session-realtime-client.tsx' 'apps/response/src/app/sessions/[sessionId]/repository-instructions.tsx' packages/contracts/src/websocket.ts
+git add -- 'apps/response/src/app/sessions/[sessionId]/session-history-loader.tsx'
+git diff --cached --stat
+git commit -m "feat: add optional repository practice instructions"
+git push origin master
+```
+
+Se trabalhar em outra branch, faça a integração em `master` antes do `git pull` abaixo.
+
+### 2. Conectar e verificar o checkout
+
+```powershell
+ssh root@216.158.236.156
+```
+
+Use a chave ou senha SSH já configurada para sua VPS. Se a conexão usa chave específica:
+`ssh -i C:\caminho\sua-chave root@216.158.236.156`.
+
+Na VPS (Bash):
+
+```bash
+cd /srv/projects/persuando
+git status --short
+git branch --show-current
+git rev-parse HEAD
+pm2 status
+node --version
+```
+
+Anote o SHA anterior para rollback. O checkout deve estar em `master`, sem mudanças locais
+pendentes, e usar Node.js 24 ou superior. Se houver mudanças locais, reconcilie-as antes de
+atualizar; não use comandos de descarte automático.
+
+### 3. Atualizar, validar e reconstruir
+
+```bash
+git pull --ff-only origin master
+
+set -a
+source .env.local
+set +a
+export NEXT_PUBLIC_API_BASE_URL="$API_BASE_URL"
+export NEXT_PUBLIC_WEBSOCKET_URL="$WEBSOCKET_URL"
+
+npm ci
+npx prisma generate
+npm test
+npm run --workspace @persuando/response build
+```
+
+Execute os comandos na ordem e interrompa se algum falhar, antes de reiniciar o PM2. `npm test`
+inclui o build TypeScript da API/pacotes. As variáveis públicas devem estar definidas antes do build
+do Next.js e conter os mesmos endpoints HTTPS/WSS de `.env.local`. Para o domínio atual:
+`API_BASE_URL=https://api-persuando.gfig.space` e
+`WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime`.
+
+Esta alteração não adiciona migração. Não execute `prisma migrate reset`. Se o pull incluir
+outras alterações com migrações, siga também as instruções específicas delas.
+
+### 4. Reiniciar e conferir
+
+```bash
+PORT=4100 pm2 restart persuando-api --update-env
+pm2 restart persuando-worker --update-env
+PORT=3100 pm2 restart persuando-response --update-env
+pm2 save
+pm2 status
+curl --fail http://127.0.0.1:4100/health
+curl --fail https://api-persuando.gfig.space/health
+curl --fail --output /dev/null --write-out '%{http_code}\n' https://persuando.gfig.space/
+pm2 logs persuando-api --lines 80 --nostream
+pm2 logs persuando-response --lines 80 --nostream
+```
+
+Abra [Response](https://persuando.gfig.space), atualize a página e entre na sessão de treino.
+Selecione Repository, cole instruções, continue e gere a resposta com um screenshot autorizado.
+Confira também **Editar instruções → Pular**, Code Problem e System Design. Não é necessário
+alterar Nginx/DNS para esta funcionalidade. O restart pode causar uma breve desconexão; o web
+reconecta automaticamente.
+
+### 5. Rollback se necessário
+
+Com o checkout limpo, volte ao SHA anotado usando `git switch --detach SHA_ANTERIOR`. Repita o
+carregamento de `.env.local`, os exports, `npm ci`, `npx prisma generate`, `npm test`, o build do
+Response e os restarts acima. Como não há mudança de schema, não há rollback de banco para esta
+alteração. Para voltar ao fluxo normal depois da correção: `git switch master` e atualize novamente.
+
 ## What Runs On The VPS
 
 Run these services on the VPS:
@@ -128,6 +230,8 @@ from being compiled with local fallback values:
 set -a
 source .env.local
 set +a
+export NEXT_PUBLIC_API_BASE_URL="$API_BASE_URL"
+export NEXT_PUBLIC_WEBSOCKET_URL="$WEBSOCKET_URL"
 
 npm run build
 npm run --workspace @persuando/response build
@@ -172,20 +276,22 @@ git pull --ff-only origin master
 set -a
 source .env.local
 set +a
+export NEXT_PUBLIC_API_BASE_URL="$API_BASE_URL"
+export NEXT_PUBLIC_WEBSOCKET_URL="$WEBSOCKET_URL"
 
 npm ci
 npx prisma generate
 npm run build
 npm run --workspace @persuando/response build
 
-pm2 restart persuando-api --update-env
+PORT=4100 pm2 restart persuando-api --update-env
 pm2 restart persuando-worker --update-env
-pm2 restart persuando-response --update-env
+PORT=3100 pm2 restart persuando-response --update-env
 pm2 save
 ```
 
 Only run `npx prisma migrate deploy` when the pulled revision contains a new committed migration.
-The current System Design latency/diagram update has no schema change and needs no migration. Never
+The optional Repository instructions update has no schema change and needs no migration. Never
 run `npx prisma migrate reset` on the VPS: it drops production data before rebuilding the schema.
 
 Check status and logs:

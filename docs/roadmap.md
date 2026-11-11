@@ -3,6 +3,17 @@
 This file describes the stable product direction. For current execution status, see
 `docs/handoff.md`.
 
+## Update - 2026-11-10 Optional Repository Instructions
+
+- Phase 3 additive delivery: the web Repository workflow has an optional prompt/email step with
+  continue, skip, edit, character limit, and tab-local per-session memory. Manual/Auto wait for
+  that choice and preserve the existing incremental walkthrough and interview speech.
+- The optional WebSocket/provider context is validated, scoped to Repository, and supplied to
+  visual analysis and answer generation. Changed/removed instructions invalidate unchanged-screen
+  suppression through a retained fingerprint; no schema migration or Capture update is needed.
+- Gates remaining: VPS rollout and real-provider smoke with a full invitation email plus actual
+  exercise screenshots. Cross-device prompt synchronization and saved prompt libraries are deferred.
+
 ## Phase 1. Foundation
 
 Goal:

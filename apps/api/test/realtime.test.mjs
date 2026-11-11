@@ -634,7 +634,7 @@ test("RealtimeService keeps legacy workflows and generates independent System De
   }));
 
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", screenContexts }));
-  await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "repository", screenContexts }));
+  await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "repository", repositoryInstructions: "  Live Coding Interview\n90 minutes; JSON dataset; mobile simulator.  ", screenContexts }));
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { mode: "code_practice", codePracticeWorkflow: "design_system", screenContexts }));
   await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, {
     mode: "system_design",
@@ -645,16 +645,48 @@ test("RealtimeService keeps legacy workflows and generates independent System De
   const explanations = replay.replayedEvents.filter((storedEvent) => storedEvent.type === "copilot.explanation");
 
   assert.equal(generationInputs[0].codePracticeWorkflow, "exercise");
+  assert.equal(generationInputs[0].repositoryInstructions, undefined);
   assert.equal(generationInputs[1].codePracticeWorkflow, "repository");
+  assert.equal(generationInputs[1].repositoryInstructions, "Live Coding Interview\n90 minutes; JSON dataset; mobile simulator.");
   assert.equal(generationInputs[1].codePracticeIncrementalHistory.length > 0, true);
   assert.equal(generationInputs[2].codePracticeWorkflow, "design_system");
+  assert.equal(generationInputs[2].repositoryInstructions, undefined);
   assert.equal(generationInputs[2].codePracticeIncrementalHistory.length > 0, true);
   assert.equal(generationInputs[3].task, "system_design");
+  assert.equal(generationInputs[3].repositoryInstructions, undefined);
   assert.equal(generationInputs[3].responseLanguage, "en-US");
   assert.equal(generationInputs[3].imageReferences.length, 6);
   assert.equal(generationInputs[3].imageReferences[0], "data:image/png;base64,current-5");
   assert.equal(generationInputs[3].previousCodePracticeGuidance.length, 0);
   assert.equal(explanations.at(-1)?.payload.assistantMode, "system_design");
+});
+
+test("RealtimeService validates optional repository instructions before calling the provider", async () => {
+  const inputs = [];
+  const { consentService, realtimeService, session, settingsService } = await buildHarness({ providersService: {
+    getActiveAdapterName: () => "mock",
+    generate: async (input) => {
+      inputs.push(input);
+      return { summary: { content: "Repository fix" }, insights: [], suggestions: [] };
+    }
+  } });
+  await grantCopilotConsent(consentService, session.id);
+  const { userId: _userId, ...settings } = await settingsService.getSettings("google:user-1");
+  await settingsService.updateSettings("google:user-1", { ...settings, assistantMode: "code_practice" });
+  realtimeService.connectClient({ clientId: "response-1", user: user(), clientType: "response" });
+  await realtimeService.handleClientEvent("response-1", event("response.subscribe", session.id));
+  const payload = { mode: "code_practice", codePracticeWorkflow: "repository", screenContexts: [{ imageReference: "data:image/png;base64,repo" }] };
+  for (const repositoryInstructions of [42, null, {}, "x".repeat(16_001)]) {
+    await assert.rejects(() => realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { ...payload, repositoryInstructions })), /repositoryInstructions must be text/);
+  }
+  for (const override of [{ codePracticeWorkflow: "exercise" }, { codePracticeWorkflow: "design_system" }, { mode: "system_design" }]) {
+    await assert.rejects(() => realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { ...payload, ...override, repositoryInstructions: "Only Repository" })), /require the repository workflow/);
+  }
+  assert.equal(inputs.length, 0);
+  for (const repositoryInstructions of [undefined, "", " \n ", "x".repeat(16_000)]) {
+    await realtimeService.handleClientEvent("response-1", event("response.generate", session.id, { ...payload, repositoryInstructions }));
+  }
+  assert.deepEqual(inputs.map((input) => input.repositoryInstructions?.length), [undefined, undefined, undefined, 16_000]);
 });
 
 test("RealtimeService deduplicates a matching request while allowing Code Practice and System Design in parallel", async () => {

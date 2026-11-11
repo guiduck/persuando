@@ -27,8 +27,15 @@ See [Windows packaging and VPS instructions](docs/vps-deployment.md#electron-cap
 
 Repository now starts with stack/environment selection, installation commands, a proposed folder
 tree and data flow, requirement mapping, and progressive code/test cards with interview speech.
-Later turns continue the same task without reinstalling or repeating the full lesson. Incomplete
-guidance receives one provider repair attempt. See [Repository practice](docs/repository-practice.md).
+Later turns continue the same task without reinstalling or repeating the full lesson. Repository
+puts code cards first, with a brief explanation, matching check and interviewer speech per increment;
+setup and architecture remain available in expandable context. Multi-file tasks request four to six
+useful code increments. See [Repository practice](docs/repository-practice.md).
+
+Generation keeps its existing fast repair, then uses the configured AI model to diagnose remaining
+prompt-related failures and automatically try one targeted prompt correction. Authentication, quota,
+rate limits and infrastructure failures retain their own handling. Diagnosis and correction are
+bounded and ephemeral; see [Generation recovery](docs/generation-recovery.md).
 
 Capture **0.1.2** also adds current GPT-6 model options and fixes screenshot acquisition while paused,
 including discarding in-flight images after lifecycle changes. Windows capture indicators remain in

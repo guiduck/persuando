@@ -50,6 +50,13 @@ Closing the main window should minimize the app to the Windows tray instead of e
 
 ### Response App
 
+Repository teaching v4 presents structured code/check/speech cards before the supporting narrative.
+The latter uses native `details`/`summary` so setup and the strict Mermaid/legend view remain
+keyboard-accessible on demand. Legacy answers without cards and completion answers retain ordinary
+visible narrative rendering. The prompt requests four to six useful multi-file increments, concise
+per-code explanations and step-specific first-person interview speech; the existing structural
+contract and optional metadata remain compatible.
+
 Repository practice has an optional pre-generation instructions step. Response sends the additive
 `repositoryInstructions` field on `response.generate` only for `code_practice` + `repository`.
 Manual and Auto generation wait until the user continues or skips; editing pauses new Repository
@@ -120,6 +127,17 @@ per-session chunk sequence, and available buffer capacity. Accepted chunks persi
 metadata in `capture_events`; raw audio bytes are not logged or stored by this ingestion slice.
 
 ### AI Pipeline And Jobs
+
+Generation now has a per-call `GenerationPromptRecovery` shared across visual and answer phases.
+After existing bounded output repairs, `PROVIDER_RESPONSE_INVALID` with a captured prompt may invoke
+one model diagnosis (same configured model, 1,200 output tokens, 30-second timeout, one transport
+attempt). Prompt-correctable failures append a bounded instruction to the failed phase's user
+prompt and retry with its expanded token budget, preserving system instructions, inputs and
+validators. HTTP rejection details are internal-only, credential-redacted evidence. A failed or
+negative diagnosis preserves the original safe error. The diagnostic budget is shared across phases
+and never recurses. It is skipped after five minutes elapsed; no persistent prompt registry, event
+contract, schema, model routing or user setting is introduced. See `docs/generation-recovery.md`
+for failure taxonomy, privacy and timing limits.
 
 Repository tutoring now has separate initial, continuation and completion teaching contracts. Initial
 responses include environment/stack evidence and proposals, setup commands, a proposed file tree and

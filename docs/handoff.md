@@ -2,6 +2,12 @@
 
 ## Current Status
 
+- `latest_generation_recovery` (2026-11-11): eligible persistent generation failures now receive
+  one AI diagnosis of the failed prompt/error/response and, when supported by that evidence, one
+  corrected phase retry. Repository v4 requests more useful code increments with brief explanations
+  and specific interview speech. Response puts cards before expandable supporting context. Local
+  validation passes; API/worker and Response deployment plus real-provider smoke remain pending.
+
 - `latest_repository_presentation` (2026-11-11): restored syntax highlighting in practice cards,
   consistent blue interview-speech callouts (including retained inline labels), readable manual
   checks, and Repository architecture diagrams with adjacent legends and expansion. Teaching v3
@@ -27,6 +33,35 @@
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
+
+### Prompt failure recovery and code-focused Repository - 2026-11-11
+
+- User request: strange generation errors should be analyzed against the last prompt, corrected
+  and retried automatically when possible; Repository should emphasize code with per-code speech
+  and brief explanations. The cause of today's production errors was not established from logs.
+- Backend: preserves the existing fast repair; adds one per-generation diagnosis/corrected retry
+  shared across visual/answer phases, same configured model/credential, strict diagnostic decision
+  validation, 30-second/1,200-token diagnosis and a five-minute eligibility cutoff. Internal HTTP
+  rejection details help diagnosis without entering the safe error API. Non-prompt failures keep
+  existing handling. Prompts/invalid responses/diagnosis text remain ephemeral and absent from logs.
+  See `docs/generation-recovery.md` for limits, privacy and extra-call cost/latency.
+- Repository: v4 requests four to six coherent code increments for multi-file tasks, short per-code
+  explanations and precise first-person speech/checks; small edits can use two. The instruction
+  fingerprint derives from the teaching version and refreshes older context once. Existing answer
+  validation and public PracticeStep/persistence contracts remain compatible.
+- Web: Repository cards now precede native expandable context; supporting setup, requirements,
+  strict Mermaid/legend rendering and full narrative remain available. Completion and legacy
+  answers without cards remain visible, and other panels preserve their existing reading order.
+- Validation: `npm test` passed all 189 tests (including 9 new recovery/unit-integration cases);
+  `npm run --workspace @persuando/response typecheck` and production `build` passed, including
+  standalone preparation. `npm run lint` and `git diff --check` passed. The build reports the existing
+  informational Next.js project-reference warning. Generated tracked tsbuildinfo was restored.
+- Remaining gates: no paid real-provider generation, live browser smoke or production deployment
+  was performed for this change. Verify manual/Auto failure recovery, original-error preservation,
+  code-card reading order and keyboard/mobile context disclosure on deployment. The existing
+  formatting gate has unrelated generated release-vendor files; those artifacts remain untouched.
+  No migration, environment variable or Capture rebuild is required. Recommended next Spec Kit step:
+  measured recovery and code-focused tutoring quality evaluation in `docs/next-spec-prompt.md`.
 
 ### Repository presentation and architecture refinement - 2026-11-11
 

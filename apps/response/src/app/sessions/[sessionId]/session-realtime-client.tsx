@@ -808,16 +808,31 @@ function CopilotPanel({ className, codePracticeWorkflow, error, explanations, fo
           explanations.map((explanation) => (
             <article className="artifact" key={explanation.contextId}>
               <span className="pill active">{explanation.assistantMode === "system_design" ? "system design" : explanation.codePracticeWorkflow ?? explanation.kind}</span>
-              {explanation.assistantMode === "system_design" || explanation.codePracticeWorkflow === "repository"
-                ? <SystemDesignExplanationContent content={explanation.content} diagramLabel={explanation.codePracticeWorkflow === "repository" ? "Repository architecture diagram" : "System Design architecture diagram"} />
-                : <MarkdownContent content={explanation.content} />}
-              {explanation.practiceSteps?.length ? <PracticeStepCards steps={explanation.practiceSteps} /> : null}
+              <PracticeExplanationContent explanation={explanation} />
             </article>
           ))
         )}
       </div>
     </section>
   );
+}
+
+function PracticeExplanationContent({ explanation }: Readonly<{ explanation: CopilotExplanation }>) {
+  const repository = explanation.codePracticeWorkflow === "repository";
+  const narrative = explanation.assistantMode === "system_design" || repository
+    ? <SystemDesignExplanationContent content={explanation.content} diagramLabel={repository ? "Repository architecture diagram" : "System Design architecture diagram"} />
+    : <MarkdownContent content={explanation.content} />;
+  const steps = explanation.practiceSteps?.length ? <PracticeStepCards steps={explanation.practiceSteps} /> : null;
+  if (repository && steps) {
+    return <>
+      {steps}
+      <details className="repository-context">
+        <summary>Contexto, ambiente e arquitetura</summary>
+        {narrative}
+      </details>
+    </>;
+  }
+  return <>{narrative}{steps}</>;
 }
 
 function SystemDesignReferenceLauncher() {

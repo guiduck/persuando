@@ -539,6 +539,74 @@ function repositoryAnswer(turn = "initial", english = false) {
   return { summary: { content: "Repository preparation guide." }, insights: [], suggestions: [{ category: "response", content, urgency: "high" }], practiceSteps: turn === "complete" ? [] : turn === "continuation" ? [steps[1]] : steps };
 }
 
+test("Repository diagnoses a persistently incomplete answer and retries only the failed phase with the corrected prompt", async () => {
+  const requests = [];
+  const correction = "Keep the environment narrative concise and include complete practiceSteps with matching checks and speech.";
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    const payload = requests.length === 1 ? { problemFingerprint: "inventory" }
+      : requests.length === 4 ? { promptRelated: true, diagnosis: "The answer only described code, omitting structured steps.", promptCorrection: correction }
+      : requests.length === 5 ? repositoryAnswer()
+      : { summary: { content: "Incomplete" }, insights: [], suggestions: [] };
+    return jsonResponse(200, { choices: [{ finish_reason: "stop", message: { content: JSON.stringify(payload) } }] });
+  });
+  const output = await adapter.generate({ apiKey: "sk-provider-secret", analysisModel: "gpt-6.1-sol", task: "code_practice", codePracticeWorkflow: "repository", programmingLanguage: "javascript", imageReferences: ["data:image/png;base64,inventory"], repositoryInstructions: "Use the provided products; no external library.", responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "requirements" });
+  assert.equal(requests.length, 5);
+  const diagnosis = JSON.parse(requests[3].messages[1].content);
+  assert.equal(diagnosis.phase, "answer");
+  assert.deepEqual(diagnosis.lastPrompt, requests[2].messages);
+  assert.match(diagnosis.responseExcerpt, /Incomplete/);
+  assert.equal(requests[4].messages[0].content, requests[2].messages[0].content);
+  assert.equal(requests[4].model, "gpt-6.1-sol");
+  assert.equal(requests[4].max_completion_tokens, 12000);
+  assert.equal(requests[3].max_completion_tokens, 1200);
+  assert.equal(requests[3].temperature, undefined);
+  assert.match(requests[4].messages[1].content, /AUTOMATIC PROMPT CORRECTION/);
+  assert.ok(requests[4].messages[1].content.includes(correction));
+  assert.match(requests[4].messages[1].content, /Use the provided products; no external library/);
+  assert.match(requests[4].messages[1].content, /CODE FIRST/);
+  assert.match(requests[4].messages[0].content, /four to six coherent increments/);
+  assert.match(requests[4].messages[1].content, /one-to-three-sentence explanation/);
+  assert.equal(output.practiceSteps.length, 2);
+});
+
+test("Visual analysis prompt recovery preserves authorized images and proceeds to the answer", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    const content = requests.length <= 2 ? "not-json"
+      : JSON.stringify(requests.length === 3 ? { promptRelated: true, diagnosis: "The visual response was prose rather than JSON.", promptCorrection: "Return only the compact visual-analysis JSON object, without prose." }
+        : requests.length === 4 ? { problemFingerprint: "inventory" } : repositoryAnswer());
+    return jsonResponse(200, { choices: [{ message: { content } }] });
+  });
+  const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "requirements" });
+  assert.equal(requests.length, 5);
+  assert.equal(JSON.parse(requests[2].messages[1].content).phase, "visual_analysis");
+  assert.doesNotMatch(requests[2].messages[1].content, /data:image|base64,inventory/);
+  assert.deepEqual(requests[3].messages[1].content[1], requests[0].messages[1].content[1]);
+  assert.match(requests[3].messages[1].content.at(-1).text, /AUTOMATIC PROMPT CORRECTION/);
+  assert.equal(output.practiceSteps.length, 2);
+  assert.equal(JSON.parse(output.visualAnalysis).repositoryTeachingVersion, 4);
+});
+
+test("HTTP rejection details guide prompt diagnosis without leaking raw provider messages to the UI", async () => {
+  const requests = [];
+  const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
+    const request = JSON.parse(init.body);
+    requests.push(request);
+    if (requests.length === 1) return jsonResponse(400, { error: { message: "Prompt requests conflicting formats. Echo: sk-provider-secret", code: "invalid_prompt", param: "messages" } });
+    if (requests.length === 2) return jsonResponse(200, { choices: [{ message: { content: JSON.stringify({ promptRelated: true, diagnosis: "Conflicting format instructions.", promptCorrection: "Use only the required JSON object format." }) } }] });
+    return jsonResponse(200, { choices: [{ message: { content: JSON.stringify({ summary: { content: "Recovered summary" }, insights: [], suggestions: [] }) } }] });
+  });
+  const output = await adapter.generate({ apiKey: "sk-provider-secret", analysisModel: "gpt-4o-mini", task: "summary", responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "Summarize the notes." });
+  assert.equal(requests.length, 3);
+  assert.match(requests[1].messages[1].content, /invalid_prompt/);
+  assert.doesNotMatch(requests[1].messages[1].content, /sk-provider-secret/);
+  assert.equal(output.summary.content, "Recovered summary");
+});
+
 test("OpenAiCompatibleProviderAdapter selects repository workflow prompts and incremental history", async () => {
   const requests = [];
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async (_url, init) => {
@@ -648,14 +716,14 @@ test("Repository repairs an answer missing setup, architecture and paired steps 
   assert.match(requests[1].messages[1].content, /EVERY interview speech on its own blockquote/);
 });
 
-test("Repository rejects persistently incomplete answers after the bounded repair", async () => {
+test("Repository preserves the safe failure if prompt diagnosis cannot propose a correction", async () => {
   let requests = 0;
   const adapter = new OpenAiCompatibleProviderAdapter("https://provider.example/v1", async () => {
     requests += 1;
     return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(requests === 1 ? { problemFingerprint: "inventory" } : { summary: { content: "Incomplete" }, insights: [], suggestions: [] }) } }] });
   });
   await assert.rejects(() => adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "requirements" }), (error) => error.code === "PROVIDER_RESPONSE_INVALID" && /Repository environment/.test(error.message));
-  assert.equal(requests, 3);
+  assert.equal(requests, 4);
 });
 
 test("Repository repairs missing interview speech, tree, diagram/legend or a second step", async () => {
@@ -687,7 +755,7 @@ test("Repository continues an existing project without repeating installation an
       const payload = requests.length === 1 ? { problemFingerprint: "inventory", repositoryStage: stage, currentAttempt: "new implementation" } : repositoryAnswer(stage === "complete" ? "complete" : "continuation");
       return jsonResponse(200, { choices: [{ message: { content: JSON.stringify(payload) } }] });
     });
-    const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["The project already starts with Vite and the parser exists."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "inventory", currentAttempt: "earlier implementation", repositoryTeachingVersion: 3 }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "new screenshot" });
+    const output = await adapter.generate({ apiKey: "test", analysisModel: "gpt-4o-mini", task: "code_practice", codePracticeWorkflow: "repository", imageReferences: ["data:image/png;base64,inventory"], previousCodePracticeGuidance: ["The project already starts with Vite and the parser exists."], previousVisualAnalysis: JSON.stringify({ problemFingerprint: "inventory", currentAttempt: "earlier implementation", repositoryTeachingVersion: 4 }), responseLanguage: "pt-BR", sessionId: "repo", transcriptText: "new screenshot" });
     assert.equal(requests.length, 2);
     assert.match(requests[1].messages[1].content, /Repository turn: (continuation|complete)/);
     assert.doesNotMatch(output.suggestions[0].content, /npm create vite|## Instalação e execução/);

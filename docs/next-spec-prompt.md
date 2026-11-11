@@ -1,6 +1,68 @@
 ## Command
 speckit.specify
 
+## Latest Prepared Prompt - 2026-11-11 Generation Recovery And Code Teaching Evaluation
+
+```text
+/speckit-specify Specify measured generation recovery and code-focused Repository tutoring quality for Persuando.
+
+Objective:
+Measure whether the implemented bounded prompt diagnosis recovers actual generation failures and
+whether code-first Repository guidance improves implementation and interview communication, with
+explicit latency, cost and regression gates.
+
+Source request/context:
+The user encountered unexplained generation failures and requested AI analysis of the last error
+and prompt, automatic targeted prompt correction/retry when justified, and more code examples with
+brief explanations and interviewer speech. The implementation preserves existing fast repair, then
+permits one same-model diagnosis and one corrected phase retry per generation, shared across visual
+analysis and answer. Prompt/response evidence is ephemeral and images/credentials are omitted from
+diagnostics. Diagnosis has 1,200 output tokens, a 30-second timeout and a five-minute eligibility
+cutoff; negative/invalid diagnosis preserves the original safe failure. Repository teaching v4 asks
+for four to six useful multi-file code increments (two for a small edit), per-code explanation/check/
+speech, and renders cards before expandable setup/architecture context. Local tests and production
+build pass; today's exact production cause, real-provider recovery rate and live UX remain unverified.
+
+Project context:
+Read README.md, docs/generation-recovery.md, docs/repository-practice.md, docs/architecture.md,
+docs/reference-ui.md, docs/handoff.md, docs/roadmap.md, specs/001-persuando-mvp/, the provider
+adapter/recovery helper/tests and Response practice renderer. Preserve consent, simulation scope,
+same-account access, public contracts, independent generation lanes and existing retention.
+
+Requirements:
+- Define PT/EN fixtures for malformed/truncated JSON, missing required artifacts, HTTP prompt
+  rejection, invalid envelope, misleading provider details and non-prompt failures.
+- Measure diagnosis accuracy, accepted correction rate, final-validator pass rate, requirement
+  preservation, false correction rate and original-error preservation. Distinguish transport,
+  fixed-format repair, diagnosis and corrected-generation attempts in all measurements.
+- Measure phase-level time, tokens, cost, overall ten-minute UI interaction and cancellation;
+  evaluate a hard shared deadline if worst-case retry timings exceed the current client wait.
+- Validate one diagnostic budget across phases and isolated concurrent generations/sessions,
+  with no credential/image leakage, raw prompt logging or unrequested model/configuration changes.
+- Score code coverage of real requirements, useful increments, coherent imports/final file versions,
+  runnable matching checks, brief explanations and natural step-specific interview speech. Detect
+  inflated step counts, redundant code copies and thin scaffolding followed by one giant code dump.
+- Verify accessible card-first reading order, touch/keyboard context disclosure, setup discoverability,
+  safe diagram rendering, legacy/completion answers and mobile overflow in a live browser.
+- Define how to collect safe production failure evidence before attributing the user's original
+  errors to a prompt cause, and keep any durable failure-history feature separately scoped.
+
+Artifact considerations:
+Current recovery is in-memory and introduces no schema/event/environment changes. Prefer safe
+metadata-only evaluation. Any stored failure artifacts require explicit ownership, consent,
+retention/deletion and migration/rollback design; do not persist private prompts by default.
+
+Risks/assumptions:
+Structural success is not proof of correct code or a correct diagnosis. Repeated requests may
+increase cost and latency. The model must decline fixes requiring auth, quota, infrastructure,
+unsupported parameters or changing the user's original requirements.
+
+Expected output:
+Produce a concise specification with fixtures, scoring thresholds, measured cost/latency budgets,
+privacy requirements, automated/live validation matrix and deployment/rollback gates. Do not
+generate tasks or start paid provider benchmarking until that work is explicitly requested.
+```
+
 ## Latest Prepared Prompt - 2026-11-11 Repository Quality And Latency Evaluation
 
 ```text

@@ -20,6 +20,11 @@ This file tracks prototype and UI reference decisions for Persuando.
 
 ## Design Decisions
 
+- Repository teaching v4 puts complete code/check cards and their brief explanations/interview
+  speeches first. The supporting narrative, setup, requirements and architecture stay in native
+  **Contexto, ambiente e arquitetura** disclosure with visible keyboard focus. Answers without
+  cards remain visible as before; other practice modes retain their existing reading order.
+
 - Repository uses the existing code/test step cards with file/action titles and prominent interview
   speech. The initial narrative adds stack/setup, proposed folder tree/data flow, and a requirements
   table; continuation responses stay focused on the next increment. Raw code is not repeated across

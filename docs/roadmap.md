@@ -3,6 +3,23 @@
 This file describes the stable product direction. For current execution status, see
 `docs/handoff.md`.
 
+## Update - 2026-11-11 Prompt Recovery And Code-Focused Repository
+
+- Phase 3 reliability/teaching improvement: after existing bounded repairs, eligible invalid
+  generation failures can receive one same-model prompt diagnosis and one corrected phase retry.
+  The diagnosis uses actual last-prompt/error/response evidence, preserves validators and original
+  requirements, and does not rewrite prompts for auth/quota/rate-limit/network failures.
+- Repository v4 requests four to six useful multi-file code increments, brief code explanations,
+  matching checks/results and specific interview-speech examples. Web cards appear first, with
+  supporting environment/architecture in a native disclosure. Older structured answers stay usable.
+- Validation: all 189 automated tests, Response typecheck/production build and lint passed. Gates:
+  deploy API/worker and rebuild/restart Response; exercise recovery with a real provider and smoke
+  keyboard/mobile disclosure. Today's exact production error cause remains unverified. There is no
+  database/config/Capture change. Diagnosis adds bounded cost and latency only on eligible failures.
+- Durable failure-history dashboards, streaming, model routing and semantic-quality benchmarking
+  remain deferred. Next spec should measure recovery yield, false corrections, cost/latency and
+  whether the extra code examples improve usable requirement coverage without repetition.
+
 ## Update - 2026-11-11 Repository Presentation And Architecture
 
 - Phase 3 quality correction: practice cards regain syntax highlighting and consistent speech

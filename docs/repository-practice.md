@@ -1,5 +1,24 @@
 # Treino de problemas de repositório
 
+## Código em primeiro plano
+
+O roteiro v4 prioriza código: em tarefas com vários arquivos, pede quatro a seis incrementos úteis;
+duas etapas bastam para uma mudança pequena. Cada card traz arquivo/ação, código completo da unidade,
+explicação breve de uma a três frases, teste ou check reproduzível, resultado esperado e um exemplo
+de **Fala para entrevista** em primeira pessoa ligado àquele trecho. Não basta uma fala genérica,
+nem dividir um arquivo em fragmentos soltos apenas para aumentar a quantidade de cards.
+
+No web, os cards aparecem primeiro. O texto de apoio fica em **Contexto, ambiente e arquitetura**,
+expansível pelo mouse, toque ou teclado. Instalação, árvore, fluxo e requisitos são preservados,
+com texto mais curto; notas necessárias para usar o código devem aparecer também no primeiro card
+relevante. Respostas antigas com cards ganham essa ordem ao recarregar. Sem cards, ou na conclusão
+sem nova alteração, o conteúdo continua visível normalmente. Uma nova geração aplica o roteiro v4,
+renovando uma vez o contexto anterior; as seguintes continuam o mesmo exercício.
+
+Além do reparo estrutural existente, falhas persistentes podem receber diagnóstico por IA e uma
+tentativa automática com prompt corrigido. Consulte [recuperação da geração](generation-recovery.md)
+para limites, tratamento de erros e dados enviados ao diagnóstico.
+
 ## Roteiro completo: ambiente, arquivos e implementação
 
 Na primeira resposta de um problema, Repository agora segue esta ordem:
@@ -11,7 +30,7 @@ Na primeira resposta de um problema, Repository agora segue esta ordem:
 5. **Organização de arquivos**: árvore proposta, responsabilidades, imports/entrypoint e fluxo de dados.
 6. **Arquitetura e fluxo**: diagrama Mermaid dos arquivos e dados/eventos, seguido de legenda.
 7. **Plano por requisitos**: tabela que relaciona cada comportamento a arquivo e checagem.
-8. **Construção passo a passo**: três a cinco incrementos por responsabilidade em tarefas com vários
+8. **Construção passo a passo**: quatro a seis incrementos por responsabilidade em tarefas com vários
    arquivos; dois bastam para uma mudança pequena.
 9. **Validação**: testes/checks, resultados esperados, complexidade e trade-offs.
 10. **Suposições e incertezas**: o que ainda falta instalar, colar, executar ou confirmar.

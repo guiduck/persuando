@@ -882,6 +882,24 @@ button:focus-visible,
 .practice-manual-check .markdown-content { min-width: 0; }
 .practice-step .interview-speech { margin: 0; }
 
+.repository-context {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.repository-context > summary {
+  cursor: pointer;
+  padding: 0.75rem 0;
+  font-weight: 600;
+}
+
+.repository-context > summary:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
 .practice-step header {
   display: grid;
   gap: 0.35rem;

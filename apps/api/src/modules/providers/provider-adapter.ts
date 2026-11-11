@@ -57,7 +57,8 @@ export class ProviderAdapterError extends Error {
       | "PROVIDER_RESPONSE_INVALID"
       | "AUDIO_FORMAT_UNSUPPORTED",
     message: string,
-    readonly retryable: boolean
+    readonly retryable: boolean,
+    readonly diagnosticContext?: string
   ) {
     super(message);
   }

@@ -2,6 +2,13 @@
 
 This guide describes the current practical deployment shape for Persuando.
 
+The latest generation-recovery/code-first change requires API/worker update and a Response rebuild
+and restart using the procedure below. No migration, environment variable or Capture installer is
+added. Repository v4 refreshes previous teaching context once on generation; retained cards move
+ahead of the expandable supporting narrative after refreshing the web. Generation diagnosis uses
+the selected model and existing credential, with bounded additional calls only on eligible errors.
+See [generation recovery](generation-recovery.md). These changes have not been deployed here.
+
 ## Atualizar o projeto e corrigir o Capture no Windows
 
 Este procedimento usa o destino já documentado: `root@216.158.236.156`, checkout em

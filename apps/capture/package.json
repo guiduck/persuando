@@ -1,6 +1,8 @@
 {
   "name": "@persuando/capture",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "description": "Persuando Windows Capture app for consented meeting and interview practice context.",
+  "author": "Persuando",
   "private": true,
   "type": "module",
   "main": "electron-main.cjs",
@@ -35,6 +37,7 @@
     },
     "files": [
       "electron-main.cjs",
+      "bootstrap-log.cjs",
       "preload.cjs",
       "package.json",
       "dist/**"

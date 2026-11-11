@@ -15,6 +15,12 @@
 
 ### Capture App
 
+The CommonJS bootstrap delegates diagnostics to `bootstrap-log.cjs`, included explicitly in the
+Electron package. It creates `logs/electron-debug.log` under `app.getPath("userData")`, outside
+the read-only ASAR and installation directory. File/directory and console logging errors are
+nonfatal, including in the main-module import failure handler. Capture 0.1.1 carries this fix;
+API, provider contracts, schema, and VPS runtime behavior do not change.
+
 The Capture App owns local desktop behavior: Google login, tray/background mode, always-on-top floating toolbar, capture controls, device selection, microphone capture, visible code copilot controls, authorized periodic screenshot/context capture, global shortcuts, and live microphone audio upload after consent is active.
 
 The current Capture implementation uses Electron main/preload/renderer boundaries. The main process

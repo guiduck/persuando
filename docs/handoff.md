@@ -2,7 +2,11 @@
 
 ## Current Status
 
-- `latest_change` (2026-11-10): Repository practice supports optional per-test instructions before
+- `latest_change` (2026-11-11): Capture 0.1.1 fixes packaged startup logging in read-only ASARs;
+  generated artifacts and direct packaged dashboard startup are validated. The locally installed
+  0.1.0 copy remains old until upgraded with the new installer.
+
+- `previous_change` (2026-11-10): Repository practice supports optional per-test instructions before
   generation. The existing step-by-step and interview-coaching behavior remains in place; see
   `docs/repository-practice.md` and the deployment procedure in `docs/vps-deployment.md`.
 
@@ -11,6 +15,40 @@
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
+
+### Latest delivery - 2026-11-11 Capture 0.1.1 packaged startup
+
+- Cause: the 0.1.0 CommonJS bootstrap synchronously appended diagnostics inside
+  `resources/app.asar/electron-debug.log`, throwing before main-module loading on installed PCs.
+- Change: an explicitly packaged `bootstrap-log.cjs` writes under `app.getPath("userData")/logs`.
+  Directory/file and console failures are isolated, and main-import errors use that same safe logger.
+  Capture and its lockfile metadata are versioned 0.1.1; description/author package warnings are fixed.
+- Validation: `npm.cmd test` passed 158/158 (including three new functional logging regressions);
+  `npm.cmd run capture:dist:win` completed with NSIS + unpacked artifacts; ASAR extraction confirmed
+  version 0.1.1, exact new logger source, bootstrap, preload, compiled main and renderer entry/assets.
+  The exact unpacked executable was started and its dashboard UI observed at the ASAR renderer URL;
+  the user independently confirmed that it opened. Its bootstrap log was created under user data.
+  `npm.cmd run lint` and `git diff --check` passed. `npm.cmd run format` still flags only the
+  generated/vendor `release/capture/win-unpacked/vk_swiftshader_icd.json` missing a final newline.
+- Artifact: `release/capture/Persuando-Capture-Setup-0.1.1.exe`, SHA-256
+  `72619A39B178F92A09DE623529BB19B5360574FA20DFEE1BD06561BDC8C4B7AF`.
+  `capture:dist:win` also generated `win-unpacked/Persuando Capture.exe`; a separate `pack:win`
+  rebuild was not run while the user was using that executable. Both scripts share the same build
+  and package configuration; `pack:win` only omits the NSIS installer step.
+- Installed-copy check: the existing `%LOCALAPPDATA%/Programs/Persuando Capture/resources/app.asar`
+  was still 0.1.0 with the faulty logger; the unpacked archive was 0.1.1 with the safe logger. The
+  subsequent error screenshot came from that old installed path. The installed app was not replaced
+  automatically. The new installer must be run on each PC, or the full unpacked folder used directly.
+- Operations: docs distinguish Windows packaging from VPS updates, require closing Capture through
+  tray Quit before rebuilding, identify the new installer filename, add API startup retries, and
+  preserve Redis/Postgres checks. No schema, API/provider behavior, environment or VPS change is
+  required to fix the Windows exception. No VPS commands or real-provider calls were made here.
+- Remaining: upgrade installed copies, smoke Google auth and consented capture against the VPS,
+  investigate current Redis role/new worker errors if READONLY persists, and later address release
+  signing, icon/branding and update channels. The app opened for smoke remains available to the user.
+- Next Spec Kit step: use the new command-ready Capture release verification prompt at the top of
+  `docs/next-spec-prompt.md`; keep Repository evaluation and progressive System Design as independent
+  follow-ups.
 
 ### Latest delivery - 2026-11-10 Repository instructions
 

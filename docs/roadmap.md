@@ -3,6 +3,19 @@
 This file describes the stable product direction. For current execution status, see
 `docs/handoff.md`.
 
+## Update - 2026-11-11 Packaged Capture Startup
+
+- Phase 3 release repair: Capture 0.1.1 moves bootstrap logs from the read-only application archive
+  to per-user data and tolerates unavailable diagnostic output. Updated NSIS and unpacked artifacts
+  make the fixed version distinguishable from the old 0.1.0 installer.
+- Regression coverage verifies per-user log creation, existing-archive preservation, blocked log
+  directories, unavailable user data, and closed console output. The packaged ASAR and direct
+  executable startup are validated in addition to unit/build checks.
+- Remaining gates: update the installed 0.1.0 app on each PC and smoke Google login/capture against
+  the VPS. Release signing, branding/icon, and automatic updates remain deferred. The VPS Redis
+  replica errors from user-supplied logs still require current-state diagnostics; this desktop fix
+  does not change server infrastructure.
+
 ## Update - 2026-11-10 Optional Repository Instructions
 
 - Phase 3 additive delivery: the web Repository workflow has an optional prompt/email step with

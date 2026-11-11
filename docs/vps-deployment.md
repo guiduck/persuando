@@ -2,12 +2,15 @@
 
 This guide describes the current practical deployment shape for Persuando.
 
-## Atualizar esta alteração de Repository na VPS
+## Atualizar o projeto e corrigir o Capture no Windows
 
 Este procedimento usa o destino já documentado: `root@216.158.236.156`, checkout em
 `/srv/projects/persuando`, branch `master`, API `4100`, Response `3100`, processos PM2
 `persuando-api`, `persuando-worker` e `persuando-response`. Não houve deploy automático.
-O recurso não exige novas variáveis de ambiente, atualização do Capture ou migração do banco.
+A correção de inicialização do Capture 0.1.1 é feita no Windows. Ela não exige reiniciar a VPS,
+novas variáveis de ambiente ou migração do banco. O roteiro abaixo também permite sincronizar o
+checkout da VPS e reiniciar os serviços, se necessário. O prompt opcional de Repository já é parte
+do fluxo web documentado.
 
 ### 1. Enviar o código local ao GitHub
 
@@ -17,10 +20,9 @@ No PowerShell, revise os arquivos e envie a alteração (não inclua `.env.local
 cd C:\Users\guilherme\Downloads\persuando
 git status --short
 git diff
-git add -- README.md docs/architecture.md docs/reference-ui.md docs/repository-practice.md docs/vps-deployment.md docs/handoff.md docs/roadmap.md docs/next-spec-prompt.md apps/api/src/modules/providers/openai-compatible-provider.adapter.ts apps/api/src/modules/providers/provider-adapter.ts apps/api/src/modules/realtime/realtime.service.ts apps/api/test/providers.test.mjs apps/api/test/realtime.test.mjs apps/response/src/app/globals.css 'apps/response/src/app/sessions/[sessionId]/session-realtime-client.tsx' 'apps/response/src/app/sessions/[sessionId]/repository-instructions.tsx' packages/contracts/src/websocket.ts
-git add -- 'apps/response/src/app/sessions/[sessionId]/session-history-loader.tsx'
+git add -- README.md docs apps/capture/electron-main.cjs apps/capture/bootstrap-log.cjs apps/capture/package.json apps/capture/test/bootstrap-log.test.mjs package-lock.json
 git diff --cached --stat
-git commit -m "feat: add optional repository practice instructions"
+git commit -m "fix: repair packaged Capture startup logging"
 git push origin master
 ```
 
@@ -61,6 +63,10 @@ set +a
 export NEXT_PUBLIC_API_BASE_URL="$API_BASE_URL"
 export NEXT_PUBLIC_WEBSOCKET_URL="$WEBSOCKET_URL"
 
+docker compose --env-file .env.local ps
+docker compose --env-file .env.local exec -T postgres pg_isready -U persuando -d persuando
+docker compose --env-file .env.local exec -T redis redis-cli INFO replication
+
 npm ci
 npx prisma generate
 npm test
@@ -76,18 +82,25 @@ do Next.js e conter os mesmos endpoints HTTPS/WSS de `.env.local`. Para o domín
 Esta alteração não adiciona migração. Não execute `prisma migrate reset`. Se o pull incluir
 outras alterações com migrações, siga também as instruções específicas delas.
 
+Para esta instalação independente, o Redis das filas deve informar `role:master`. Se informar
+`role:slave` ou o worker emitir novos erros `READONLY`, interrompa a atualização e confirme o
+endpoint/configuração do Redis antes de alterar sua replicação. Os logs antigos sem timestamp
+não confirmam uma falha atual; observe novos registros com
+`pm2 logs persuando-worker --lines 0 --timestamp` e saia com `Ctrl+C`.
+
 ### 4. Reiniciar e conferir
 
 ```bash
 PORT=4100 pm2 restart persuando-api --update-env
 pm2 restart persuando-worker --update-env
 PORT=3100 pm2 restart persuando-response --update-env
+curl --fail --retry 15 --retry-delay 2 --retry-connrefused --retry-max-time 60 http://127.0.0.1:4100/health
+curl --fail --retry 15 --retry-delay 2 --retry-connrefused --retry-max-time 60 https://api-persuando.gfig.space/health
+curl --fail --output /dev/null --write-out '%{http_code}\n' https://persuando.gfig.space/
 pm2 save
 pm2 status
-curl --fail http://127.0.0.1:4100/health
-curl --fail https://api-persuando.gfig.space/health
-curl --fail --output /dev/null --write-out '%{http_code}\n' https://persuando.gfig.space/
 pm2 logs persuando-api --lines 80 --nostream
+pm2 logs persuando-worker --lines 80 --nostream
 pm2 logs persuando-response --lines 80 --nostream
 ```
 
@@ -96,6 +109,11 @@ Selecione Repository, cole instruções, continue e gere a resposta com um scree
 Confira também **Editar instruções → Pular**, Code Problem e System Design. Não é necessário
 alterar Nginx/DNS para esta funcionalidade. O restart pode causar uma breve desconexão; o web
 reconecta automaticamente.
+
+O `/health` atual confirma que a API está respondendo; ele não verifica o processamento de filas.
+Compare `pm2 describe persuando-api` e `pm2 describe persuando-worker` para ler uptime/restarts
+sem o truncamento da tabela. Em um restart normal, uma chamada imediata pode recusar conexão ou
+retornar 502 durante a inicialização; os comandos com retry acima esperam esse intervalo.
 
 ### 5. Rollback se necessário
 
@@ -319,6 +337,43 @@ http://216.158.236.156:3100
 
 The Electron app is not deployed to the VPS. It runs on the Windows machine that captures microphone and screen context.
 
+### Correção de inicialização do instalador 0.1.1
+
+O instalador antigo 0.1.0 tentava gravar `electron-debug.log` em
+`resources/app.asar/electron-debug.log`. ASAR é somente leitura; esse caminho causava o diálogo
+`A JavaScript error occurred in the main process` / `ENOENT` em qualquer PC. A versão 0.1.1
+grava em `app.getPath("userData")/logs/electron-debug.log` e continua a inicialização mesmo se
+o log não puder ser gravado. É uma correção do executável local, independente da VPS.
+
+No Windows que compila o app:
+
+```powershell
+cd C:\Users\guilherme\Downloads\persuando
+# Feche o Capture pelo menu Quit da bandeja antes de recompilar.
+npm.cmd ci
+npm.cmd run capture:dist:win
+Get-Item .\release\capture\Persuando-Capture-Setup-0.1.1.exe | Select-Object Name, LastWriteTime, Length
+```
+
+Esse comando gera a pasta `win-unpacked` e o novo instalador. Abra especificamente
+`release/capture/Persuando-Capture-Setup-0.1.1.exe` para atualizar a instalação antiga. Um atalho
+existente ainda executa a versão instalada em `%LOCALAPPDATA%\Programs\Persuando Capture`
+até que o instalador novo seja executado. O `0.1.0.exe` antigo pode continuar na pasta de saída;
+ele não é atualizado pelo comando `pack:win` e não deve ser usado para testar a correção.
+
+Para abrir a versão nova diretamente, sem instalar:
+
+```powershell
+& '.\release\capture\win-unpacked\Persuando Capture.exe'
+```
+
+Para o outro PC, copie o instalador **0.1.1** e instale-o lá. Alternativamente, copie toda a pasta
+`win-unpacked` e abra `Persuando Capture.exe` dentro dela; não copie apenas o executável.
+Não é necessário Node/npm no PC que apenas executa o app pronto. `pack:win` gera somente a pasta;
+`dist:win` também gera o instalador NSIS. Execute um comando de cada vez e espere sua conclusão.
+Os avisos de ícone padrão e referências de dependência duplicadas não são a exceção de log que
+impedia a inicialização. Ícone e assinatura de distribuição continuam como trabalho separado.
+
 To run Capture locally against the VPS domain:
 
 ```bash
@@ -346,7 +401,7 @@ npm.cmd run capture:dist:win
 Output:
 
 ```text
-release/capture/Persuando-Capture-Setup-0.1.0.exe
+release/capture/Persuando-Capture-Setup-0.1.1.exe
 ```
 
 The current installer is suitable for local smoke testing. Production distribution still needs app icon, publisher/signing decisions, update strategy, and release-channel policy.

@@ -13,6 +13,14 @@ The MVP uses two visible modes:
 The backend is a NestJS API with PostgreSQL, Prisma, native WebSocket realtime, Redis/BullMQ worker
 boundaries, encrypted provider credentials, consent enforcement, and 7-day session retention with
 manual delete.
+
+Windows Capture startup fix: version **0.1.1** writes bootstrap diagnostics under the current
+user's data directory instead of the read-only `app.asar`. Run `npm.cmd run capture:dist:win`
+on Windows and install `release/capture/Persuando-Capture-Setup-0.1.1.exe`, or open
+`release/capture/win-unpacked/Persuando Capture.exe` directly. `capture:pack:win` creates only
+the unpacked folder; it does not refresh an older installer. Close Capture through its tray Quit
+action before rebuilding. See [Windows packaging and VPS instructions](docs/vps-deployment.md#electron-capture-app).
+
 ## Interview Practice
 
 Repository practice now includes an optional preparation step in Response Mode: select **Repository**,

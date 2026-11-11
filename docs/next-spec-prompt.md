@@ -1,6 +1,54 @@
 ## Command
 speckit.specify
 
+## Latest Prepared Prompt - 2026-11-11 Capture Release Verification
+
+```text
+/speckit-specify Specify repeatable Windows Capture packaging and installed-upgrade verification.
+
+Objective:
+Prevent packaged-only startup regressions and stale installer confusion after the Capture 0.1.1 fix.
+
+Source request/context:
+Users on two Windows PCs encountered ENOENT because the old bootstrap wrote logs inside app.asar.
+The safe bootstrap logger now uses per-user data and tolerates unavailable log storage/console.
+The NSIS and unpacked 0.1.1 artifacts build successfully, and the exact unpacked executable reaches
+the dashboard. The existing installed 0.1.0 archive was separately identified as stale. pack:win
+updates only win-unpacked; dist:win also generates the versioned installer. The installed copies
+and real-provider capture still need upgrade/smoke. VPS Redis READONLY logs are a separate issue.
+
+Project context:
+Read README.md, docs/architecture.md, docs/vps-deployment.md, docs/handoff.md, docs/roadmap.md,
+apps/capture/package.json, electron-main.cjs, bootstrap-log.cjs, and Capture tests. Preserve consent,
+Capture/Response ownership, Google cookie handling, tray behavior, shortcuts, and provider contracts.
+
+Requirements:
+- Define a release check that inspects the actual ASAR, version, bootstrap/preload/main/renderer
+  assets, dependency resolution, and writable per-user log location before accepting an artifact.
+- Smoke the actual packaged executable and a per-user installed upgrade from the previous version,
+  including read-only installation folders, spaces/non-ASCII paths, closed console, and log failure.
+- Define clean-machine/second-PC verification, graceful app exit before rebuilding, and detection
+  of stale installer files and running executable versions without deleting user profiles.
+- Report version, artifact paths, checksum, validation results, and failure attribution clearly.
+- Separate local startup validation from API/WebSocket, Google login, provider, and Redis health.
+- Specify release signing, branding/icon and update-channel decisions as explicit scope choices,
+  with no automatic upload, installation, publishing, or new secrets assumed.
+
+Artifact considerations:
+Keep current npm command compatibility and versioned NSIS/unpacked outputs. No database or API
+migration is needed for packaging checks. Add CI/test/deployment notes only where justified.
+
+Risks/assumptions:
+Source tests alone do not exercise ASAR behavior; an online PM2 process or /health response does not
+prove background queues or desktop login are working. Avoid mutating the user's installed app or
+profiles as part of an unattended smoke unless that destination is explicitly authorized.
+
+Expected output:
+Produce a scoped release-verification specification with environment matrix, artifact acceptance
+checks, upgrade/rollback rules, auth/capture manual gates, and documentation closeout. Do not build
+a full auto-updater, change provider behavior or create implementation tasks until requested.
+```
+
 ## Latest Prepared Prompt - 2026-11-10 Repository Instructions Evaluation
 
 ```text

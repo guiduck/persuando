@@ -17,9 +17,11 @@ manual delete.
 Windows Capture includes the startup fix introduced in **0.1.1**, writing bootstrap diagnostics under the current
 user's data directory instead of the read-only `app.asar`. Run `npm.cmd run capture:dist:win`
 on Windows and install `release/capture/Persuando-Capture-Setup-0.1.2.exe`, or open
-`release/capture/win-unpacked/Persuando Capture.exe` directly. `capture:pack:win` creates only
-the unpacked folder; it does not refresh an older installer. Close Capture through its tray Quit
-action before rebuilding. See [Windows packaging and VPS instructions](docs/vps-deployment.md#electron-capture-app).
+the executable listed in `release/capture/latest-build.json` directly. Both packaging commands use
+a fresh `release/capture/builds/build-*` folder, avoiding Windows `EBUSY` locks on old builds.
+`capture:pack:win` creates only the unpacked folder; `capture:dist:win` also creates the installer
+and copies it to `release/capture`. Close Capture through tray Quit before installing an upgrade.
+See [Windows packaging and VPS instructions](docs/vps-deployment.md#electron-capture-app).
 
 ## Interview Practice
 

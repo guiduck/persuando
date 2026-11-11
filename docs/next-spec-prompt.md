@@ -67,6 +67,11 @@ Objective:
 Prevent packaged-only startup regressions and stale installer confusion after the Capture 0.1.1 fix.
 
 Source request/context:
+Windows packaging previously regressed after an update discarded local uncommitted fixes.
+Both packaging commands now use scripts/package-capture-win.mjs, fresh builds/build-* output,
+latest-build.json and a root installer convenience copy. Tests guard npm entrypoints and output
+isolation. Preserve these tracked files across upgrades; exercise repeated pack/dist builds with
+older output locked and verify the installer from the latest successful build.
 Users on two Windows PCs encountered ENOENT because the old bootstrap wrote logs inside app.asar.
 The safe bootstrap logger now uses per-user data and tolerates unavailable log storage/console.
 The NSIS and unpacked 0.1.1 artifacts build successfully, and the exact unpacked executable reaches

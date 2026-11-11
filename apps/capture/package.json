@@ -15,8 +15,8 @@
     "typecheck": "tsc -b --pretty false",
     "test": "node --test",
     "start:vps": "set VITE_API_BASE_URL=https://api-persuando.gfig.space&& set VITE_WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime&& set PERSUANDO_API_BASE_URL=https://api-persuando.gfig.space&& npm run build && electron .",
-    "pack:win": "set VITE_API_BASE_URL=https://api-persuando.gfig.space&& set VITE_WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime&& set PERSUANDO_API_BASE_URL=https://api-persuando.gfig.space&& npm run build && electron-builder --win dir --x64",
-    "dist:win": "set VITE_API_BASE_URL=https://api-persuando.gfig.space&& set VITE_WEBSOCKET_URL=wss://api-persuando.gfig.space/realtime&& set PERSUANDO_API_BASE_URL=https://api-persuando.gfig.space&& npm run build && electron-builder --win nsis --x64"
+    "pack:win": "node ../../scripts/package-capture-win.mjs dir",
+    "dist:win": "node ../../scripts/package-capture-win.mjs nsis"
   },
   "dependencies": {
     "@persuando/config": "0.1.0",

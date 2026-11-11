@@ -345,17 +345,24 @@ screenshots; terminar, revogar, trocar sessão ou pausar/retomar enquanto uma ca
 descarta a imagem antiga. O fallback do navegador também libera o elemento de vídeo temporário.
 Nenhuma opção para ocultar captura/indicador foi adicionada.
 
-Para gerar sem sobrescrever a pasta do Capture que está aberto, há uma saída alternativa:
+Para gerar o instalador, use sempre o comando normal:
 
 ```powershell
-npm.cmd run --workspace @persuando/capture dist:win -- --config.directories.output=../../release/capture-0.1.2
+npm.cmd run capture:dist:win
 ```
 
-Foi essa saída que gerou o artefato atual:
-`release/capture-0.1.2/Persuando-Capture-Setup-0.1.2.exe`. A pasta
-`release/capture-0.1.2/win-unpacked` acompanha o mesmo build. Feche o app pela bandeja antes de
-executar o instalador; copie o instalador novo para o outro PC. A instalação antiga não é
-substituída apenas por compilar o projeto.
+Cada build usa uma pasta nova `release/capture/builds/build-*`, sem apagar ou sobrescrever um
+Capture aberto. Isso resolve `EBUSY` ao remover a antiga pasta `win-unpacked`. O instalador também
+é copiado para `release/capture/Persuando-Capture-Setup-0.1.2.exe`. Se essa cópia estiver bloqueada,
+o comando informa o caminho do instalador na pasta nova. Os caminhos exatos da última compilação
+concluída ficam em `release/capture/latest-build.json`.
+
+Feche o app pela bandeja antes de executar o instalador; copie o instalador novo para o outro PC.
+A instalação antiga não é substituída apenas por compilar o projeto. Não é necessário escolher
+ou limpar diretórios manualmente a cada atualização. Preserve o script `scripts/package-capture-win.mjs`
+e seus dois comandos no package.json em atualizações/merges; os testes do Capture verificam essa ligação.
+Se `git pull` avisar sobre alterações locais, preserve-as com commit antes de integrar a atualização;
+descartá-las pode remover correções que ainda não estão no remoto.
 
 Depois de atualizar o backend, faça login no Capture e escolha **Analysis model**: Terra para
 comparar velocidade em screenshots, Sol para código, Luna para tarefas focadas ou Astra para
@@ -387,13 +394,13 @@ No Windows que compila o app:
 
 ```powershell
 cd C:\Users\guilherme\Downloads\persuando
-# Feche o Capture pelo menu Quit da bandeja antes de recompilar.
+# Não precisa fechar uma versão antiga para compilar; feche-a antes de instalar.
 npm.cmd ci
 npm.cmd run capture:dist:win
 Get-Item .\release\capture\Persuando-Capture-Setup-0.1.2.exe | Select-Object Name, LastWriteTime, Length
 ```
 
-Esse comando gera a pasta `win-unpacked` e o novo instalador. Abra especificamente
+Esse comando gera uma pasta nova com `win-unpacked` e o novo instalador. Abra especificamente
 `release/capture/Persuando-Capture-Setup-0.1.2.exe` para atualizar a instalação antiga. Um atalho
 existente ainda executa a versão instalada em `%LOCALAPPDATA%\Programs\Persuando Capture`
 até que o instalador novo seja executado. O `0.1.0.exe` antigo pode continuar na pasta de saída;
@@ -402,7 +409,8 @@ ele não é atualizado pelo comando `pack:win` e não deve ser usado para testar
 Para abrir a versão nova diretamente, sem instalar:
 
 ```powershell
-& '.\release\capture\win-unpacked\Persuando Capture.exe'
+$captureBuild = Get-Content .\release\capture\latest-build.json | ConvertFrom-Json
+& $captureBuild.executable
 ```
 
 Para o outro PC, copie o instalador **0.1.2** e instale-o lá. Alternativamente, copie toda a pasta
@@ -427,7 +435,7 @@ npm.cmd run capture:pack:win
 Output:
 
 ```text
-release/capture/win-unpacked/Persuando Capture.exe
+release/capture/builds/build-<id>/win-unpacked/Persuando Capture.exe
 ```
 
 To build a Windows installer:

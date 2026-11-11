@@ -2,6 +2,10 @@
 
 ## Current Status
 
+- `latest_packaging_repair` (2026-11-11): restored lock-safe Windows packaging after the update
+  discarded the earlier local runner/commands. Capture 0.1.2 now packages into unique build
+  directories using the standard npm commands, with regression coverage for entrypoint wiring.
+
 - `latest_change` (2026-11-11): Repository has full environment/setup/architecture coaching,
   structured code/check steps and bounded repair; Capture 0.1.2 adds current GPT-6 choices and
   prevents screenshots while paused, discarding stale in-flight images. API/worker deployment and
@@ -17,6 +21,36 @@
 - `summary`: Persuando now has a NestJS API, Prisma-backed PostgreSQL persistence, Google/local-dev auth, encrypted provider credentials, consent grant/revoke, settings, retention/manual delete, workspace/session REST endpoints, native `/realtime` WebSocket fan-out, consent-gated microphone chunk ingestion, mock/OpenAI-compatible provider adapters, BullMQ worker boundaries, live Response Mode, and a Windows-first Electron Capture Mode scaffold with dashboard, settings, floating toolbar, tray menu, microphone upload, visible text/screen context, and code-practice guidance.
 
 ## Implemented Scope
+
+### Windows packaging recurrence - 2026-11-11
+
+- Evidence: user logs show local edits blocking pull, followed by a successful pull and the old
+  direct electron-builder commands failing with EBUSY. At repair start the worktree was clean,
+  the lock-safe runner was absent, and package.json again targeted the shared win-unpacked folder.
+- Fix: restore scripts/package-capture-win.mjs and route both Windows npm commands through it.
+  Each run creates release/capture/builds/build-* without deleting old builds or terminating apps.
+  NSIS refreshes the root versioned installer; if that convenience copy is locked, the successful
+  isolated installer path is reported. latest-build.json records the last successful build paths.
+  No API/schema/provider or capture lifecycle behavior changed.
+- Regression coverage: npm entrypoint wiring for both root/workspace commands, output override
+  for both builder targets, disabled publishing, and preservation of previous/open app files.
+  All 22 Capture tests passed; Capture TypeScript/Vite and NSIS build passed. A subsequent standard
+  capture:pack:win also passed while Capture windows were open, using build-j5y5Di instead of the
+  previous directory. git diff --check passed. ASAR inspection
+  verified 0.1.2, bootstrap/logger/preload, compiled main and renderer. A dashboard was observed
+  after launching the new build; Computer Use grouped windows under the installed executable
+  identifier, so UI attribution to the exact unpacked path is limited.
+- Installer: release/capture/Persuando-Capture-Setup-0.1.2.exe, SHA-256
+  7FE45F68A0DDC883B4425F3E1A085EC1A1EFADA2507B3131158B619766953931.
+  Original NSIS build: release/capture/builds/build-PSTeeK. This supersedes the older artifact
+  checksum below. The first sandboxed build failed DNS; the authorized network-enabled retry passed.
+- Durability: keep runner, scripts, regression tests and docs in the same source commit. A local
+  commit protects this repair during ordinary pulls; it still needs pushing to distribute to
+  other clones. Do not discard the fix to resolve a future local-change pull warning.
+- Remaining: target-PC installed upgrade, Google login and consented capture smoke. Full backend/web
+  validation, signing, branding, update channels and old-output cleanup are outside this repair.
+  Recommended next step: release-verification prompt in docs/next-spec-prompt.md; Repository quality
+  evaluation remains independently prepared.
 
 ### Latest delivery - 2026-11-11 Repository teaching, GPT-6 choices and Capture 0.1.2
 
@@ -62,7 +96,7 @@
 - Artifact: `release/capture-0.1.2/Persuando-Capture-Setup-0.1.2.exe`, SHA-256
   `7EC718832B4F7FD265DD946429C20C0BA68C8A1DF33DFB3D5FD921D4FC8E0596`.
   The separate output directory preserves the user's running 0.1.1 unpacked app. Normal dist:win
-  still targets release/capture; close Capture before using that shared folder.
+  now uses the isolated build runner described above; this older workaround is no longer needed.
 - Remaining gates: publish/deploy, install the new Capture, compare PT/EN real-provider outputs on
   bare/explicit-stack/existing-project fixtures, measure latency and repair rate, and smoke native
   pause/end/revoke against the VPS. New model access depends on provider/account. Streaming/per-phase

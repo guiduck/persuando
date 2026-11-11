@@ -3,6 +3,17 @@
 This file describes the stable product direction. For current execution status, see
 `docs/handoff.md`.
 
+## Update - 2026-11-11 Repeatable Windows Packaging
+
+- Phase 3 release repair: both Windows packaging commands now use the shared Node runner with
+  a fresh build directory. Repeated builds preserve open applications and previous artifacts;
+  successful builds report exact paths in latest-build.json and copy NSIS to the release root.
+- Regression checks guard both npm entrypoints, per-target output override, no publishing, and
+  previous-output preservation. Keep runner, scripts and tests together in source control so an
+  update does not silently discard the packaging fix.
+- Gates remaining: installed upgrade and Google/consented capture smoke on target PCs. Signing,
+  branding, automatic updates and old-build cleanup remain deferred; API/schema are unchanged.
+
 ## Update - 2026-11-11 Repository Setup Coaching, Models And Capture Pause
 
 - Phase 3 additive improvement: Repository now provides evidence-aware stack choice, installation,
